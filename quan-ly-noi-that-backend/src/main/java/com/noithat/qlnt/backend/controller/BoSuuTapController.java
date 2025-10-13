@@ -1,0 +1,59 @@
+package com.noithat.qlnt.backend.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.noithat.qlnt.backend.dto.BoSuuTapDto;
+import com.noithat.qlnt.backend.entity.BoSuuTap;
+import com.noithat.qlnt.backend.service.BoSuuTapService;
+
+@RestController
+@RequestMapping("/api/collections")
+public class BoSuuTapController {
+
+    @Autowired
+    private BoSuuTapService boSuuTapService;
+
+    @GetMapping
+    public ResponseEntity<List<BoSuuTap>> getAll() {
+        return ResponseEntity.ok(boSuuTapService.getAll());
+    }
+
+    @PostMapping
+    public ResponseEntity<BoSuuTap> create(@RequestBody BoSuuTapDto dto) {
+        return new ResponseEntity<>(boSuuTapService.create(dto), HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<BoSuuTap> update(@PathVariable Integer id, @RequestBody BoSuuTapDto dto) {
+        return ResponseEntity.ok(boSuuTapService.update(id, dto));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+        boSuuTapService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/{collectionId}/products/{productId}")
+    public ResponseEntity<Void> addProductToCollection(@PathVariable Integer collectionId, @PathVariable Integer productId) {
+        boSuuTapService.addProductToCollection(collectionId, productId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{collectionId}/products/{productId}")
+    public ResponseEntity<Void> removeProductFromCollection(@PathVariable Integer collectionId, @PathVariable Integer productId) {
+        boSuuTapService.removeProductFromCollection(collectionId, productId);
+        return ResponseEntity.noContent().build();
+    }
+}

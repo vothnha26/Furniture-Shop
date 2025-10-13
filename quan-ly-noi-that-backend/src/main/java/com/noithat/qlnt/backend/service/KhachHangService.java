@@ -1,6 +1,6 @@
 package com.noithat.qlnt.backend.service;
 
-import com.noithat.qlnt.backend.dto.KhachHangCreationRequest;
+import com.noithat.qlnt.backend.dto.request.KhachHangCreationRequest;
 import com.noithat.qlnt.backend.entity.KhachHang;
 import com.noithat.qlnt.backend.entity.HangThanhVien;
 import com.noithat.qlnt.backend.entity.TaiKhoan;
@@ -105,20 +105,9 @@ public class KhachHangService {
 
         if (!hangMoi.equals(khachHang.getHangThanhVien())) {
             khachHang.setHangThanhVien(hangMoi);
-            // TODO: Lưu LichSuDiemThuong (Nâng hạng)
+            
         }
-
-        // TODO: Lưu LichSuDiemThuong (Tích điểm)
 
         return khachHangRepository.save(khachHang);
-    }
-
-    private void validateHangThanhVien(KhachHang khachHang) {
-        if (khachHang.getHangThanhVien() == null || khachHang.getHangThanhVien().getMaHangThanhVien() == null) {
-            throw new IllegalArgumentException("Cần cung cấp hạng thành viên hợp lệ.");
-        }
-        Integer id = khachHang.getHangThanhVien().getMaHangThanhVien();
-        hangThanhVienRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + id + " không tồn tại."));
     }
 }

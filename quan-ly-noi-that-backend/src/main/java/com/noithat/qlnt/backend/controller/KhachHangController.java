@@ -1,6 +1,6 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.KhachHangCreationRequest;
+import com.noithat.qlnt.backend.dto.request.KhachHangCreationRequest;
 import com.noithat.qlnt.backend.entity.KhachHang;
 import com.noithat.qlnt.backend.service.KhachHangService;
 import org.springframework.http.ResponseEntity;

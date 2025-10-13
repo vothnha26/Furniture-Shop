@@ -30,6 +30,8 @@ public class ChiTietDonHang implements Serializable {
     @Column(name = "DonGiaThucTe", precision = 18, scale = 2, nullable = false)
     private BigDecimal donGiaThucTe;
 
+    
+
     @Embeddable
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @EqualsAndHashCode
     public static class ChiTietDonHangId implements Serializable {

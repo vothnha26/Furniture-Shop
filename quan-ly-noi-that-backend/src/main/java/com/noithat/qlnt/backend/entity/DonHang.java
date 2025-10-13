@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 
+import java.util.List;
 @Entity
 @Table(name = "DonHang")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
@@ -26,6 +28,12 @@ public class DonHang {
     @Column(name = "GiamGiaVoucher", precision = 18, scale = 2)
     private BigDecimal giamGiaVoucher = BigDecimal.ZERO;
 
+    @Column(name = "DiemThuongSuDung")
+    private Integer diemThuongSuDung = 0;
+
+    @Column(name = "GiamGiaDiemThuong", precision = 18, scale = 2)
+    private BigDecimal giamGiaDiemThuong = BigDecimal.ZERO;
+
     @Column(name = "ChiPhiDichVu", precision = 18, scale = 2)
     private BigDecimal chiPhiDichVu = BigDecimal.ZERO;
 
@@ -35,6 +43,12 @@ public class DonHang {
     @Column(name = "TrangThai", nullable = false)
     private String trangThai;
 
+    @Column(name = "PhuongThucThanhToan", nullable = false)
+    private String phuongThucThanhToan;
+
+    @Column(length = 255)
+    private String ghiChu;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaNhanVienDuyet")
     private NhanVien nhanVienDuyet;
@@ -42,4 +56,14 @@ public class DonHang {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaVoucher")
     private Voucher voucher;
+
+   @OneToMany(mappedBy = "donHang", 
+           cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE}, // THÊM MERGE
+           orphanRemoval = true)
+    private List<ChiTietDonHang> chiTietDonHangs = new ArrayList<>();
+
+    @OneToMany(mappedBy = "donHang",
+            cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE},
+            orphanRemoval = true)
+    private List<DonHangDichVu> donHangDichVus = new ArrayList<>();
 }

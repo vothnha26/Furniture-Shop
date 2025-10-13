@@ -1,6 +1,8 @@
 package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.dto.*;
+import com.noithat.qlnt.backend.dto.request.VoucherApplyRequest;
+import com.noithat.qlnt.backend.dto.request.VoucherCreationRequest;
 import com.noithat.qlnt.backend.entity.Voucher;
 import com.noithat.qlnt.backend.service.VoucherService;
 import com.noithat.qlnt.backend.service.ChuongTrinhGiamGiaService;
@@ -154,7 +156,7 @@ public class VoucherController {
      * Tạo voucher mới
      */
     @PostMapping
-    public ResponseEntity<com.noithat.qlnt.backend.dto.VoucherResponse> create(@Valid @RequestBody com.noithat.qlnt.backend.dto.VoucherCreationRequest request) {
+    public ResponseEntity<VoucherResponse> create(@Valid @RequestBody VoucherCreationRequest request) {
         var v = voucherService.createVoucher(request);
         return ResponseEntity.ok(voucherService.getVoucherDetail(v.getMaVoucher()));
     }
@@ -163,7 +165,7 @@ public class VoucherController {
      * Cập nhật voucher
      */
     @PutMapping("/{id}")
-    public ResponseEntity<com.noithat.qlnt.backend.dto.VoucherResponse> update(@PathVariable Integer id, @Valid @RequestBody com.noithat.qlnt.backend.dto.VoucherCreationRequest request) {
+    public ResponseEntity<VoucherResponse> update(@PathVariable Integer id, @Valid @RequestBody VoucherCreationRequest request) {
         var v = voucherService.updateVoucher(id, request);
         return ResponseEntity.ok(voucherService.getVoucherDetail(v.getMaVoucher()));
     }
@@ -181,7 +183,7 @@ public class VoucherController {
      * Lấy voucher phân loại theo hạng thành viên
      */
     @GetMapping("/classify")
-    public ResponseEntity<List<com.noithat.qlnt.backend.dto.VoucherByTierResponse>> classifyByTier() {
+    public ResponseEntity<List<VoucherByTierResponse>> classifyByTier() {
         return ResponseEntity.ok(voucherService.getVouchersGroupedByTier());
     }
 
@@ -189,7 +191,7 @@ public class VoucherController {
      * Lấy voucher áp dụng cho 1 hạng thành viên
      */
     @GetMapping("/by-tier/{maHangThanhVien}")
-    public ResponseEntity<List<com.noithat.qlnt.backend.dto.VoucherResponse>> getByTier(@PathVariable Integer maHangThanhVien) {
+    public ResponseEntity<List<VoucherResponse>> getByTier(@PathVariable Integer maHangThanhVien) {
         return ResponseEntity.ok(voucherService.getVouchersForTier(maHangThanhVien));
     }
 
@@ -197,7 +199,7 @@ public class VoucherController {
      * Gán (thay thế) danh sách hạng thành viên cho 1 voucher (Admin)
      */
     @PostMapping("/{id}/assign-tiers")
-    public ResponseEntity<com.noithat.qlnt.backend.dto.VoucherResponse> assignTiers(@PathVariable Integer id, @RequestBody List<Integer> maHangIds) {
+    public ResponseEntity<VoucherResponse> assignTiers(@PathVariable Integer id, @RequestBody List<Integer> maHangIds) {
         var v = voucherService.assignTiersToVoucher(id, maHangIds);
         return ResponseEntity.ok(voucherService.getVoucherDetail(v.getMaVoucher()));
     }

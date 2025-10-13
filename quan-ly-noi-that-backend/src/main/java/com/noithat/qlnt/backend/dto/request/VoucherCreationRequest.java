@@ -1,5 +1,5 @@
 // File: com/noithat/qlnt/backend/dto/VoucherCreationRequest.java
-package com.noithat.qlnt.backend.dto;
+package com.noithat.qlnt.backend.dto.request;
 
 import jakarta.validation.constraints.*;
 import lombok.Data;

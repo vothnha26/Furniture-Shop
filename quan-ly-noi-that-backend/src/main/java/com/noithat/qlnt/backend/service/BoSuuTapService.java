@@ -71,4 +71,12 @@ public class BoSuuTapService {
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bộ sưu tập: " + collectionId));
         return bst.getSanPhams();
     }
+
+    public BoSuuTap getById(Integer id) {
+        BoSuuTap bst = boSuuTapRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bộ sưu tập với id: " + id));
+        // touch collection to ensure it is initialized for serialization
+        bst.getSanPhams().size();
+        return bst;
+    }
 }

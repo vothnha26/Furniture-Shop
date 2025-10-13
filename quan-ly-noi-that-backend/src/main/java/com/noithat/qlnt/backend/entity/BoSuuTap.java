@@ -1,8 +1,9 @@
 package com.noithat.qlnt.backend.entity;
 
 import java.util.Set;
+import java.util.HashSet;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -42,6 +43,7 @@ public class BoSuuTap {
     @JoinTable(name = "BoSuuTap_SanPham", // Tên bảng trung gian
             joinColumns = { @JoinColumn(name = "maBoSuuTap") },
             inverseJoinColumns = { @JoinColumn(name = "maSanPham") })
-    @JsonIgnore // Tránh lỗi lặp vô hạn
-    private Set<SanPham> sanPhams;
+    // Expose products in collection responses; products are returned as a Set<SanPham>
+    @JsonProperty("sanPhams")
+    private Set<SanPham> sanPhams = new HashSet<>();
 }

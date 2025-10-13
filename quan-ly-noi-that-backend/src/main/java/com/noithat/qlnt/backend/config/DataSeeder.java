@@ -13,13 +13,14 @@ import java.time.LocalDateTime;
 public class DataSeeder {
 
     @Bean
-    CommandLineRunner initData(HangThanhVienRepository hangRepo,
+        CommandLineRunner initData(HangThanhVienRepository hangRepo,
                                TaiKhoanRepository taiKhoanRepo,
                                KhachHangRepository khachHangRepo,
                                VoucherRepository voucherRepo,
                                VoucherHangThanhVienRepository voucherHangRepo,
                                SanPhamRepository sanPhamRepo,
                                BienTheSanPhamRepository bienTheRepo,
+                                BoSuuTapRepository boSuuTapRepo,
                                VaiTroRepository vaiTroRepo,
                                DonHangRepository donHangRepo,
                                ChiTietDonHangRepository chiTietDonHangRepo,
@@ -148,10 +149,10 @@ public class DataSeeder {
             chiTietDonHangRepo.save(ct3_1);
 
             // ================== DỊCH VỤ ==================
-            DichVu dv1 = dichVuRepo.save(new DichVu(null, "Vận chuyển tiêu chuẩn", "Giao hàng trong vòng 3-5 ngày làm việc", BigDecimal.valueOf(50000)));
+            dichVuRepo.save(new DichVu(null, "Vận chuyển tiêu chuẩn", "Giao hàng trong vòng 3-5 ngày làm việc", BigDecimal.valueOf(50000)));
             DichVu dv2 = dichVuRepo.save(new DichVu(null, "Vận chuyển nhanh", "Giao hàng trong vòng 24h", BigDecimal.valueOf(150000)));
             DichVu dv3 = dichVuRepo.save(new DichVu(null, "Lắp đặt tại nhà", "Dịch vụ lắp đặt và sắp xếp nội thất", BigDecimal.valueOf(200000)));
-            DichVu dv4 = dichVuRepo.save(new DichVu(null, "Bảo hành mở rộng 2 năm", "Gia hạn thêm 2 năm bảo hành", BigDecimal.valueOf(500000)));
+            dichVuRepo.save(new DichVu(null, "Bảo hành mở rộng 2 năm", "Gia hạn thêm 2 năm bảo hành", BigDecimal.valueOf(500000)));
 
             // Thêm dịch vụ vào đơn hàng 1 (Vận chuyển nhanh + Lắp đặt)
             DonHangDichVu dhdv1 = new DonHangDichVu();
@@ -177,6 +178,22 @@ public class DataSeeder {
             donHangRepo.save(savedDonHang1);
 
             // ================== DỮ LIỆU KHUYẾN MÃI ==================
+
+            // ================== BỘ SƯU TẬP ==================
+            BoSuuTap bst1 = new BoSuuTap();
+            bst1.setTenBoSuuTap("Bộ sưu tập Phòng Khách");
+            bst1.setMoTa("Bộ sưu tập dành cho phòng khách");
+            bst1 = boSuuTapRepo.save(bst1);
+
+            BoSuuTap bst2 = new BoSuuTap();
+            bst2.setTenBoSuuTap("Bộ sưu tập Phòng Ăn");
+            bst2.setMoTa("Bộ sưu tập dành cho phòng ăn");
+            bst2 = boSuuTapRepo.save(bst2);
+
+            // Gán sản phẩm vào bộ sưu tập
+            bst1.getSanPhams().add(sp1);
+            bst1.getSanPhams().add(sp2);
+            boSuuTapRepo.save(bst1);
 
             // VOUCHER 1: Giảm phần trăm cho mọi người
             Voucher voucher1 = new Voucher();

@@ -32,6 +32,11 @@ public class BoSuuTapController {
         return ResponseEntity.ok(boSuuTapService.getAll());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<BoSuuTap> getById(@PathVariable Integer id) {
+        return ResponseEntity.ok(boSuuTapService.getById(id));
+    }
+
     @PostMapping
     public ResponseEntity<BoSuuTap> create(@RequestBody BoSuuTapDto dto) {
         return new ResponseEntity<>(boSuuTapService.create(dto), HttpStatus.CREATED);

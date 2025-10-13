@@ -3,6 +3,8 @@ package com.noithat.qlnt.backend.entity;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.stream.Collectors;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -55,5 +57,14 @@ public class SanPham {
     @ManyToMany(mappedBy = "sanPhams", fetch = FetchType.LAZY)
     @JsonIgnore // Tránh lỗi lặp vô hạn
     private Set<BoSuuTap> boSuuTaps;
+    
+    // Trả về mã các bộ sưu tập liên kết để client dễ truy vấn
+    @JsonProperty("maBoSuuTapList")
+    public Set<Integer> getMaBoSuuTapList() {
+        if (this.boSuuTaps == null) return java.util.Set.of();
+        return this.boSuuTaps.stream()
+                .map(BoSuuTap::getMaBoSuuTap)
+                .collect(Collectors.toSet());
+    }
     
 }

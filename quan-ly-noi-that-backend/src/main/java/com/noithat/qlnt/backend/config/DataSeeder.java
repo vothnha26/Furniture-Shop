@@ -35,6 +35,12 @@ public class DataSeeder {
             silver.setDiemToiThieu(1000);
             hangRepo.save(silver);
 
+            // Ensure Gold exists (id 3 expected when DB empty)
+            HangThanhVien gold = new HangThanhVien();
+            gold.setTenHang("Gold");
+            gold.setDiemToiThieu(5000);
+            hangRepo.save(gold);
+
             // Vai tro
             VaiTro vaiTro = new VaiTro();
             vaiTro.setTenVaiTro("USER");
@@ -96,6 +102,21 @@ public class DataSeeder {
             bt.setSanPham(sp);
             bienTheRepo.save(bt);
 
+            // Additional variants so variant IDs 2 and 3 exist for testing
+            BienTheSanPham bt2 = new BienTheSanPham();
+            bt2.setGiaBan(BigDecimal.valueOf(2100000));
+            bt2.setSku("SOFA-A-2");
+            bt2.setSoLuongTon(7);
+            bt2.setSanPham(sp);
+            bienTheRepo.save(bt2);
+
+            BienTheSanPham bt3 = new BienTheSanPham();
+            bt3.setGiaBan(BigDecimal.valueOf(2200000));
+            bt3.setSku("SOFA-A-3");
+            bt3.setSoLuongTon(3);
+            bt3.setSanPham(sp);
+            bienTheRepo.save(bt3);
+
             BienTheGiamGia btg = new BienTheGiamGia();
             BienTheGiamGia.BienTheGiamGiaId id = new BienTheGiamGia.BienTheGiamGiaId(ct.getMaChuongTrinhGiamGia(), bt.getMaBienThe());
             btg.setId(id);
@@ -103,6 +124,15 @@ public class DataSeeder {
             btg.setBienTheSanPham(bt);
             btg.setGiaSauGiam(BigDecimal.valueOf(1800000));
             bienTheGiamGiaRepo.save(btg);
+
+            // Also add a discount mapping for variant 2 to test lookups
+            BienTheGiamGia btg2 = new BienTheGiamGia();
+            BienTheGiamGia.BienTheGiamGiaId id2 = new BienTheGiamGia.BienTheGiamGiaId(ct.getMaChuongTrinhGiamGia(), bt2.getMaBienThe());
+            btg2.setId(id2);
+            btg2.setChuongTrinhGiamGia(ct);
+            btg2.setBienTheSanPham(bt2);
+            btg2.setGiaSauGiam(BigDecimal.valueOf(1900000));
+            bienTheGiamGiaRepo.save(btg2);
         };
     }
 }

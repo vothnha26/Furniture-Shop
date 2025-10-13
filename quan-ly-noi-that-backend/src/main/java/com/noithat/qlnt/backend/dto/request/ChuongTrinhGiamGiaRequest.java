@@ -1,4 +1,4 @@
-package com.noithat.qlnt.backend.dto;
+package com.noithat.qlnt.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

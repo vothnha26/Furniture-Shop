@@ -1,7 +1,7 @@
 package com.noithat.qlnt.backend.service;
 
-import com.noithat.qlnt.backend.dto.VoucherApplyRequest;
-import com.noithat.qlnt.backend.dto.VoucherCreationRequest;
+import com.noithat.qlnt.backend.dto.request.VoucherApplyRequest;
+import com.noithat.qlnt.backend.dto.request.VoucherCreationRequest;
 import com.noithat.qlnt.backend.entity.KhachHang;
 import com.noithat.qlnt.backend.entity.Voucher;
 import com.noithat.qlnt.backend.entity.VoucherHangThanhVien;

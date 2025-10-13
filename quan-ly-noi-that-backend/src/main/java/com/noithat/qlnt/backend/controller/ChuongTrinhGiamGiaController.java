@@ -1,6 +1,6 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.ChuongTrinhGiamGiaRequest;
+import com.noithat.qlnt.backend.dto.request.ChuongTrinhGiamGiaRequest;
 import com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia;
 import com.noithat.qlnt.backend.service.ChuongTrinhGiamGiaService;
 import jakarta.validation.Valid;

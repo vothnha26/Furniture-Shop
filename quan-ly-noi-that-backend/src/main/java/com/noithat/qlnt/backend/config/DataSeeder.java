@@ -17,92 +17,101 @@ public class DataSeeder {
                                TaiKhoanRepository taiKhoanRepo,
                                KhachHangRepository khachHangRepo,
                                VoucherRepository voucherRepo,
-                               VoucherHangThanhVienRepository voucherHangRepo,
-                               ChuongTrinhGiamGiaRepository ctRepo,
                                SanPhamRepository sanPhamRepo,
                                BienTheSanPhamRepository bienTheRepo,
-                               BienTheGiamGiaRepository bienTheGiamGiaRepo,
-                               VaiTroRepository vaiTroRepo) {
+                               VaiTroRepository vaiTroRepo,
+                               DonHangRepository donHangRepo,
+                               ChiTietDonHangRepository chiTietDonHangRepo) {
         return args -> {
-            // Hangs
-            HangThanhVien bronze = new HangThanhVien();
-            bronze.setTenHang("Bronze");
-            bronze.setDiemToiThieu(0);
-            hangRepo.save(bronze);
 
-            HangThanhVien silver = new HangThanhVien();
-            silver.setTenHang("Silver");
-            silver.setDiemToiThieu(1000);
-            hangRepo.save(silver);
+            // ================== DỮ LIỆU NỀN TẢNG ==================
+            HangThanhVien bronze = hangRepo.save(new HangThanhVien(null, "Bronze", 0));
+            HangThanhVien silver = hangRepo.save(new HangThanhVien(null, "Silver", 1000));
 
-            // Vai tro
-            VaiTro vaiTro = new VaiTro();
-            vaiTro.setTenVaiTro("USER");
-            vaiTroRepo.save(vaiTro);
+            VaiTro vaiTro = vaiTroRepo.save(new VaiTro(null, "USER"));
 
-            // Tai khoan
-            TaiKhoan t1 = new TaiKhoan();
-            t1.setEmail("user1@example.com");
-            t1.setMatKhauHash("password");
-            t1.setTenDangNhap("user1");
-            t1.setVaiTro(vaiTro);
-            taiKhoanRepo.save(t1);
+            TaiKhoan t1 = taiKhoanRepo.save(new TaiKhoan(null, "user1", "password", "user1@example.com", vaiTro));
+            TaiKhoan t2 = taiKhoanRepo.save(new TaiKhoan(null, "user2", "password", "user2@example.com", vaiTro));
 
-            // Tai khoan thu 2
-            TaiKhoan t2 = new TaiKhoan();
-            t2.setEmail("userb@example.com");
-            t2.setMatKhauHash("password");
-            t2.setTenDangNhap("userb");
-            t2.setVaiTro(vaiTro);
-            taiKhoanRepo.save(t2);
+            KhachHang k1 = khachHangRepo.save(new KhachHang(null, t1, "Nguyễn Văn An", "an.nguyen@example.com", "0901112221", "Thủ Đức", 1000, bronze));
+            KhachHang k2 = khachHangRepo.save(new KhachHang(null, t2, "Trần Thị Bình", "binh.tran@example.com", "0903334442", "Hà Nội", 1200, silver));
 
-            // Khach hang
-            KhachHang k1 = new KhachHang();
-            k1.setHoTen("Nguyen Van A");
-            k1.setEmail("a@example.com");
-            k1.setSoDienThoai("0900000001");
-            k1.setDiemThuong(0);
-            k1.setHangThanhVien(bronze);
-            k1.setTaiKhoan(t1);
-            khachHangRepo.save(k1);
+            Voucher v1 = voucherRepo.save(new Voucher(
+                    null, "SALE100K", "FIXED", BigDecimal.valueOf(100000),
+                    LocalDateTime.now().minusDays(10),
+                    LocalDateTime.now().plusYears(1),
+                    true, null
+            ));
 
-            // Voucher
-            Voucher v1 = new Voucher();
-            v1.setMaCode("SALE10");
-            v1.setLoaiGiamGia("PERCENT");
-            v1.setGiaTriGiam(BigDecimal.valueOf(10));
-            v1.setNgayBatDau(LocalDateTime.now().minusDays(1));
-            v1.setNgayKetThuc(LocalDateTime.now().plusYears(1));
-            v1.setApDungChoMoiNguoi(true);
-            voucherRepo.save(v1);
+            SanPham sp1 = sanPhamRepo.save(new SanPham(null, "Ghế Sofa Băng Dài",
+                    "Ghế sofa hiện đại cho phòng khách.", 20, 5, 6, 60, null, null, null));
 
-            // Chuong trinh giam gia
-            ChuongTrinhGiamGia ct = new ChuongTrinhGiamGia();
-            ct.setTenChuongTrinh("Tet Promo");
-            ct.setNgayBatDau(LocalDateTime.now().minusDays(1));
-            ct.setNgayKetThuc(LocalDateTime.now().plusMonths(1));
-            ctRepo.save(ct);
+            BienTheSanPham bt1 = bienTheRepo.save(new BienTheSanPham(null, sp1, "SF-BANG-XAM", BigDecimal.valueOf(4500000), 50));
+            BienTheSanPham bt2 = bienTheRepo.save(new BienTheSanPham(null, sp1, "SF-BANG-KEM", BigDecimal.valueOf(4650000), 30));
 
-            // San pham + bien the
-            SanPham sp = new SanPham();
-            sp.setTenSanPham("Sofa A");
-            sp.setMoTa("Mau sofa dep");
-            sanPhamRepo.save(sp);
+            SanPham sp2 = sanPhamRepo.save(new SanPham(null, "Bàn Trà Gỗ Sồi",
+                    "Bàn trà nhỏ gọn, thiết kế tinh tế.", 40, 6, 8, 400, null, null, null));
 
-            BienTheSanPham bt = new BienTheSanPham();
-            bt.setGiaBan(BigDecimal.valueOf(2000000));
-            bt.setSku("SOFA-A-1");
-            bt.setSoLuongTon(10);
-            bt.setSanPham(sp);
-            bienTheRepo.save(bt);
+            BienTheSanPham bt3 = bienTheRepo.save(new BienTheSanPham(null, sp2, "BT-SOI-TRON", BigDecimal.valueOf(1200000), 100));
 
-            BienTheGiamGia btg = new BienTheGiamGia();
-            BienTheGiamGia.BienTheGiamGiaId id = new BienTheGiamGia.BienTheGiamGiaId(ct.getMaChuongTrinhGiamGia(), bt.getMaBienThe());
-            btg.setId(id);
-            btg.setChuongTrinhGiamGia(ct);
-            btg.setBienTheSanPham(bt);
-            btg.setGiaSauGiam(BigDecimal.valueOf(1800000));
-            bienTheGiamGiaRepo.save(btg);
+            // ================== TẠO ĐƠN HÀNG ==================
+
+            // ===== ĐƠN HÀNG 1 =====
+            DonHang donHang1 = new DonHang();
+            donHang1.setKhachHang(k1);
+            donHang1.setNgayDatHang(LocalDateTime.now().minusDays(1));
+            donHang1.setTrangThai("Hoàn thành");
+            donHang1.setPhuongThucThanhToan("COD"); // 🟢 BẮT BUỘC THÊM
+            donHang1.setGhiChu("Giao hàng vào giờ hành chính.");
+            donHang1.setVoucher(v1);
+
+            BigDecimal tongTienGoc1 = bt1.getGiaBan().add(bt3.getGiaBan().multiply(BigDecimal.valueOf(2)));
+            donHang1.setTongTienGoc(tongTienGoc1);
+            donHang1.setGiamGiaVoucher(v1.getGiaTriGiam());
+            donHang1.setThanhTien(tongTienGoc1.subtract(v1.getGiaTriGiam()));
+            donHang1.setChiPhiDichVu(BigDecimal.ZERO);
+
+            DonHang savedDonHang1 = donHangRepo.save(donHang1);
+
+            ChiTietDonHang.ChiTietDonHangId id1 = new ChiTietDonHang.ChiTietDonHangId(savedDonHang1.getMaDonHang(), bt1.getMaBienThe());
+            ChiTietDonHang ct1_1 = new ChiTietDonHang(id1, savedDonHang1, bt1, 1, bt1.getGiaBan(), bt1.getGiaBan());
+            chiTietDonHangRepo.save(ct1_1);
+
+            ChiTietDonHang.ChiTietDonHangId id2 = new ChiTietDonHang.ChiTietDonHangId(savedDonHang1.getMaDonHang(), bt3.getMaBienThe());
+            ChiTietDonHang ct1_2 = new ChiTietDonHang(id2, savedDonHang1, bt3, 2, bt3.getGiaBan(), bt3.getGiaBan());
+            chiTietDonHangRepo.save(ct1_2);
+
+            // ===== ĐƠN HÀNG 2 =====
+            DonHang donHang2 = new DonHang();
+            donHang2.setKhachHang(k2);
+            donHang2.setNgayDatHang(LocalDateTime.now());
+            donHang2.setTrangThai("Chờ xử lý");
+            donHang2.setPhuongThucThanhToan("Chuyển khoản"); // 🟢 BẮT BUỘC THÊM
+            donHang2.setTongTienGoc(bt2.getGiaBan());
+            donHang2.setThanhTien(bt2.getGiaBan());
+            donHang2.setChiPhiDichVu(BigDecimal.ZERO);
+
+            DonHang savedDonHang2 = donHangRepo.save(donHang2);
+
+            ChiTietDonHang.ChiTietDonHangId id3 = new ChiTietDonHang.ChiTietDonHangId(savedDonHang2.getMaDonHang(), bt2.getMaBienThe());
+            ChiTietDonHang ct2_1 = new ChiTietDonHang(id3, savedDonHang2, bt2, 1, bt2.getGiaBan(), bt2.getGiaBan());
+            chiTietDonHangRepo.save(ct2_1);
+
+            // ===== ĐƠN HÀNG 3 =====
+            DonHang donHang3 = new DonHang();
+            donHang3.setKhachHang(k1);
+            donHang3.setNgayDatHang(LocalDateTime.now().minusHours(2));
+            donHang3.setTrangThai("Đang giao");
+            donHang3.setPhuongThucThanhToan("COD"); // 🟢 BẮT BUỘC THÊM
+            donHang3.setTongTienGoc(bt3.getGiaBan());
+            donHang3.setThanhTien(bt3.getGiaBan());
+            donHang3.setChiPhiDichVu(BigDecimal.ZERO);
+
+            DonHang savedDonHang3 = donHangRepo.save(donHang3);
+
+            ChiTietDonHang.ChiTietDonHangId id4 = new ChiTietDonHang.ChiTietDonHangId(savedDonHang3.getMaDonHang(), bt3.getMaBienThe());
+            ChiTietDonHang ct3_1 = new ChiTietDonHang(id4, savedDonHang3, bt3, 1, bt3.getGiaBan(), bt3.getGiaBan());
+            chiTietDonHangRepo.save(ct3_1);
         };
     }
 }

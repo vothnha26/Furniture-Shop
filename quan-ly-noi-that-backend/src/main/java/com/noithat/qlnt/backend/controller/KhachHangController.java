@@ -10,7 +10,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/v1/khach-hang")
+@RequestMapping("/api/khachhang")
 @Validated
 public class KhachHangController {
 
@@ -63,5 +63,32 @@ public class KhachHangController {
         }
         KhachHang khachHangCapNhat = khachHangService.tichDiemVaCapNhatHang(maKhachHang, diem);
         return ResponseEntity.ok(khachHangCapNhat);
+    }
+
+    // [Quyền: Admin/Nhân viên] - Thêm điểm cho khách hàng (cho Postman test)
+    @PostMapping("/add-points")
+    public ResponseEntity<KhachHang> addPoints(@RequestBody java.util.Map<String, Object> request) {
+        Integer maKhachHang = (Integer) request.get("maKhachHang");
+        Integer diemThem = (Integer) request.get("diemThem");
+        
+        if (maKhachHang == null || diemThem == null || diemThem <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        KhachHang khachHangCapNhat = khachHangService.tichDiemVaCapNhatHang(maKhachHang, diemThem);
+        return ResponseEntity.ok(khachHangCapNhat);
+    }
+
+    // [Quyền: Admin/Nhân viên] - Tìm kiếm khách hàng
+    @GetMapping("/search")
+    public ResponseEntity<List<KhachHang>> search(@RequestParam("keyword") String keyword) {
+        // Simple search by name for now
+        List<KhachHang> allCustomers = khachHangService.getAll();
+        List<KhachHang> result = allCustomers.stream()
+            .filter(kh -> kh.getHoTen().toLowerCase().contains(keyword.toLowerCase()) ||
+                         kh.getEmail().toLowerCase().contains(keyword.toLowerCase()) ||
+                         kh.getSoDienThoai().contains(keyword))
+            .toList();
+        return ResponseEntity.ok(result);
     }
 }

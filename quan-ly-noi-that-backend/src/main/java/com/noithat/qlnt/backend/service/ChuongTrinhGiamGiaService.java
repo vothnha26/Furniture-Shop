@@ -51,6 +51,23 @@ public class ChuongTrinhGiamGiaService {
     }
 
     @Transactional
+    public ChuongTrinhGiamGia create(com.noithat.qlnt.backend.dto.request.ChuongTrinhGiamGiaRequest request) {
+        if (request.getNgayBatDau() == null || request.getNgayKetThuc() == null || 
+            request.getNgayKetThuc().isBefore(request.getNgayBatDau())) {
+            throw new IllegalArgumentException("Khoảng thời gian không hợp lệ.");
+        }
+        ChuongTrinhGiamGia ct = new ChuongTrinhGiamGia();
+        ct.setTenChuongTrinh(request.getTenChuongTrinh());
+        ct.setMoTa(request.getMoTa());
+        ct.setNgayBatDau(request.getNgayBatDau());
+        ct.setNgayKetThuc(request.getNgayKetThuc());
+        ct.setTrangThai(request.getTrangThai());
+        ct.setLoaiGiamGia(request.getLoaiGiamGia());
+        ct.setGiaTriGiam(request.getGiaTriGiam());
+        return chuongTrinhGiamGiaRepository.save(ct);
+    }
+
+    @Transactional
     public ChuongTrinhGiamGia update(Integer id, String ten, LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null || end.isBefore(start)) {
             throw new IllegalArgumentException("Khoảng thời gian không hợp lệ.");
@@ -271,13 +288,13 @@ public class ChuongTrinhGiamGiaService {
                             .multiply(new BigDecimal("100"));
 
                     return BienTheGiamGiaResponse.builder()
+                            .maChuongTrinhGiamGia(item.getId().getMaChuongTrinhGiamGia())
                             .maBienThe(bt.getMaBienThe())
-                            .sku(bt.getSku())
-                            .tenSanPham(bt.getSanPham().getTenSanPham())
-                            .giaBanGoc(giaBanGoc)
+                            .skuBienThe(bt.getSku())
+                            .tenChuongTrinh(ct.getTenChuongTrinh())
+                            .giaGoc(giaBanGoc)
                             .giaSauGiam(giaSauGiam)
                             .phanTramGiam(phanTramGiam)
-                            .soLuongTon(bt.getSoLuongTon())
                             .build();
                 })
                 .collect(Collectors.toList());

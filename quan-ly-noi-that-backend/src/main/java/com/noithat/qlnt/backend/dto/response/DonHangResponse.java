@@ -17,6 +17,9 @@ public class DonHangResponse {
     private BigDecimal giamGiaVoucher;
     private Integer diemThuongSuDung; // Số điểm thưởng đã sử dụng
     private BigDecimal giamGiaDiemThuong; // Số tiền giảm giá từ điểm thưởng
+    private BigDecimal giamGiaVip; // Số tiền giảm giá từ hạng thành viên VIP
+    private Integer diemVipThuong; // Điểm thưởng VIP nhận được từ đơn hàng này
+    private Boolean mienPhiVanChuyen; // Có miễn phí vận chuyển từ VIP không
     private BigDecimal chiPhiDichVu; // Tổng chi phí dịch vụ (vận chuyển, lắp đặt...)
     private BigDecimal thanhTien;
     private String trangThai;

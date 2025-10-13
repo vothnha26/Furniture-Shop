@@ -15,15 +15,31 @@ public class Voucher {
     private Integer maVoucher;
 
     private String maCode;
+    
+    private String tenVoucher;
+    
+    private String moTa;
 
     @Column(name = "LoaiGiamGia", length = 20)
-    private String loaiGiamGia; // 'PERCENT' hoặc 'FIXED'
+    private String loaiGiamGia; // 'PERCENTAGE' hoặc 'FIXED'
 
     @Column(name = "GiaTriGiam", precision = 18, scale = 2)
     private BigDecimal giaTriGiam;
+    
+    @Column(name = "GiaTriDonHangToiThieu", precision = 18, scale = 2)
+    private BigDecimal giaTriDonHangToiThieu = BigDecimal.ZERO;
+    
+    @Column(name = "GiaTriGiamToiDa", precision = 18, scale = 2)
+    private BigDecimal giaTriGiamToiDa;
 
     private LocalDateTime ngayBatDau;
     private LocalDateTime ngayKetThuc;
+    
+    private Integer soLuongToiDa = 1000;
+    
+    private Integer soLuongDaSuDung = 0;
+    
+    private Boolean trangThai = true;
 
     private Boolean apDungChoMoiNguoi = true;
 

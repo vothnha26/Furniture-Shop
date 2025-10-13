@@ -31,6 +31,7 @@ public class DonHangServiceImpl implements DonHangService {
     private final VoucherRepository voucherRepository;
     private final DichVuRepository dichVuRepository;
     private final DonHangDichVuRepository donHangDichVuRepository;
+    private final com.noithat.qlnt.backend.service.VipBenefitProcessor vipBenefitProcessor;
 
     @Override
     @Transactional
@@ -136,15 +137,50 @@ public class DonHangServiceImpl implements DonHangService {
             donHang.setGiamGiaDiemThuong(BigDecimal.ZERO);
         }
 
-        // 🔹 Tính tổng tiền và thành tiền sau giảm giá + chi phí dịch vụ
-        // Công thức: Thành tiền = (Tổng tiền gốc - Giảm voucher - Giảm điểm thưởng) + Chi phí dịch vụ
+        // 🔹 ÁP DỤNG ƯU ĐÃI VIP 🎯
+        BigDecimal giamGiaVip = vipBenefitProcessor.calculateVipDiscount(khachHang, tongTienGoc);
+        
+        // Kiểm tra miễn phí vận chuyển từ VIP
+        boolean mienPhiVanChuyenVip = vipBenefitProcessor.hasFreshipping(khachHang);
+        BigDecimal chiPhiDichVuSauVip = vipBenefitProcessor.calculateShippingCostAfterVipBenefit(khachHang, chiPhiDichVu);
+
+        // 🔹 Tính tổng tiền và thành tiền sau tất cả giảm giá + chi phí dịch vụ
+        // Công thức: Thành tiền = (Tổng tiền gốc - Giảm VIP - Giảm voucher - Giảm điểm thưởng) + Chi phí dịch vụ sau VIP
         donHang.setTongTienGoc(tongTienGoc);
-        donHang.setThanhTien(
-                tongTienGoc
-                        .subtract(giamGiaVoucher)
-                        .subtract(giamGiaDiemThuong)
-                        .add(chiPhiDichVu)
-        );
+        donHang.setGiamGiaVip(giamGiaVip);
+        donHang.setMienPhiVanChuyen(mienPhiVanChuyenVip);
+        donHang.setChiPhiDichVu(chiPhiDichVuSauVip); // Cập nhật chi phí sau khi áp dụng VIP
+        
+        BigDecimal thanhTienSauGiam = tongTienGoc
+                .subtract(giamGiaVip)        // 🎯 Giảm giá VIP
+                .subtract(giamGiaVoucher)    // 🎫 Giảm voucher
+                .subtract(giamGiaDiemThuong) // 🏆 Giảm điểm thưởng
+                .add(chiPhiDichVuSauVip);    // 🚚 Chi phí vận chuyển (có thể miễn phí)
+
+        donHang.setThanhTien(thanhTienSauGiam);
+
+        // 🔹 TÍCH ĐIỂM VIP THƯỞNG 🏆
+        Integer vipBonusPoints = vipBenefitProcessor.calculateVipBonusPoints(khachHang, thanhTienSauGiam);
+        donHang.setDiemVipThuong(vipBonusPoints);
+        
+        if (vipBonusPoints > 0) {
+            // Cộng điểm VIP vào tài khoản khách hàng
+            khachHang.setDiemThuong(khachHang.getDiemThuong() + vipBonusPoints);
+            
+            // Cập nhật tổng chi tiêu và số đơn hàng cho VIP tracking
+            if (khachHang.getTongChiTieu() == null) {
+                khachHang.setTongChiTieu(BigDecimal.ZERO);
+            }
+            khachHang.setTongChiTieu(khachHang.getTongChiTieu().add(thanhTienSauGiam));
+            
+            if (khachHang.getTongDonHang() == null) {
+                khachHang.setTongDonHang(0);
+            }
+            khachHang.setTongDonHang(khachHang.getTongDonHang() + 1);
+            khachHang.setDonHangCuoi(java.time.LocalDate.now());
+            
+            khachHangRepository.save(khachHang);
+        }
 
         // 🔹 Gắn danh sách chi tiết và dịch vụ vào đơn hàng
         donHang.setChiTietDonHangs(chiTietList);
@@ -232,6 +268,9 @@ public class DonHangServiceImpl implements DonHangService {
         response.setGiamGiaVoucher(donHang.getGiamGiaVoucher());
         response.setDiemThuongSuDung(donHang.getDiemThuongSuDung());
         response.setGiamGiaDiemThuong(donHang.getGiamGiaDiemThuong());
+        response.setGiamGiaVip(donHang.getGiamGiaVip());
+        response.setDiemVipThuong(donHang.getDiemVipThuong());
+        response.setMienPhiVanChuyen(donHang.getMienPhiVanChuyen());
         response.setChiPhiDichVu(donHang.getChiPhiDichVu());
         response.setThanhTien(donHang.getThanhTien());
         response.setTrangThai(donHang.getTrangThai());

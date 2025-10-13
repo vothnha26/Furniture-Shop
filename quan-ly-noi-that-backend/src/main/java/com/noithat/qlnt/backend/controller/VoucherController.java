@@ -129,6 +129,14 @@ public class VoucherController {
     }
 
     /**
+     * Lấy danh sách tất cả voucher (entity) - endpoint /all
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<Voucher>> getAllVouchers() {
+        return ResponseEntity.ok(voucherService.getAll());
+    }
+
+    /**
      * Lấy danh sách tất cả voucher (response chi tiết)
      */
     @GetMapping("/details")

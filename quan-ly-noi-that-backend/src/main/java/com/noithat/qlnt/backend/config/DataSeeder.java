@@ -32,10 +32,27 @@ public class DataSeeder {
             // ================== DỮ LIỆU NỀN TẢNG ==================
             System.out.println("🎯 Bắt đầu seed dữ liệu...");
             
-            // Tạo hạng thành viên
-            HangThanhVien bronze = hangRepo.save(new HangThanhVien(null, "Bronze", 0));
-            HangThanhVien silver = hangRepo.save(new HangThanhVien(null, "Silver", 1000));
-            HangThanhVien gold = hangRepo.save(new HangThanhVien(null, "Gold", 5000));
+            // Tạo hạng thành viên VIP (theo thứ tự từ thấp đến cao)
+            HangThanhVien silver = taoHangThanhVien("Silver", 1000, new BigDecimal("5000000"), new BigDecimal("5.0"),
+                "Hạng thành viên bạc", "#C0C0C0", "[\"Giảm giá 5%\"]", "IoMedal", 1);
+            silver = hangRepo.save(silver);
+
+            HangThanhVien gold = taoHangThanhVien("Gold", 5000, new BigDecimal("15000000"), new BigDecimal("10.0"),
+                "Hạng thành viên vàng", "#FFD700", "[\"Giảm giá 10%\", \"Ưu tiên giao hàng\"]", "IoStar", 2);
+            gold = hangRepo.save(gold);
+
+            HangThanhVien platinum = taoHangThanhVien("Platinum", 15000, new BigDecimal("30000000"), new BigDecimal("15.0"),
+                "Hạng thành viên bạch kim", "#E5E4E2", "[\"Miễn phí vận chuyển\", \"Giảm giá 15%\", \"Ưu tiên giao hàng\"]", "IoTrophy", 3);
+            platinum = hangRepo.save(platinum);
+
+            HangThanhVien diamond = taoHangThanhVien("Diamond", 30000, new BigDecimal("50000000"), new BigDecimal("20.0"),
+                "Hạng thành viên kim cương", "#B9F2FF", "[\"Miễn phí vận chuyển\", \"Giảm giá 20%\", \"Ưu tiên giao hàng\", \"Tư vấn riêng\"]", "IoDiamond", 4);
+            diamond = hangRepo.save(diamond);
+
+            // Bronze cho khách hàng mới
+            HangThanhVien bronze = taoHangThanhVien("Bronze", 0, new BigDecimal("0"), new BigDecimal("3.0"),
+                "Hạng thành viên cơ bản", "#CD7F32", "[\"Giảm giá 3%\", \"Tích điểm thưởng\"]", "IoMedal", 0);
+            bronze = hangRepo.save(bronze);
 
             // Tạo vai trò
             VaiTro vaiTro = vaiTroRepo.save(new VaiTro(null, "USER"));
@@ -46,16 +63,19 @@ public class DataSeeder {
             TaiKhoan t3 = taiKhoanRepo.save(new TaiKhoan(null, "user3", "password", "user3@example.com", vaiTro));
 
             // Tạo khách hàng
-            KhachHang k1 = khachHangRepo.save(new KhachHang(null, t1, "Nguyễn Văn An", "an.nguyen@example.com", "0901112221", "123 Đường Lê Lợi, Quận 1, TP.HCM", 800, bronze));
-            KhachHang k2 = khachHangRepo.save(new KhachHang(null, t2, "Trần Thị Bình", "binh.tran@example.com", "0903334442", "456 Đường Nguyễn Huệ, Quận 1, TP.HCM", 1500, silver));
-            KhachHang k3 = khachHangRepo.save(new KhachHang(null, t3, "Lê Văn Cường", "cuong.le@example.com", "0907778889", "789 Đường Hai Bà Trưng, Quận 3, TP.HCM", 6200, gold));
+            KhachHang k1 = khachHangRepo.save(taoKhachHang(t1, "Nguyễn Văn An", "an.nguyen@example.com", "0901112221", "123 Đường Lê Lợi, Quận 1, TP.HCM", 800, bronze));
+            KhachHang k2 = khachHangRepo.save(taoKhachHang(t2, "Trần Thị Bình", "binh.tran@example.com", "0903334442", "456 Đường Nguyễn Huệ, Quận 1, TP.HCM", 1500, silver));
+            KhachHang k3 = khachHangRepo.save(taoKhachHang(t3, "Lê Văn Cường", "cuong.le@example.com", "0907778889", "789 Đường Hai Bà Trưng, Quận 3, TP.HCM", 6200, gold));
 
-            Voucher v1 = voucherRepo.save(new Voucher(
-                    null, "SALE100K", "FIXED", BigDecimal.valueOf(100000),
-                    LocalDateTime.now().minusDays(10),
-                    LocalDateTime.now().plusYears(1),
-                    true, null
-            ));
+            Voucher v1 = new Voucher();
+            v1.setTenVoucher("SALE100K");
+            v1.setMaCode("SALE100K");
+            v1.setLoaiGiamGia("FIXED");
+            v1.setGiaTriGiam(BigDecimal.valueOf(100000));
+            v1.setNgayBatDau(LocalDateTime.now().minusDays(10));
+            v1.setNgayKetThuc(LocalDateTime.now().plusYears(1));
+            v1.setTrangThai(true);
+            v1 = voucherRepo.save(v1);
 
             SanPham sp1 = sanPhamRepo.save(new SanPham(null, "Ghế Sofa Băng Dài",
                     "Ghế sofa hiện đại cho phòng khách.", 20, 5, 6, 60, null, null, null));
@@ -159,28 +179,38 @@ public class DataSeeder {
             // ================== DỮ LIỆU KHUYẾN MÃI ==================
 
             // VOUCHER 1: Giảm phần trăm cho mọi người
-            voucherRepo.save(new Voucher(
-                    null, "TETALE2025", "PERCENT", BigDecimal.valueOf(15),
-                    LocalDateTime.of(2025, 1, 15, 0, 0),
-                    LocalDateTime.of(2025, 2, 15, 23, 59),
-                    true, null
-            ));
+            Voucher voucher1 = new Voucher();
+            voucher1.setTenVoucher("TETALE2025");
+            voucher1.setMaCode("TETALE2025");
+            voucher1.setLoaiGiamGia("PERCENTAGE");
+            voucher1.setGiaTriGiam(BigDecimal.valueOf(15));
+            voucher1.setNgayBatDau(LocalDateTime.of(2025, 1, 15, 0, 0));
+            voucher1.setNgayKetThuc(LocalDateTime.of(2025, 2, 15, 23, 59));
+            voucher1.setTrangThai(true);
+            voucherRepo.save(voucher1);
 
             // VOUCHER 2: Giảm cố định cho mọi người
-            voucherRepo.save(new Voucher(
-                    null, "FREESHIP100K", "FIXED", BigDecimal.valueOf(100000),
-                    LocalDateTime.now().minusDays(1),
-                    LocalDateTime.now().plusMonths(1),
-                    true, null
-            ));
+            Voucher voucher2 = new Voucher();
+            voucher2.setTenVoucher("FREESHIP100K");
+            voucher2.setMaCode("FREESHIP100K");
+            voucher2.setLoaiGiamGia("FIXED");
+            voucher2.setGiaTriGiam(BigDecimal.valueOf(100000));
+            voucher2.setNgayBatDau(LocalDateTime.now().minusDays(1));
+            voucher2.setNgayKetThuc(LocalDateTime.now().plusMonths(1));
+            voucher2.setTrangThai(true);
+            voucherRepo.save(voucher2);
 
             // VOUCHER 3: Giảm cho hạng VIP (Silver và Gold)
-            Voucher voucher3 = voucherRepo.save(new Voucher(
-                    null, "VIP2025", "FIXED", BigDecimal.valueOf(500000),
-                    LocalDateTime.of(2025, 1, 1, 0, 0),
-                    LocalDateTime.of(2025, 12, 31, 23, 59),
-                    false, null
-            ));
+            Voucher voucher3 = new Voucher();
+            voucher3.setTenVoucher("VIP2025");
+            voucher3.setMaCode("VIP2025");
+            voucher3.setLoaiGiamGia("FIXED");
+            voucher3.setGiaTriGiam(BigDecimal.valueOf(500000));
+            voucher3.setNgayBatDau(LocalDateTime.of(2025, 1, 1, 0, 0));
+            voucher3.setNgayKetThuc(LocalDateTime.of(2025, 12, 31, 23, 59));
+            voucher3.setTrangThai(false);
+            voucher3.setApDungChoMoiNguoi(false);
+            voucher3 = voucherRepo.save(voucher3);
             
             // Gán voucher cho hạng thành viên Silver và Gold
             voucherHangRepo.save(new VoucherHangThanhVien(
@@ -267,5 +297,43 @@ public class DataSeeder {
 
             System.out.println("✅ Seed dữ liệu thành công!");
         };
+    }
+
+    /**
+     * Helper method để tạo hạng thành viên với đầy đủ thông tin
+     */
+    private HangThanhVien taoHangThanhVien(String tenHang, Integer diemToiThieu, 
+            BigDecimal soTienToiThieu, BigDecimal phanTramGiamGia, String moTa, 
+            String mauSac, String uuDai, String icon, Integer thuTu) {
+        HangThanhVien hang = new HangThanhVien();
+        hang.setTenHang(tenHang);
+        hang.setDiemToiThieu(diemToiThieu);
+        hang.setSoTienToiThieu(soTienToiThieu);
+        hang.setPhanTramGiamGia(phanTramGiamGia);
+        hang.setMoTa(moTa);
+        hang.setMauSac(mauSac);
+        hang.setUuDai(uuDai);
+        hang.setIcon(icon);
+        hang.setTrangThai(true);
+        hang.setThuTu(thuTu);
+        return hang;
+    }
+
+    /**
+     * Helper method để tạo khách hàng với đầy đủ thông tin
+     */
+    private KhachHang taoKhachHang(TaiKhoan taiKhoan, String hoTen, String email, String soDienThoai, 
+                                  String diaChi, Integer diemThuong, HangThanhVien hangThanhVien) {
+        KhachHang khachHang = new KhachHang();
+        khachHang.setTaiKhoan(taiKhoan);
+        khachHang.setHoTen(hoTen);
+        khachHang.setEmail(email);
+        khachHang.setSoDienThoai(soDienThoai);
+        khachHang.setDiaChi(diaChi);
+        khachHang.setDiemThuong(diemThuong);
+        khachHang.setHangThanhVien(hangThanhVien);
+        khachHang.setNgayThamGia(java.time.LocalDate.now());
+        khachHang.setTrangThaiVip("active");
+        return khachHang;
     }
 }

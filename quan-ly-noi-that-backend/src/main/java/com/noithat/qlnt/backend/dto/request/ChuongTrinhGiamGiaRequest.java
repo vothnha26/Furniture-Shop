@@ -8,11 +8,19 @@ import java.time.LocalDateTime;
 @Data
 public class ChuongTrinhGiamGiaRequest {
     @NotBlank(message = "Tên chương trình không được để trống")
-    private String ten;
+    private String tenChuongTrinh;
+    
+    private String moTa;
     
     @NotNull(message = "Ngày bắt đầu không được để trống")
     private LocalDateTime ngayBatDau;
     
     @NotNull(message = "Ngày kết thúc không được để trống")
     private LocalDateTime ngayKetThuc;
+    
+    private Boolean trangThai = true;
+    
+    private String loaiGiamGia;
+    
+    private java.math.BigDecimal giaTriGiam;
 }

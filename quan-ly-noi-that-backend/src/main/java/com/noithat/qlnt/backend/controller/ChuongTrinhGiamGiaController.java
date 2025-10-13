@@ -15,7 +15,7 @@ import java.util.List;
  * Controller quản lý Chương trình Giảm giá trực tiếp trên Biến thể Sản phẩm
  */
 @RestController
-@RequestMapping("/api/v1/chuong-trinh-giam-gia")
+@RequestMapping("/api/chuongtrinh-giamgia")
 public class ChuongTrinhGiamGiaController {
 
     private final ChuongTrinhGiamGiaService service;
@@ -41,19 +41,42 @@ public class ChuongTrinhGiamGiaController {
     }
 
     /**
-     * Lấy thông tin cơ bản chương trình giảm giá
+     * Lấy thông tin chương trình giảm giá (chi tiết gồm danh sách biến thể)
+     * Trả về `ChuongTrinhGiamGiaResponse` để phù hợp với Postman tests
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ChuongTrinhGiamGia> getById(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.getById(id));
+    public ResponseEntity<ChuongTrinhGiamGiaResponse> getById(@PathVariable String id) {
+        if (id == null || "null".equals(id) || id.trim().isEmpty()) {
+            throw new IllegalArgumentException("ID chương trình giảm giá không được để trống hoặc không hợp lệ");
+        }
+        
+        Integer idInteger;
+        try {
+            idInteger = Integer.parseInt(id);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("ID chương trình giảm giá phải là số nguyên hợp lệ");
+        }
+        
+        return ResponseEntity.ok(service.getDetailById(idInteger));
     }
 
     /**
      * Lấy thông tin chi tiết chương trình giảm giá kèm danh sách biến thể
      */
     @GetMapping("/{id}/details")
-    public ResponseEntity<ChuongTrinhGiamGiaResponse> getDetailById(@PathVariable Integer id) {
-        return ResponseEntity.ok(service.getDetailById(id));
+    public ResponseEntity<ChuongTrinhGiamGiaResponse> getDetailById(@PathVariable String id) {
+        if (id == null || "null".equals(id) || id.trim().isEmpty()) {
+            throw new IllegalArgumentException("ID chương trình giảm giá không được để trống hoặc không hợp lệ");
+        }
+        
+        Integer idInteger;
+        try {
+            idInteger = Integer.parseInt(id);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("ID chương trình giảm giá phải là số nguyên hợp lệ");
+        }
+        
+        return ResponseEntity.ok(service.getDetailById(idInteger));
     }
 
     /**
@@ -61,7 +84,7 @@ public class ChuongTrinhGiamGiaController {
      */
     @PostMapping
     public ResponseEntity<ChuongTrinhGiamGia> create(@Valid @RequestBody ChuongTrinhGiamGiaRequest request) {
-        return ResponseEntity.ok(service.create(request.getTen(), request.getNgayBatDau(), request.getNgayKetThuc()));
+        return ResponseEntity.ok(service.create(request));
     }
 
     /**
@@ -79,7 +102,7 @@ public class ChuongTrinhGiamGiaController {
     @PutMapping("/{id}")
     public ResponseEntity<ChuongTrinhGiamGia> update(@PathVariable Integer id,
                                                     @Valid @RequestBody ChuongTrinhGiamGiaRequest request) {
-        return ResponseEntity.ok(service.update(id, request.getTen(), request.getNgayBatDau(), request.getNgayKetThuc()));
+        return ResponseEntity.ok(service.update(id, request.getTenChuongTrinh(), request.getNgayBatDau(), request.getNgayKetThuc()));
     }
 
     /**

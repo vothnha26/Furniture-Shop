@@ -200,7 +200,7 @@ public class VoucherService {
     BigDecimal giaTriGiam = voucher.getGiaTriGiam();
         BigDecimal soTienGiam;
 
-        if ("PERCENT".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
+        if ("PERCENTAGE".equalsIgnoreCase(voucher.getLoaiGiamGia()) || "PERCENT".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
             soTienGiam = tongTien.multiply(giaTriGiam.divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
         } else if ("FIXED".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
             soTienGiam = giaTriGiam;
@@ -247,10 +247,17 @@ public class VoucherService {
 
         Voucher voucher = new Voucher();
         voucher.setMaCode(req.getMaCode());
+        voucher.setTenVoucher(req.getTenVoucher());
+        voucher.setMoTa(req.getMoTa());
         voucher.setLoaiGiamGia(req.getLoaiGiamGia());
         voucher.setGiaTriGiam(req.getGiaTriGiam());
+        voucher.setGiaTriDonHangToiThieu(req.getGiaTriDonHangToiThieu() != null ? req.getGiaTriDonHangToiThieu() : BigDecimal.ZERO);
+        voucher.setGiaTriGiamToiDa(req.getGiaTriGiamToiDa() != null ? req.getGiaTriGiamToiDa() : req.getGiaTriGiam());
         voucher.setNgayBatDau(req.getNgayBatDau());
         voucher.setNgayKetThuc(req.getNgayKetThuc());
+        voucher.setSoLuongToiDa(req.getSoLuongToiDa() != null ? req.getSoLuongToiDa() : 1000);
+        voucher.setSoLuongDaSuDung(0);
+        voucher.setTrangThai(true);
         voucher.setApDungChoMoiNguoi(req.getApDungChoMoiNguoi());
 
         // Thiết lập hạn chế theo hạng nếu không áp dụng cho mọi người

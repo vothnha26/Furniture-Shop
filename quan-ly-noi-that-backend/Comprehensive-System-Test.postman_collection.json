@@ -1,0 +1,1159 @@
+{
+	"info": {
+		"_postman_id": "comprehensive-system-test",
+		"name": "🧪 Test Toàn Diện Hệ Thống Quản Lý",
+		"description": "Collection test toàn diện: Khách hàng, Điểm thưởng, Cấp bậc thành viên, Giảm giá sản phẩm, Voucher",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "👥 1. QUẢN LÝ KHÁCH HÀNG",
+			"item": [
+				{
+					"name": "1.1 Get All Customers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    pm.expect(pm.response.json()).to.be.an('array');",
+									"});",
+									"",
+									"if (pm.response.json().length > 0) {",
+									"    const firstCustomer = pm.response.json()[0];",
+									"    pm.globals.set(\"CUSTOMER_ID\", firstCustomer.maKhachHang);",
+									"    console.log(\"Set CUSTOMER_ID:\", firstCustomer.maKhachHang);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "1.2 Create New Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"hoTen\": \"Nguyễn Văn Test\",\n  \"email\": \"test@email.com\",\n  \"soDienThoai\": \"0987654321\",\n  \"diaChi\": \"123 Đường Test, Quận 1, TP.HCM\",\n  \"maHangThanhVien\": 1\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const customer = pm.response.json();",
+									"    pm.globals.set(\"NEW_CUSTOMER_ID\", customer.maKhachHang);",
+									"    console.log(\"Created customer with ID:\", customer.maKhachHang);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "1.3 Get Customer Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/{{CUSTOMER_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "{{CUSTOMER_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Customer has VIP level\", function () {",
+									"    const customer = pm.response.json();",
+									"    pm.expect(customer).to.have.property('hangThanhVien');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "1.4 Update Customer",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maKhachHang\": {{CUSTOMER_ID}},\n  \"hoTen\": \"Nguyễn Văn Test Updated\",\n  \"email\": \"test_updated@email.com\",\n  \"soDienThoai\": \"0987654321\",\n  \"diaChi\": \"456 Đường Update, Quận 2, TP.HCM\",\n  \"maHangThanhVien\": 1\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/{{CUSTOMER_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "{{CUSTOMER_ID}}"]
+						}
+					}
+				},
+				{
+					"name": "1.5 Search Customers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/search?keyword=test",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "search"],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "test"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🎖️ 2. CẤP BẬC THÀNH VIÊN (VIP)",
+			"item": [
+				{
+					"name": "2.1 Initialize VIP Levels",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{BASE_URL}}/api/vip/initialize",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "vip", "initialize"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Success message returned\", function () {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('message');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.2 Get All VIP Levels",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/vip/levels",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "vip", "levels"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"VIP levels exist\", function () {",
+									"    const levels = pm.response.json();",
+									"    pm.expect(levels).to.be.an('array');",
+									"    pm.expect(levels.length).to.be.greaterThan(0);",
+									"});",
+									"",
+									"// Store VIP level IDs for later use",
+									"const levels = pm.response.json();",
+									"if (levels.length > 0) {",
+									"    levels.forEach((level, index) => {",
+									"        pm.globals.set(`VIP_LEVEL_${index + 1}_ID`, level.maHangThanhVien);",
+									"        console.log(`VIP Level ${level.tenHang} ID:`, level.maHangThanhVien);",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "2.3 Create Custom VIP Level",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenHang\": \"Test VIP\",\n  \"soTienToiThieu\": 200000000,\n  \"phanTramGiamGia\": 25,\n  \"thuTu\": 6,\n  \"trangThai\": true,\n  \"mauSac\": \"#FF0000\",\n  \"uuDai\": \"[\\\"Giảm giá 25%\\\", \\\"Tích điểm 15%\\\", \\\"Miễn phí vận chuyển\\\", \\\"Ưu tiên giao hàng\\\", \\\"Tư vấn riêng\\\", \\\"Voucher VIP hàng tháng\\\", \\\"Quà tặng sinh nhật\\\"]\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/vip/levels",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "vip", "levels"]
+						}
+					}
+				},
+				{
+					"name": "2.4 Get VIP Customers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/vip/customers",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "vip", "customers"]
+						}
+					}
+				},
+				{
+					"name": "2.5 Preview VIP Benefits",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/vip/benefits/preview/{{CUSTOMER_ID}}?orderAmount=2000000",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "vip", "benefits", "preview", "{{CUSTOMER_ID}}"],
+							"query": [
+								{
+									"key": "orderAmount",
+									"value": "2000000"
+								}
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Benefits preview contains discount info\", function () {",
+									"    const benefits = pm.response.json();",
+									"    pm.expect(benefits).to.have.property('giamGiaVip');",
+									"    pm.expect(benefits).to.have.property('danhSachUuDai');",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🏆 3. ĐIỂM THƯỞNG",
+			"item": [
+				{
+					"name": "3.1 Check Customer Points",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/{{CUSTOMER_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "{{CUSTOMER_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Customer has points field\", function () {",
+									"    const customer = pm.response.json();",
+									"    pm.expect(customer).to.have.property('diemThuong');",
+									"    pm.globals.set('CURRENT_POINTS', customer.diemThuong);",
+									"    console.log('Current points:', customer.diemThuong);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "3.2 Add Points to Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maKhachHang\": {{CUSTOMER_ID}},\n  \"diemThem\": 100,\n  \"lyDo\": \"Thưởng điểm test\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/add-points",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "add-points"]
+						}
+					}
+				},
+				{
+					"name": "3.3 Verify Points Added",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/{{CUSTOMER_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "{{CUSTOMER_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Points increased correctly\", function () {",
+									"    const customer = pm.response.json();",
+									"    const currentPoints = customer.diemThuong;",
+									"    const previousPoints = parseInt(pm.globals.get('CURRENT_POINTS') || '0');",
+									"    ",
+									"    console.log('Previous points:', previousPoints);",
+									"    console.log('Current points:', currentPoints);",
+									"    ",
+									"    pm.expect(currentPoints).to.be.greaterThan(previousPoints);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "🎫 4. QUẢN LÝ VOUCHER",
+			"item": [
+				{
+					"name": "4.1 Get All Vouchers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher/all",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher", "all"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.json().length > 0) {",
+									"    const firstVoucher = pm.response.json()[0];",
+									"    pm.globals.set(\"VOUCHER_ID\", firstVoucher.maVoucher);",
+									"    pm.globals.set(\"VOUCHER_CODE\", firstVoucher.maCode);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.2 Create General Voucher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maCode\": \"TEST50K\",\n  \"tenVoucher\": \"Test Giảm 50K\",\n  \"moTa\": \"Voucher test giảm 50,000đ cho đơn từ 200K\",\n  \"giaTriGiam\": 50000,\n  \"loaiGiamGia\": \"FIXED\",\n  \"giaTriDonHangToiThieu\": 200000,\n  \"giaTriGiamToiDa\": 50000,\n  \"ngayBatDau\": \"2024-01-01T00:00:00\",\n  \"ngayKetThuc\": \"2025-12-31T23:59:59\",\n  \"soLuongToiDa\": 100,\n  \"apDungChoMoiNguoi\": true\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Voucher created successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const voucher = pm.response.json();",
+									"    pm.globals.set(\"NEW_VOUCHER_ID\", voucher.maVoucher);",
+									"    console.log(\"Created voucher ID:\", voucher.maVoucher);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.3 Create Percentage Voucher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maCode\": \"PERCENT10\",\n  \"tenVoucher\": \"Giảm 10% tối đa 100K\",\n  \"moTa\": \"Voucher giảm 10% tổng đơn hàng, tối đa 100,000đ\",\n  \"giaTriGiam\": 10,\n  \"loaiGiamGia\": \"PERCENTAGE\",\n  \"giaTriDonHangToiThieu\": 500000,\n  \"giaTriGiamToiDa\": 100000,\n  \"ngayBatDau\": \"2024-01-01T00:00:00\",\n  \"ngayKetThuc\": \"2025-12-31T23:59:59\",\n  \"soLuongToiDa\": 50,\n  \"apDungChoMoiNguoi\": true\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher"]
+						}
+					}
+				},
+				{
+					"name": "4.4 Create VIP-Only Voucher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maCode\": \"VIPONLY200K\",\n  \"tenVoucher\": \"VIP Giảm 200K\",\n  \"moTa\": \"Voucher đặc biệt chỉ dành cho thành viên VIP\",\n  \"giaTriGiam\": 200000,\n  \"loaiGiamGia\": \"FIXED\",\n  \"giaTriDonHangToiThieu\": 1000000,\n  \"giaTriGiamToiDa\": 200000,\n  \"ngayBatDau\": \"2024-01-01T00:00:00\",\n  \"ngayKetThuc\": \"2025-12-31T23:59:59\",\n  \"soLuongToiDa\": 20,\n  \"apDungChoMoiNguoi\": false\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const voucher = pm.response.json();",
+									"    pm.globals.set(\"VIP_VOUCHER_ID\", voucher.maVoucher);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.5 Assign VIP Levels to Voucher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[{{VIP_LEVEL_3_ID}}, {{VIP_LEVEL_4_ID}}, {{VIP_LEVEL_5_ID}}]"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher/{{VIP_VOUCHER_ID}}/assign-tiers",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher", "{{VIP_VOUCHER_ID}}", "assign-tiers"]
+						}
+					}
+				},
+				{
+					"name": "4.6 Get Eligible Vouchers for Customer",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher/eligible/{{CUSTOMER_ID}}/details",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher", "eligible", "{{CUSTOMER_ID}}", "details"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Eligible vouchers returned\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const vouchers = pm.response.json();",
+									"    pm.expect(vouchers).to.be.an('array');",
+									"    console.log('Eligible vouchers count:', vouchers.length);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "4.7 Test Apply Voucher",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maCode\": \"TEST50K\",\n  \"maKhachHang\": {{CUSTOMER_ID}},\n  \"tongTienDonHang\": 300000,\n  \"items\": [\n    {\n      \"maBienThe\": 1,\n      \"soLuong\": 1,\n      \"donGia\": 300000\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher/apply/details",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher", "apply", "details"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Voucher applied successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const result = pm.response.json();",
+									"    pm.expect(result).to.have.property('soTienGiam');",
+									"    pm.expect(result.soTienGiam).to.equal(50000);",
+									"    console.log('Discount amount:', result.soTienGiam);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "💰 5. GIẢM GIÁ SẢN PHẨM/BIẾN THỂ",
+			"item": [
+				{
+					"name": "5.1 Get All Discount Programs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/chuongtrinh-giamgia",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "chuongtrinh-giamgia"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.json().length > 0) {",
+									"    const firstProgram = pm.response.json()[0];",
+									"    pm.globals.set(\"DISCOUNT_PROGRAM_ID\", firstProgram.maChuongTrinh);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5.2 Create Discount Program",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tenChuongTrinh\": \"Flash Sale Test\",\n  \"moTa\": \"Chương trình giảm giá test 20%\",\n  \"ngayBatDau\": \"2024-01-01T00:00:00\",\n  \"ngayKetThuc\": \"2025-12-31T23:59:59\",\n  \"trangThai\": true,\n  \"loaiGiamGia\": \"PERCENTAGE\",\n  \"giaTriGiam\": 20\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/chuongtrinh-giamgia",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "chuongtrinh-giamgia"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Discount program created\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const program = pm.response.json();",
+									"    pm.globals.set(\"NEW_DISCOUNT_PROGRAM_ID\", program.maChuongTrinh);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5.3 Get All Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/sanpham",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "sanpham"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.json().length > 0) {",
+									"    const firstProduct = pm.response.json()[0];",
+									"    pm.globals.set(\"PRODUCT_ID\", firstProduct.maSanPham);",
+									"    ",
+									"    // Get first variant if available",
+									"    if (firstProduct.bienTheList && firstProduct.bienTheList.length > 0) {",
+									"        pm.globals.set(\"VARIANT_ID\", firstProduct.bienTheList[0].maBienThe);",
+									"    }",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5.4 Add Product to Discount Program",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maChuongTrinh\": {{NEW_DISCOUNT_PROGRAM_ID}},\n  \"maBienThe\": {{VARIANT_ID}},\n  \"giaTriGiam\": 25,\n  \"loaiGiamGia\": \"PERCENTAGE\"\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/chuongtrinh-giamgia/{{NEW_DISCOUNT_PROGRAM_ID}}/bien-the/{{VARIANT_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "chuongtrinh-giamgia", "{{NEW_DISCOUNT_PROGRAM_ID}}", "bien-the", "{{VARIANT_ID}}"]
+						}
+					}
+				},
+				{
+					"name": "5.5 Get Discount Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/chuongtrinh-giamgia/{{NEW_DISCOUNT_PROGRAM_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "chuongtrinh-giamgia", "{{NEW_DISCOUNT_PROGRAM_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Discount program has variants\", function () {",
+									"    const program = pm.response.json();",
+									"    pm.expect(program).to.have.property('bienTheGiamGiaList');",
+									"    console.log('Variants in discount program:', program.bienTheGiamGiaList.length);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "5.6 Get Discounted Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/sanpham?hasDiscount=true",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "sanpham"],
+							"query": [
+								{
+									"key": "hasDiscount",
+									"value": "true"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🛒 6. INTEGRATION TEST - ORDER FLOW",
+			"item": [
+				{
+					"name": "6.1 Complete Order - All Features",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maKhachHang\": {{CUSTOMER_ID}},\n  \"maCodeVoucher\": \"TEST50K\",\n  \"diemThuongSuDung\": 20,\n  \"trangThai\": \"Chờ xác nhận\",\n  \"phuongThucThanhToan\": \"Chuyển khoản\",\n  \"ghiChu\": \"Test đơn hàng tích hợp đầy đủ tính năng\",\n  \"chiTietDonHangList\": [\n    {\n      \"maBienThe\": {{VARIANT_ID}},\n      \"soLuong\": 2,\n      \"donGia\": 500000\n    }\n  ],\n  \"donHangDichVuList\": [\n    {\n      \"maDichVu\": 1,\n      \"soLuong\": 1\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/banhang/donhang",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "banhang", "donhang"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order created successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"if (pm.response.code === 200) {",
+									"    const order = pm.response.json();",
+									"    pm.globals.set(\"ORDER_ID\", order.maDonHang);",
+									"    ",
+									"    pm.test(\"Order has all discount calculations\", function () {",
+									"        pm.expect(order).to.have.property('giamGiaVip');",
+									"        pm.expect(order).to.have.property('giamGiaVoucher');",
+									"        pm.expect(order).to.have.property('giamGiaDiemThuong');",
+									"        pm.expect(order).to.have.property('thanhTien');",
+									"        ",
+									"        console.log('VIP Discount:', order.giamGiaVip);",
+									"        console.log('Voucher Discount:', order.giamGiaVoucher);",
+									"        console.log('Points Discount:', order.giamGiaDiemThuong);",
+									"        console.log('Final Amount:', order.thanhTien);",
+									"    });",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "6.2 Verify Order Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/banhang/donhang/{{ORDER_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "banhang", "donhang", "{{ORDER_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Order details retrieved\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const order = pm.response.json();",
+									"    ",
+									"    pm.expect(order).to.have.property('chiTietDonHangList');",
+									"    pm.expect(order.chiTietDonHangList).to.be.an('array');",
+									"    pm.expect(order.chiTietDonHangList.length).to.be.greaterThan(0);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "6.3 Verify Customer Points Updated",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/{{CUSTOMER_ID}}",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "{{CUSTOMER_ID}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Customer points updated after order\", function () {",
+									"    const customer = pm.response.json();",
+									"    pm.expect(customer).to.have.property('diemThuong');",
+									"    console.log('Customer points after order:', customer.diemThuong);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "❌ 7. ERROR TESTING",
+			"item": [
+				{
+					"name": "7.1 Invalid Customer ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/khachhang/99999",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "khachhang", "99999"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Returns 404 for invalid customer\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "7.2 Invalid Voucher Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maCode\": \"INVALIDCODE123\",\n  \"maKhachHang\": {{CUSTOMER_ID}},\n  \"tongTienDonHang\": 300000\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher/apply",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher", "apply"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Returns error for invalid voucher\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "7.3 Insufficient Points Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maKhachHang\": {{CUSTOMER_ID}},\n  \"diemThuongSuDung\": 999999,\n  \"trangThai\": \"Chờ xác nhận\",\n  \"phuongThucThanhToan\": \"Tiền mặt\",\n  \"chiTietDonHangList\": [\n    {\n      \"maBienThe\": {{VARIANT_ID}},\n      \"soLuong\": 1,\n      \"donGia\": 100000\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{BASE_URL}}/api/banhang/donhang",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "banhang", "donhang"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Returns error for insufficient points\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "📊 8. VERIFICATION & REPORTS",
+			"item": [
+				{
+					"name": "8.1 Get All Orders Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/banhang/donhang",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "banhang", "donhang"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Orders list retrieved\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const orders = pm.response.json();",
+									"    pm.expect(orders).to.be.an('array');",
+									"    console.log('Total orders:', orders.length);",
+									"    ",
+									"    // Calculate total revenue",
+									"    let totalRevenue = 0;",
+									"    orders.forEach(order => {",
+									"        totalRevenue += order.thanhTien || 0;",
+									"    });",
+									"    console.log('Total revenue:', totalRevenue.toLocaleString(), 'VND');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "8.2 VIP Customers Report",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/vip/customers",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "vip", "customers"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"VIP customers report\", function () {",
+									"    const customers = pm.response.json();",
+									"    ",
+									"    let vipStats = {};",
+									"    customers.forEach(customer => {",
+									"        const level = customer.tenHangThanhVien || 'Unknown';",
+									"        vipStats[level] = (vipStats[level] || 0) + 1;",
+									"    });",
+									"    ",
+									"    console.log('VIP Level Distribution:', JSON.stringify(vipStats, null, 2));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "8.3 Voucher Usage Statistics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/v1/voucher/all",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "v1", "voucher", "all"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Voucher statistics\", function () {",
+									"    const vouchers = pm.response.json();",
+									"    ",
+									"    let activeVouchers = 0;",
+									"    let totalVoucherValue = 0;",
+									"    ",
+									"    vouchers.forEach(voucher => {",
+									"        if (voucher.trangThai) {",
+									"            activeVouchers++;",
+									"            totalVoucherValue += voucher.giaTriGiam || 0;",
+									"        }",
+									"    });",
+									"    ",
+									"    console.log('Active vouchers:', activeVouchers);",
+									"    console.log('Total voucher value:', totalVoucherValue.toLocaleString(), 'VND');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "8.4 Discount Programs Report",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BASE_URL}}/api/chuongtrinh-giamgia",
+							"host": ["{{BASE_URL}}"],
+							"path": ["api", "chuongtrinh-giamgia"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Discount programs report\", function () {",
+									"    const programs = pm.response.json();",
+									"    ",
+									"    let activePrograms = 0;",
+									"    programs.forEach(program => {",
+									"        if (program.trangThai) {",
+									"            activePrograms++;",
+									"        }",
+									"    });",
+									"    ",
+									"    console.log('Total discount programs:', programs.length);",
+									"    console.log('Active programs:', activePrograms);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set default values if not set",
+					"if (!pm.globals.has('CUSTOMER_ID')) {",
+					"    pm.globals.set('CUSTOMER_ID', '1');",
+					"}",
+					"if (!pm.globals.has('VARIANT_ID')) {",
+					"    pm.globals.set('VARIANT_ID', '1');",
+					"}",
+					"if (!pm.globals.has('VIP_LEVEL_1_ID')) {",
+					"    pm.globals.set('VIP_LEVEL_1_ID', '1');",
+					"}"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Global test for all requests",
+					"pm.test('Response time is acceptable', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});",
+					"",
+					"// Log request info",
+					"console.log('Request:', pm.request.name);",
+					"console.log('Status:', pm.response.status);",
+					"console.log('Response Time:', pm.response.responseTime + 'ms');"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

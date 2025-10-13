@@ -34,6 +34,15 @@ public class DonHang {
     @Column(name = "GiamGiaDiemThuong", precision = 18, scale = 2)
     private BigDecimal giamGiaDiemThuong = BigDecimal.ZERO;
 
+    @Column(name = "GiamGiaVip", precision = 18, scale = 2)
+    private BigDecimal giamGiaVip = BigDecimal.ZERO; // Giảm giá từ hạng thành viên VIP
+
+    @Column(name = "DiemVipThuong")
+    private Integer diemVipThuong = 0; // Điểm thưởng VIP từ đơn hàng này
+
+    @Column(name = "MienPhiVanChuyen")
+    private Boolean mienPhiVanChuyen = false; // Có miễn phí vận chuyển từ VIP không
+
     @Column(name = "ChiPhiDichVu", precision = 18, scale = 2)
     private BigDecimal chiPhiDichVu = BigDecimal.ZERO;
 

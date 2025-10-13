@@ -24,6 +24,6 @@ public class KhachHangCreationRequest {
     @NotNull(message = "Hạng thành viên không được để trống")
     private Integer maHangThanhVien;
 
-    @NotNull(message = "Thông tin tài khoản không được để trống")
+    // Optional - có thể tạo khách hàng mà không cần tài khoản ngay lập tức
     private Integer maTaiKhoan;
 }

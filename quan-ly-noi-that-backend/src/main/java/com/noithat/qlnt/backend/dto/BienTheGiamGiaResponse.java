@@ -15,11 +15,11 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class BienTheGiamGiaResponse {
     
+    private Integer maChuongTrinhGiamGia;
     private Integer maBienThe;
-    private String sku;
-    private String tenSanPham;
-    private BigDecimal giaBanGoc;
+    private String skuBienThe;
+    private String tenChuongTrinh;
+    private BigDecimal giaGoc;
     private BigDecimal giaSauGiam;
     private BigDecimal phanTramGiam;
-    private Integer soLuongTon;
 }

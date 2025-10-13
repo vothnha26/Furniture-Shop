@@ -31,13 +31,19 @@ public class VoucherApplyRequest {
     private BigDecimal tongTienDonHang;
 
     @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Item {
         @NotNull(message = "Mã biến thể không được để trống")
         @Positive(message = "Mã biến thể không hợp lệ")
+        @JsonProperty("maBienThe")
         private Integer bienTheId;
 
         @NotNull(message = "Số lượng không được để trống")
         @Positive(message = "Số lượng phải là số dương")
+        @JsonProperty("soLuong")
         private Integer quantity;
+        
+        // Optional field - client có thể gửi nhưng server sẽ tính lại từ database
+        private java.math.BigDecimal donGia;
     }
 }

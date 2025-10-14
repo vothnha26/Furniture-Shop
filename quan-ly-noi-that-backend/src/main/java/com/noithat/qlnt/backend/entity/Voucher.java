@@ -8,7 +8,10 @@ import java.util.Set;
 
 @Entity
 @Table(name = "Voucher")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Voucher {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

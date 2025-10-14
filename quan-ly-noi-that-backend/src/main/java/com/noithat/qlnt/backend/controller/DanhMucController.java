@@ -14,21 +14,27 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.noithat.qlnt.backend.dto.DanhMucDto;
+import com.noithat.qlnt.backend.dto.common.DanhMucDto;
 import com.noithat.qlnt.backend.entity.DanhMuc;
-import com.noithat.qlnt.backend.service.DanhMucService;
+import com.noithat.qlnt.backend.service.IDanhMucService;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/categories")
 public class DanhMucController {
 
     @Autowired
-    private DanhMucService danhMucService;
+    private IDanhMucService danhMucService;
 
     @PostMapping
     public ResponseEntity<DanhMuc> createDanhMuc(@RequestBody DanhMucDto dto) {
         DanhMuc newCategory = danhMucService.createDanhMuc(dto);
         return new ResponseEntity<>(newCategory, HttpStatus.CREATED);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<DanhMuc>> getAllCategories() {
+        return ResponseEntity.ok(danhMucService.getAll());
     }
 
     @GetMapping("/{id}/children")

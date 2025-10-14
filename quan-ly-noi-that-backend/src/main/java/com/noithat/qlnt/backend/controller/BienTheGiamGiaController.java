@@ -1,9 +1,9 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.BienTheGiamGiaRequest;
-import com.noithat.qlnt.backend.dto.BienTheGiamGiaResponse;
+import com.noithat.qlnt.backend.dto.request.BienTheGiamGiaRequest;
+import com.noithat.qlnt.backend.dto.response.BienTheGiamGiaResponse;
 import com.noithat.qlnt.backend.entity.BienTheGiamGia;
-import com.noithat.qlnt.backend.service.BienTheGiamGiaService;
+import com.noithat.qlnt.backend.service.IBienTheGiamGiaService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -23,7 +23,7 @@ import java.util.List;
 public class BienTheGiamGiaController {
 
     @Autowired
-    private BienTheGiamGiaService bienTheGiamGiaService;
+    private IBienTheGiamGiaService bienTheGiamGiaService;
 
     /**
      * Lấy tất cả biến thể giảm giá với phân trang

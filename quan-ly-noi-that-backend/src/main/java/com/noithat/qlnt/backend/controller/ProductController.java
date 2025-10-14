@@ -1,10 +1,11 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.BienTheRequestDto;
-import com.noithat.qlnt.backend.dto.SanPhamRequestDto;
+import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
+import com.noithat.qlnt.backend.dto.request.SanPhamRequestDto;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.entity.SanPham;
-import com.noithat.qlnt.backend.service.ProductService;
+import com.noithat.qlnt.backend.service.IProductService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,7 @@ import java.util.List;
 @RequestMapping("/api/products")
 public class ProductController {
     @Autowired
-    private ProductService productService;
+    private IProductService productService;
 
     // ===== CRUD cho Sản phẩm (Sản phẩm gốc) =====
     @GetMapping
@@ -30,12 +31,12 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<SanPham> createSanPham(@RequestBody SanPhamRequestDto dto) {
+    public ResponseEntity<SanPham> createSanPham(@Valid @RequestBody SanPhamRequestDto dto) {
         return new ResponseEntity<>(productService.createSanPham(dto), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SanPham> updateSanPham(@PathVariable Integer id, @RequestBody SanPhamRequestDto dto) {
+    public ResponseEntity<SanPham> updateSanPham(@PathVariable Integer id, @Valid @RequestBody SanPhamRequestDto dto) {
         return ResponseEntity.ok(productService.updateSanPham(id, dto));
     }
 

@@ -1,9 +1,11 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.*;
 import com.noithat.qlnt.backend.dto.request.ChuongTrinhGiamGiaRequest;
+import com.noithat.qlnt.backend.dto.request.ChuongTrinhGiamGiaDetailRequest;
+import com.noithat.qlnt.backend.dto.response.ChuongTrinhGiamGiaResponse;
+import com.noithat.qlnt.backend.dto.response.BienTheSanPhamGiaResponse;
 import com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia;
-import com.noithat.qlnt.backend.service.ChuongTrinhGiamGiaService;
+import com.noithat.qlnt.backend.service.IChuongTrinhGiamGiaService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,9 +20,9 @@ import java.util.List;
 @RequestMapping("/api/chuongtrinh-giamgia")
 public class ChuongTrinhGiamGiaController {
 
-    private final ChuongTrinhGiamGiaService service;
+    private final IChuongTrinhGiamGiaService service;
 
-    public ChuongTrinhGiamGiaController(ChuongTrinhGiamGiaService service) {
+    public ChuongTrinhGiamGiaController(IChuongTrinhGiamGiaService service) {
         this.service = service;
     }
 

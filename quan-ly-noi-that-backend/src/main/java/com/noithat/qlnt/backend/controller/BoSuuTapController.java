@@ -1,7 +1,6 @@
 package com.noithat.qlnt.backend.controller;
 
 import java.util.List;
-import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,17 +14,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.noithat.qlnt.backend.dto.BoSuuTapDto;
+import com.noithat.qlnt.backend.dto.common.BoSuuTapDto;
 import com.noithat.qlnt.backend.entity.BoSuuTap;
 import com.noithat.qlnt.backend.entity.SanPham;
-import com.noithat.qlnt.backend.service.BoSuuTapService;
+import com.noithat.qlnt.backend.service.IBoSuuTapService;
 
 @RestController
 @RequestMapping("/api/collections")
 public class BoSuuTapController {
 
     @Autowired
-    private BoSuuTapService boSuuTapService;
+    private IBoSuuTapService boSuuTapService;
 
     @GetMapping
     public ResponseEntity<List<BoSuuTap>> getAll() {
@@ -54,7 +53,7 @@ public class BoSuuTapController {
     }
 
     @GetMapping("/{collectionId}/products")
-    public ResponseEntity<Set<SanPham>> getProductsInCollection(@PathVariable Integer collectionId) {
+    public ResponseEntity<List<SanPham>> getProductsInCollection(@PathVariable Integer collectionId) {
         return ResponseEntity.ok(boSuuTapService.getProductsInCollection(collectionId));
     }
 

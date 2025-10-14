@@ -2,7 +2,7 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.dto.request.KhachHangCreationRequest;
 import com.noithat.qlnt.backend.entity.KhachHang;
-import com.noithat.qlnt.backend.service.KhachHangService;
+import com.noithat.qlnt.backend.service.IKhachHangService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -10,13 +10,13 @@ import java.util.List;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/khachhang")
+@RequestMapping("/api/v1/khach-hang")
 @Validated
 public class KhachHangController {
 
-    private final KhachHangService khachHangService;
+    private final IKhachHangService khachHangService;
 
-    public KhachHangController(KhachHangService khachHangService) {
+    public KhachHangController(IKhachHangService khachHangService) {
         this.khachHangService = khachHangService;
     }
 
@@ -64,7 +64,7 @@ public class KhachHangController {
         KhachHang khachHangCapNhat = khachHangService.tichDiemVaCapNhatHang(maKhachHang, diem);
         return ResponseEntity.ok(khachHangCapNhat);
     }
-
+    
     // [Quyền: Admin/Nhân viên] - Thêm điểm cho khách hàng (cho Postman test)
     @PostMapping("/add-points")
     public ResponseEntity<KhachHang> addPoints(@RequestBody java.util.Map<String, Object> request) {
@@ -75,6 +75,21 @@ public class KhachHangController {
             return ResponseEntity.badRequest().build();
         }
         
+        KhachHang khachHangCapNhat = khachHangService.tichDiemVaCapNhatHang(maKhachHang, diemThem);
+        return ResponseEntity.ok(khachHangCapNhat);
+    }
+
+    // [Quyền: Admin/Nhân viên] - Thêm điểm cho khách hàng (POST /tich-diem) - supports POST with JSON body
+    @PostMapping("/tich-diem")
+    public ResponseEntity<KhachHang> addPointsPost(@RequestBody com.noithat.qlnt.backend.dto.request.TichDiemRequest request) {
+        Integer maKhachHang = request.getMaKhachHang();
+        // Use compatibility getter that prefers 'diem' but falls back to 'diemThem'
+        Integer diemThem = request.getEffectiveDiem();
+
+        if (maKhachHang == null || diemThem == null || diemThem <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
+
         KhachHang khachHangCapNhat = khachHangService.tichDiemVaCapNhatHang(maKhachHang, diemThem);
         return ResponseEntity.ok(khachHangCapNhat);
     }

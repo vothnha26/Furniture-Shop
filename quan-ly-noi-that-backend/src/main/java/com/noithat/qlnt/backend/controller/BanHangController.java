@@ -3,7 +3,7 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.dto.request.DonHangRequest;
 import com.noithat.qlnt.backend.dto.response.DonHangResponse;
 import com.noithat.qlnt.backend.dto.response.ThongKeBanHangResponse;
-import com.noithat.qlnt.backend.service.DonHangService;
+import com.noithat.qlnt.backend.service.IDonHangService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +16,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BanHangController {
 
-    private final DonHangService donHangService;
+    private final IDonHangService donHangService;
 
     @PostMapping("/donhang")
     public ResponseEntity<DonHangResponse> taoDonHang(@Valid @RequestBody DonHangRequest request) {
@@ -53,6 +53,17 @@ public class BanHangController {
     // ✅ Thống kê bán hàng (4 mục)
     @GetMapping("/thongke")
     public ResponseEntity<ThongKeBanHangResponse> thongKeBanHang() {
+        return ResponseEntity.ok(donHangService.thongKeBanHang());
+    }
+
+    // Accept hyphenated path `/thong-ke` and optional date range query params for backward compatibility
+    @GetMapping("/thong-ke")
+    public ResponseEntity<ThongKeBanHangResponse> thongKeBanHangHyphen(
+            @RequestParam(value = "fromDate", required = false) String fromDate,
+            @RequestParam(value = "toDate", required = false) String toDate
+    ) {
+        // Currently the service doesn't support date range. Ignore params for now and return overall stats.
+        // In future we can extend IDonHangService to accept date range and implement filtering.
         return ResponseEntity.ok(donHangService.thongKeBanHang());
     }
 }

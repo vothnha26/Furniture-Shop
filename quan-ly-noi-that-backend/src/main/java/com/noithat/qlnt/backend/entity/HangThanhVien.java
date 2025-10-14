@@ -6,7 +6,10 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "HangThanhVien")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class HangThanhVien {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

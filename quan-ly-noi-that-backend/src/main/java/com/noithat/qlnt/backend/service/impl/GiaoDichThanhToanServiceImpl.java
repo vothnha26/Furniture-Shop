@@ -6,7 +6,7 @@ import com.noithat.qlnt.backend.entity.DonHang;
 import com.noithat.qlnt.backend.entity.GiaoDichThanhToan;
 import com.noithat.qlnt.backend.repository.DonHangRepository;
 import com.noithat.qlnt.backend.repository.GiaoDichThanhToanRepository;
-import com.noithat.qlnt.backend.service.GiaoDichThanhToanService;
+import com.noithat.qlnt.backend.service.IGiaoDichThanhToanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class GiaoDichThanhToanServiceImpl implements GiaoDichThanhToanService {
+public class GiaoDichThanhToanServiceImpl implements IGiaoDichThanhToanService {
 
     private final GiaoDichThanhToanRepository giaoDichRepo;
     private final DonHangRepository donHangRepo;

@@ -1,7 +1,9 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.HangThanhVienDto;
-import com.noithat.qlnt.backend.service.HangThanhVienService;
+import com.noithat.qlnt.backend.dto.common.HangThanhVienDto;
+import com.noithat.qlnt.backend.dto.common.VipKhachHangDto;
+import com.noithat.qlnt.backend.dto.response.VipBenefitResponse;
+import com.noithat.qlnt.backend.service.IHangThanhVienService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,8 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/vip")
@@ -18,7 +18,7 @@ import java.util.HashMap;
 public class VipController {
 
     @Autowired
-    private HangThanhVienService hangThanhVienService;
+    private IHangThanhVienService hangThanhVienService;
 
     @GetMapping("/levels")
     public ResponseEntity<List<HangThanhVienDto>> getAllVipLevels() {
@@ -52,32 +52,18 @@ public class VipController {
     }
 
     @GetMapping("/customers")
-    public ResponseEntity<List<com.noithat.qlnt.backend.dto.VipKhachHangDto>> getVipCustomers(
+    public ResponseEntity<List<VipKhachHangDto>> getVipCustomers(
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String search) {
-        List<com.noithat.qlnt.backend.dto.VipKhachHangDto> customers = hangThanhVienService.getVipCustomers(level, search);
+        List<VipKhachHangDto> customers = hangThanhVienService.getVipCustomers(level, search);
         return ResponseEntity.ok(customers);
     }
 
     @GetMapping("/benefits/preview/{customerId}")
-    public ResponseEntity<com.noithat.qlnt.backend.dto.response.VipBenefitResponse> previewVipBenefits(
+    public ResponseEntity<VipBenefitResponse> previewVipBenefits(
             @PathVariable Integer customerId,
             @RequestParam BigDecimal orderAmount) {
-        com.noithat.qlnt.backend.dto.response.VipBenefitResponse benefits = hangThanhVienService.previewVipBenefits(customerId, orderAmount);
+        VipBenefitResponse benefits = hangThanhVienService.previewVipBenefits(customerId, orderAmount);
         return ResponseEntity.ok(benefits);
-    }
-
-    @PostMapping("/initialize")
-    public ResponseEntity<Map<String, String>> initializeVipLevels() {
-        try {
-            hangThanhVienService.khoiTaoHangThanhVienMacDinh();
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Khởi tạo hạng thành viên mặc định thành công");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> response = new HashMap<>();
-            response.put("error", "Lỗi khi khởi tạo: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
     }
 }

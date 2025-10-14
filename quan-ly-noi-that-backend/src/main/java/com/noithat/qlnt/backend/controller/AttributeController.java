@@ -11,23 +11,24 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.noithat.qlnt.backend.dto.GiaTriThuocTinhDto;
-import com.noithat.qlnt.backend.dto.ThuocTinhDto;
+import com.noithat.qlnt.backend.dto.common.GiaTriThuocTinhDto;
+import com.noithat.qlnt.backend.dto.common.ThuocTinhDto;
 import com.noithat.qlnt.backend.entity.GiaTriThuocTinh;
 import com.noithat.qlnt.backend.entity.ThuocTinh;
-import com.noithat.qlnt.backend.service.AttributeService;
+import com.noithat.qlnt.backend.service.IAttributeService;
 
 @RestController
 @RequestMapping("/api/attributes")
 public class AttributeController {
-    @Autowired private AttributeService attributeService;
+    @Autowired private IAttributeService attributeService;
 
     // ===== Thuộc tính (Attribute) =====
     @PostMapping
-    public ResponseEntity<ThuocTinh> createThuocTinh(@RequestBody ThuocTinhDto dto) {
+    public ResponseEntity<ThuocTinh> createThuocTinh(@Valid @RequestBody ThuocTinhDto dto) {
         return new ResponseEntity<>(attributeService.createThuocTinh(dto), HttpStatus.CREATED);
     }
 

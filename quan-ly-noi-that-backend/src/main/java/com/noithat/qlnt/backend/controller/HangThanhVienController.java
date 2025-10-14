@@ -2,7 +2,7 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.dto.request.HangThanhVienRequest;
 import com.noithat.qlnt.backend.dto.response.HangThanhVienResponse;
-import com.noithat.qlnt.backend.service.HangThanhVienService;
+import com.noithat.qlnt.backend.service.IHangThanhVienService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -22,7 +22,7 @@ import java.util.Map;
 public class HangThanhVienController {
 
     @Autowired
-    private HangThanhVienService hangThanhVienService;
+    private IHangThanhVienService hangThanhVienService;
 
     /**
      * Lấy tất cả hạng thành viên với phân trang

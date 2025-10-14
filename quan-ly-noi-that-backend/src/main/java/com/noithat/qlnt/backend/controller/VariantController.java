@@ -3,25 +3,36 @@ package com.noithat.qlnt.backend.controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.noithat.qlnt.backend.dto.BienTheUpdateRequestDto;
+import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
+import com.noithat.qlnt.backend.dto.request.BienTheUpdateRequestDto;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
-import com.noithat.qlnt.backend.service.VariantService;
+import com.noithat.qlnt.backend.service.IVariantService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/variants")
 public class VariantController {
 
     @Autowired
-    private VariantService variantService;
+    private IVariantService variantService;
+
+    // Tạo biến thể mới
+    @PostMapping
+    public ResponseEntity<BienTheSanPham> createVariant(@Valid @RequestBody BienTheRequestDto dto) {
+        return new ResponseEntity<>(variantService.createVariant(dto), HttpStatus.CREATED);
+    }
 
     // Lấy tất cả biến thể của một sản phẩm
     @GetMapping("/product/{productId}")

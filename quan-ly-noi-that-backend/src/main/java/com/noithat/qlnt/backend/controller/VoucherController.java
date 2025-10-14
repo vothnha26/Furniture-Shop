@@ -1,11 +1,11 @@
 package com.noithat.qlnt.backend.controller;
 
-import com.noithat.qlnt.backend.dto.*;
 import com.noithat.qlnt.backend.dto.request.VoucherApplyRequest;
 import com.noithat.qlnt.backend.dto.request.VoucherCreationRequest;
+import com.noithat.qlnt.backend.dto.response.*;
 import com.noithat.qlnt.backend.entity.Voucher;
-import com.noithat.qlnt.backend.service.VoucherService;
-import com.noithat.qlnt.backend.service.ChuongTrinhGiamGiaService;
+import com.noithat.qlnt.backend.service.IVoucherService;
+import com.noithat.qlnt.backend.service.IChuongTrinhGiamGiaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
@@ -19,10 +19,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/v1/voucher")
 public class VoucherController {
 
-    private final VoucherService voucherService;
-    private final ChuongTrinhGiamGiaService chuongTrinhGiamGiaService;
+    private final IVoucherService voucherService;
+    private final IChuongTrinhGiamGiaService chuongTrinhGiamGiaService;
 
-    public VoucherController(VoucherService voucherService, ChuongTrinhGiamGiaService chuongTrinhGiamGiaService) {
+    public VoucherController(IVoucherService voucherService, IChuongTrinhGiamGiaService chuongTrinhGiamGiaService) {
         this.voucherService = voucherService;
         this.chuongTrinhGiamGiaService = chuongTrinhGiamGiaService;
     }

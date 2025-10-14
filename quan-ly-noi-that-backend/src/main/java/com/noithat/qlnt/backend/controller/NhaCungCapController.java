@@ -14,16 +14,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.noithat.qlnt.backend.dto.NhaCungCapDto;
+import com.noithat.qlnt.backend.dto.common.NhaCungCapDto;
 import com.noithat.qlnt.backend.entity.NhaCungCap;
-import com.noithat.qlnt.backend.service.NhaCungCapService;
+import com.noithat.qlnt.backend.service.INhaCungCapService;
 
 @RestController
 @RequestMapping("/api/suppliers")
 public class NhaCungCapController {
 
     @Autowired
-    private NhaCungCapService nhaCungCapService;
+    private INhaCungCapService nhaCungCapService;
 
     @GetMapping
     public ResponseEntity<List<NhaCungCap>> getAll() {

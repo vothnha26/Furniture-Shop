@@ -14,20 +14,36 @@ public class DataSeeder {
 
     @Bean
         CommandLineRunner initData(HangThanhVienRepository hangRepo,
-                               TaiKhoanRepository taiKhoanRepo,
-                               KhachHangRepository khachHangRepo,
-                               VoucherRepository voucherRepo,
-                               VoucherHangThanhVienRepository voucherHangRepo,
-                               SanPhamRepository sanPhamRepo,
-                               BienTheSanPhamRepository bienTheRepo,
-                                BoSuuTapRepository boSuuTapRepo,
-                               VaiTroRepository vaiTroRepo,
-                               DonHangRepository donHangRepo,
-                               ChiTietDonHangRepository chiTietDonHangRepo,
-                               ChuongTrinhGiamGiaRepository chuongTrinhRepo,
-                               BienTheGiamGiaRepository bienTheGiamGiaRepo,
-                               DichVuRepository dichVuRepo,
-                               DonHangDichVuRepository donHangDichVuRepo) {
+                                                           TaiKhoanRepository taiKhoanRepo,
+                                                           KhachHangRepository khachHangRepo,
+                                                           VoucherRepository voucherRepo,
+                                                           VoucherHangThanhVienRepository voucherHangRepo,
+                                                           SanPhamRepository sanPhamRepo,
+                                                           BienTheSanPhamRepository bienTheRepo,
+                                                           BoSuuTapRepository boSuuTapRepo,
+                                                           VaiTroRepository vaiTroRepo,
+                                                           DonHangRepository donHangRepo,
+                                                           ChiTietDonHangRepository chiTietDonHangRepo,
+                                                           ChuongTrinhGiamGiaRepository chuongTrinhRepo,
+                                                           BienTheGiamGiaRepository bienTheGiamGiaRepo,
+                                                           DichVuRepository dichVuRepo,
+                                                           DonHangDichVuRepository donHangDichVuRepo,
+                                                           DanhMucRepository danhMucRepo,
+                                                           NhaCungCapRepository nhaCungCapRepo,
+                                                           ThuocTinhRepository thuocTinhRepo,
+                                                           GiaTriThuocTinhRepository giaTriRepo,
+                                                           BienTheGiaTriThuocTinhRepository bienTheGiaTriRepo,
+                                                           GiaoDichThanhToanRepository giaoDichRepo,
+                                                           LichSuTonKhoRepository lichSuTonKhoRepo,
+                                                           LichSuTrangThaiDonHangRepository lichSuTrangThaiRepo,
+                                                           LichSuDiemThuongRepository lichSuDiemThuongRepo,
+                                                           KiemKeKhoRepository kiemKeKhoRepo,
+                                                           KiemKeChiTietRepository kiemKeChiTietRepo,
+                                                           CanhBaoTonKhoRepository canhBaoTonKhoRepo,
+                                                           HoaDonRepository hoaDonRepo,
+                                                           NhanVienRepository nhanVienRepo,
+                                                           ThongTinGiaoHangRepository thongTinGiaoHangRepo,
+                                                           TrangThaiDonHangRepository trangThaiDonHangRepo) {
         return args -> {
 
             // ================== DỮ LIỆU NỀN TẢNG ==================
@@ -81,13 +97,29 @@ public class DataSeeder {
             SanPham sp1 = sanPhamRepo.save(new SanPham(null, "Ghế Sofa Băng Dài",
                     "Ghế sofa hiện đại cho phòng khách.", 20, 5, 6, 60, null, null, null));
 
-            BienTheSanPham bt1 = bienTheRepo.save(new BienTheSanPham(null, sp1, "SF-BANG-XAM", BigDecimal.valueOf(4500000), 50));
-            BienTheSanPham bt2 = bienTheRepo.save(new BienTheSanPham(null, sp1, "SF-BANG-KEM", BigDecimal.valueOf(4650000), 30));
+            BienTheSanPham bt1 = new BienTheSanPham();
+            bt1.setSanPham(sp1);
+            bt1.setSku("SF-BANG-XAM");
+            bt1.setGiaBan(BigDecimal.valueOf(4500000));
+            bt1.setSoLuongTon(50);
+            bt1 = bienTheRepo.save(bt1);
+
+            BienTheSanPham bt2 = new BienTheSanPham();
+            bt2.setSanPham(sp1);
+            bt2.setSku("SF-BANG-KEM");
+            bt2.setGiaBan(BigDecimal.valueOf(4650000));
+            bt2.setSoLuongTon(30);
+            bt2 = bienTheRepo.save(bt2);
 
             SanPham sp2 = sanPhamRepo.save(new SanPham(null, "Bàn Trà Gỗ Sồi",
                     "Bàn trà nhỏ gọn, thiết kế tinh tế.", 40, 6, 8, 400, null, null, null));
 
-            BienTheSanPham bt3 = bienTheRepo.save(new BienTheSanPham(null, sp2, "BT-SOI-TRON", BigDecimal.valueOf(1200000), 100));
+            BienTheSanPham bt3 = new BienTheSanPham();
+            bt3.setSanPham(sp2);
+            bt3.setSku("BT-SOI-TRON");
+            bt3.setGiaBan(BigDecimal.valueOf(1200000));
+            bt3.setSoLuongTon(100);
+            bt3 = bienTheRepo.save(bt3);
 
             // ================== TẠO ĐƠN HÀNG ==================
 
@@ -311,6 +343,165 @@ public class DataSeeder {
             ctdh1.setDonGiaGoc(BigDecimal.valueOf(2500000));
             ctdh1.setDonGiaThucTe(BigDecimal.valueOf(2500000));
             chiTietDonHangRepo.save(ctdh1);
+
+            // ================== NHÀ CUNG CẤP ==================
+            NhaCungCap ncc1 = new NhaCungCap();
+            ncc1.setTenNhaCungCap("Công ty Nội Thất A");
+            nhaCungCapRepo.save(ncc1);
+
+            NhaCungCap ncc2 = new NhaCungCap();
+            ncc2.setTenNhaCungCap("Công ty Đồ Gỗ B");
+            nhaCungCapRepo.save(ncc2);
+
+            // ================== THUỘC TÍNH & GIÁ TRỊ ==================
+            ThuocTinh color = thuocTinhRepo.save(new ThuocTinh(null, "Màu sắc"));
+            ThuocTinh material = thuocTinhRepo.save(new ThuocTinh(null, "Chất liệu"));
+
+            GiaTriThuocTinh gt1 = new GiaTriThuocTinh();
+            gt1.setThuocTinh(color);
+            gt1.setGiaTri("Xám");
+            gt1 = giaTriRepo.save(gt1);
+
+            GiaTriThuocTinh gt2 = new GiaTriThuocTinh();
+            gt2.setThuocTinh(color);
+            gt2.setGiaTri("Kem");
+            gt2 = giaTriRepo.save(gt2);
+
+            GiaTriThuocTinh gt3 = new GiaTriThuocTinh();
+            gt3.setThuocTinh(material);
+            gt3.setGiaTri("Gỗ sồi");
+            gt3 = giaTriRepo.save(gt3);
+
+            // Map attribute values to variants (BienThe)
+            BienTheGiaTriThuocTinh bgt1 = new BienTheGiaTriThuocTinh();
+            bgt1.setBienTheSanPham(bt1);
+            bgt1.setGiaTriThuocTinh(gt1);
+            bienTheGiaTriRepo.save(bgt1);
+
+            BienTheGiaTriThuocTinh bgt2 = new BienTheGiaTriThuocTinh();
+            bgt2.setBienTheSanPham(bt2);
+            bgt2.setGiaTriThuocTinh(gt2);
+            bienTheGiaTriRepo.save(bgt2);
+
+            BienTheGiaTriThuocTinh bgt3 = new BienTheGiaTriThuocTinh();
+            bgt3.setBienTheSanPham(bt3);
+            bgt3.setGiaTriThuocTinh(gt3);
+            bienTheGiaTriRepo.save(bgt3);
+
+            // ================== GIAO DỊCH THANH TOÁN ==================
+            GiaoDichThanhToan gd1 = new GiaoDichThanhToan();
+            gd1.setDonHang(savedDonHang1);
+            gd1.setSoTien(savedDonHang1.getThanhTien());
+            gd1.setPhuongThuc("COD");
+            gd1.setNgayGiaoDich(LocalDateTime.now().minusDays(1));
+            // required non-null column
+            gd1.setTrangThai("COMPLETED");
+            giaoDichRepo.save(gd1);
+
+            // ================== LỊCH SỬ TỒN KHO ==================
+            LichSuTonKho ls1 = new LichSuTonKho();
+            ls1.setBienTheSanPham(bt1);
+            ls1.setSoLuongTruoc(bt1.getSoLuongTon());
+            ls1.setSoLuongThayDoi(-1);
+            ls1.setSoLuongSau(bt1.getSoLuongTon() - 1);
+            ls1.setLyDo("Bán hàng");
+            ls1.setLoaiGiaoDich("BAN_HANG");
+            // reference order id as maThamChieu
+            ls1.setMaThamChieu(savedDonHang1.getMaDonHang() != null ? savedDonHang1.getMaDonHang().toString() : null);
+            ls1.setNguoiThucHien("system");
+            ls1.setThoiGianThucHien(LocalDateTime.now().minusDays(1));
+            lichSuTonKhoRepo.save(ls1);
+
+            // ================== LỊCH SỬ TRANG THÁI ĐƠN HÀNG ==================
+            LichSuTrangThaiDonHang lstd1 = new LichSuTrangThaiDonHang();
+            lstd1.setDonHang(savedDonHang1);
+            lstd1.setTrangThaiCu("Chờ lấy hàng");
+            lstd1.setTrangThaiMoi("Hoàn thành");
+            lstd1.setNguoiThayDoi("system");
+            lstd1.setThoiGianThayDoi(LocalDateTime.now().minusHours(2));
+            lichSuTrangThaiRepo.save(lstd1);
+
+            // ================== LỊCH SỬ ĐIỂM THƯỞNG ==================
+            LichSuDiemThuong lsd1 = new LichSuDiemThuong();
+            lsd1.setKhachHang(k1);
+            lsd1.setDiemThayDoi(50);
+            lsd1.setLyDo("Mua hàng");
+            lsd1.setNgayGhiNhan(LocalDateTime.now().minusDays(1));
+            lichSuDiemThuongRepo.save(lsd1);
+
+            // ================== KIỂM KÊ MẪU ==================
+            KiemKeKho kk1 = new KiemKeKho();
+            kk1.setTenKiemKe("Kiểm kê thử");
+            kk1.setNguoiTao("system");
+            kk1.setTrangThai(KiemKeKho.TrangThaiKiemKe.DANG_CHUAN_BI);
+            kk1 = kiemKeKhoRepo.save(kk1);
+
+            KiemKeChiTiet kct1 = new KiemKeChiTiet();
+            kct1.setKiemKeKho(kk1);
+            kct1.setBienTheSanPham(bt1);
+            kct1.setSoLuongHeThong(bt1.getSoLuongTon()); // 🟢 BẮT BUỘC: Số lượng theo hệ thống
+            kct1.setSoLuongThucTe(bt1.getSoLuongTon()); // Số lượng thực tế
+            kiemKeChiTietRepo.save(kct1);
+
+            // ================== BỔ SUNG DỮ LIỆU CHO CÁC BẢNG THIẾU ==================
+            // Danh mục
+            DanhMuc dm1 = new DanhMuc();
+            dm1.setTenDanhMuc("Phòng Khách");
+            dm1 = danhMucRepo.save(dm1);
+
+            DanhMuc dm2 = new DanhMuc();
+            dm2.setTenDanhMuc("Phòng Ăn");
+            dm2 = danhMucRepo.save(dm2);
+
+            // Gán danh mục cho sản phẩm nếu cần
+            sp1.setDanhMuc(dm1);
+            sp2.setDanhMuc(dm2);
+            sanPhamRepo.save(sp1);
+            sanPhamRepo.save(sp2);
+
+            // Nhân viên mẫu (chỉ set tên & chức vụ vì entity chỉ có những trường đó)
+            // Tạo tài khoản riêng cho nhân viên vì cột MaTaiKhoan không được NULL
+            TaiKhoan nvAccount = taiKhoanRepo.save(new TaiKhoan(null, "nvquan", "password", "nv.quan@example.com", vaiTro));
+
+            NhanVien nv1 = new NhanVien();
+            nv1.setTaiKhoan(nvAccount);
+            nv1.setHoTen("Nguyễn Văn Quản");
+            nv1.setChucVu("Quản lý kho");
+            nv1 = nhanVienRepo.save(nv1);
+
+            // Thông tin giao hàng cho đơn hàng mẫu (savedDonHang1)
+            ThongTinGiaoHang ttgh1 = new ThongTinGiaoHang();
+            ttgh1.setDonHang(savedDonHang1);
+            ttgh1.setDonViVanChuyen("Vận chuyển nhanh");
+            ttgh1.setMaVanDon("VD-" + (savedDonHang1.getMaDonHang() != null ? savedDonHang1.getMaDonHang() : "000"));
+            ttgh1.setPhiVanChuyen(BigDecimal.valueOf(150000));
+            ttgh1.setTrangThaiGiaoHang("Đã giao");
+            thongTinGiaoHangRepo.save(ttgh1);
+
+            // Hóa đơn mẫu liên kết với đơn hàng
+            HoaDon hoaDon1 = new HoaDon();
+            hoaDon1.setDonHang(savedDonHang1);
+            hoaDon1.setSoHoaDon("HD-" + (savedDonHang1.getMaDonHang() != null ? savedDonHang1.getMaDonHang() : "000"));
+            hoaDon1.setNgayXuat(LocalDateTime.now().minusDays(1));
+            hoaDon1.setNhanVienXuat(nv1);
+            hoaDon1.setTongTienThanhToan(savedDonHang1.getThanhTien());
+            hoaDonRepo.save(hoaDon1);
+
+            // Cảnh báo tồn kho mẫu
+            CanhBaoTonKho cb1 = new CanhBaoTonKho();
+            cb1.setBienTheSanPham(bt3);
+            cb1.setMucCanhBao(10);
+            cb1.setGhiChu("Tồn kho thấp, cần đặt thêm");
+            canhBaoTonKhoRepo.save(cb1);
+
+            // Trạng thái đơn hàng (bổ sung dữ liệu tham khảo)
+            TrangThaiDonHang ts1 = new TrangThaiDonHang();
+            ts1.setTenTrangThai("Chờ xử lý");
+            trangThaiDonHangRepo.save(ts1);
+
+            TrangThaiDonHang ts2 = new TrangThaiDonHang();
+            ts2.setTenTrangThai("Đang giao");
+            trangThaiDonHangRepo.save(ts2);
 
             System.out.println("✅ Seed dữ liệu thành công!");
         };

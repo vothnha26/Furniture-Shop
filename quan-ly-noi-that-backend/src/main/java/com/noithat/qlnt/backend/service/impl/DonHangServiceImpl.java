@@ -9,7 +9,7 @@ import com.noithat.qlnt.backend.dto.response.DonHangDichVuResponse;
 import com.noithat.qlnt.backend.dto.response.ThongKeBanHangResponse;
 import com.noithat.qlnt.backend.entity.*;
 import com.noithat.qlnt.backend.repository.*;
-import com.noithat.qlnt.backend.service.DonHangService;
+import com.noithat.qlnt.backend.service.IDonHangService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class DonHangServiceImpl implements DonHangService {
+public class DonHangServiceImpl implements IDonHangService {
 
     private final DonHangRepository donHangRepository;
     private final KhachHangRepository khachHangRepository;
@@ -30,8 +30,13 @@ public class DonHangServiceImpl implements DonHangService {
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final VoucherRepository voucherRepository;
     private final DichVuRepository dichVuRepository;
-    private final DonHangDichVuRepository donHangDichVuRepository;
     private final com.noithat.qlnt.backend.service.VipBenefitProcessor vipBenefitProcessor;
+    
+    // Repositories cho xóa đơn hàng
+    private final GiaoDichThanhToanRepository giaoDichThanhToanRepository;
+    private final ChiTietDonHangRepository chiTietDonHangRepository;
+    private final DonHangDichVuRepository donHangDichVuRepository;
+    private final LichSuTrangThaiDonHangRepository lichSuTrangThaiDonHangRepository;
 
     @Override
     @Transactional
@@ -249,9 +254,37 @@ public class DonHangServiceImpl implements DonHangService {
 
 
     @Override
+    @Transactional
     public void xoaDonHang(Integer id) {
         DonHang donHang = donHangRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + id));
+        
+        // 🔹 Xóa các bản ghi liên quan theo thứ tự
+        // 1. Xóa giao dịch thanh toán
+        List<GiaoDichThanhToan> giaoDichList = giaoDichThanhToanRepository.findByDonHang_MaDonHang(id);
+        if (!giaoDichList.isEmpty()) {
+            giaoDichThanhToanRepository.deleteAll(giaoDichList);
+        }
+        
+        // 2. Xóa lịch sử trạng thái đơn hàng
+        List<LichSuTrangThaiDonHang> lichSuList = lichSuTrangThaiDonHangRepository.findByDonHangOrderByThoiGianThayDoiDesc(id);
+        if (!lichSuList.isEmpty()) {
+            lichSuTrangThaiDonHangRepository.deleteAll(lichSuList);
+        }
+        
+        // 3. Xóa chi tiết đơn hàng
+        List<ChiTietDonHang> chiTietList = chiTietDonHangRepository.findByDonHangId(id);
+        if (!chiTietList.isEmpty()) {
+            chiTietDonHangRepository.deleteAll(chiTietList);
+        }
+        
+        // 4. Xóa dịch vụ đơn hàng (nếu có)
+        // DonHangDichVu có composite key, cần xóa thông qua đơn hàng entity
+        if (donHang.getDonHangDichVus() != null && !donHang.getDonHangDichVus().isEmpty()) {
+            donHangDichVuRepository.deleteAll(donHang.getDonHangDichVus());
+        }
+        
+        // 5. Cuối cùng xóa đơn hàng
         donHangRepository.delete(donHang);
     }
 

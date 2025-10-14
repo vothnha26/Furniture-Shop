@@ -31,7 +31,11 @@ public class ChiTietDonHang implements Serializable {
     private BigDecimal donGiaThucTe;
 
     @Embeddable
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @EqualsAndHashCode
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @EqualsAndHashCode
     public static class ChiTietDonHangId implements Serializable {
         @Column(name = "MaDonHang")
         private Integer maDonHang;

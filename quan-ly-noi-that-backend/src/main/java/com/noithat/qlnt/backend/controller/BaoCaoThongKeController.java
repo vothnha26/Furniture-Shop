@@ -1,9 +1,9 @@
 package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
-import com.noithat.qlnt.backend.service.QuanLyTonKhoService;
-import com.noithat.qlnt.backend.service.QuanLyTrangThaiDonHangService;
-import com.noithat.qlnt.backend.service.QuanLyKiemKeService;
+import com.noithat.qlnt.backend.service.IQuanLyTonKhoService;
+import com.noithat.qlnt.backend.service.IQuanLyTrangThaiDonHangService;
+import com.noithat.qlnt.backend.service.IQuanLyKiemKeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,13 +19,28 @@ import java.util.Map;
 public class BaoCaoThongKeController {
 
     @Autowired
-    private QuanLyTonKhoService quanLyTonKhoService;
+    private IQuanLyTonKhoService quanLyTonKhoService;
 
     @Autowired
-    private QuanLyTrangThaiDonHangService quanLyTrangThaiDonHangService;
+    private IQuanLyTrangThaiDonHangService quanLyTrangThaiDonHangService;
 
     @Autowired
-    private QuanLyKiemKeService quanLyKiemKeService;
+    private IQuanLyKiemKeService quanLyKiemKeService;
+
+    @Autowired
+    private com.noithat.qlnt.backend.service.IDonHangService donHangService;
+
+    @Autowired
+    private com.noithat.qlnt.backend.service.IKhachHangService khachHangService;
+
+    @Autowired
+    private com.noithat.qlnt.backend.repository.KhachHangRepository khachHangRepository;
+
+    @Autowired
+    private com.noithat.qlnt.backend.repository.HangThanhVienRepository hangThanhVienRepository;
+
+    @Autowired
+    private com.noithat.qlnt.backend.repository.ChiTietDonHangRepository chiTietDonHangRepository;
     
     /**
      * Lấy dữ liệu tổng quan cho Dashboard
@@ -196,6 +211,129 @@ public class BaoCaoThongKeController {
             
             response.put("success", true);
             response.put("data", summary);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Báo cáo doanh thu bán hàng
+     * GET /api/v1/bao-cao-thong-ke/bao-cao-doanh-thu
+     */
+    @GetMapping("/bao-cao-doanh-thu")
+    public ResponseEntity<Map<String, Object>> getRevenueReport() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var stats = donHangService.thongKeBanHang(); // ThongKeBanHangResponse
+            Map<String, Object> data = new HashMap<>();
+            data.put("tongDonHang", stats.getTongDonHang());
+            data.put("choXuLy", stats.getChoXuLy());
+            data.put("hoanThanh", stats.getHoanThanh());
+            data.put("doanhThuHomNay", stats.getDoanhThuHomNay());
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Báo cáo khách hàng
+     * GET /api/v1/bao-cao-thong-ke/bao-cao-khach-hang
+     */
+    @GetMapping("/bao-cao-khach-hang")
+    public ResponseEntity<Map<String, Object>> getCustomerReport() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Lấy tất cả khách hàng
+            var allCustomers = khachHangService.getAll();
+            long totalCustomers = allCustomers.size();
+
+            // Thống kê theo hạng thành viên
+            var allTiers = hangThanhVienRepository.findAll();
+            Map<String, Object> tierStats = new HashMap<>();
+            
+            for (var tier : allTiers) {
+                long count = khachHangRepository.countByHangThanhVien_MaHangThanhVien(tier.getMaHangThanhVien());
+                tierStats.put(tier.getTenHang(), count);
+            }
+
+            // Tính tổng điểm thưởng của tất cả khách hàng
+            int totalLoyaltyPoints = allCustomers.stream()
+                .mapToInt(k -> k.getDiemThuong() != null ? k.getDiemThuong() : 0)
+                .sum();
+
+            // Tạo báo cáo
+            Map<String, Object> report = new HashMap<>();
+            report.put("tongSoKhachHang", totalCustomers);
+            report.put("thongKeTheoHangThanhVien", tierStats);
+            report.put("tongDiemThuong", totalLoyaltyPoints);
+            report.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+            response.put("success", true);
+            response.put("data", report);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Báo cáo sản phẩm bán chạy
+     * GET /api/v1/bao-cao-thong-ke/san-pham-ban-chay?limit=10
+     */
+    @GetMapping("/san-pham-ban-chay")
+    public ResponseEntity<Map<String, Object>> getTopSellingProducts(
+            @RequestParam(value = "limit", defaultValue = "10") Integer limit) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Validate limit
+            if (limit == null || limit <= 0) {
+                limit = 10;
+            }
+            if (limit > 100) {
+                limit = 100; // Giới hạn tối đa 100 sản phẩm
+            }
+            
+            // Lấy dữ liệu sản phẩm bán chạy
+            List<Object[]> topProducts = chiTietDonHangRepository.findTopSellingProducts();
+            
+            // Giới hạn số lượng kết quả
+            int actualLimit = Math.min(limit, topProducts.size());
+            List<Object[]> limitedProducts = topProducts.subList(0, actualLimit);
+            
+            // Chuyển đổi dữ liệu sang format dễ đọc
+            List<Map<String, Object>> productList = new java.util.ArrayList<>();
+            int rank = 1;
+            for (Object[] row : limitedProducts) {
+                Map<String, Object> product = new HashMap<>();
+                product.put("rank", rank++);
+                product.put("maBienThe", row[0]);
+                product.put("tenSanPham", row[1]);
+                product.put("sku", row[2]);
+                product.put("tongSoLuongBan", row[3]);
+                product.put("tongDoanhThu", row[4]);
+                productList.add(product);
+            }
+            
+            Map<String, Object> report = new HashMap<>();
+            report.put("sanPhamBanChay", productList);
+            report.put("soLuongHienThi", actualLimit);
+            report.put("tongSoSanPham", topProducts.size());
+            report.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            
+            response.put("success", true);
+            response.put("data", report);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

@@ -15,10 +15,18 @@ import java.util.Optional;
 @Repository
 public interface BienTheSanPhamRepository extends JpaRepository<BienTheSanPham, Integer> {
     
-    // Tìm theo SKU
+    // =================== BASIC QUERIES (Từ cả hai nhánh) ===================
+    
+    // Tìm theo SKU (từ cả hai nhánh)
     Optional<BienTheSanPham> findBySku(String sku);
     
-    // Tìm tất cả biến thể của một sản phẩm
+    // Kiểm tra tồn tại theo SKU (từ HEAD)
+    boolean existsBySku(String sku);
+    
+    // Tìm tất cả biến thể của một sản phẩm - method naming convention (từ HEAD)
+    List<BienTheSanPham> findBySanPham_MaSanPham(Integer maSanPham);
+    
+    // Tìm tất cả biến thể của một sản phẩm - JPQL query (từ nhánh Phuc)
     @Query("SELECT b FROM BienTheSanPham b WHERE b.sanPham.maSanPham = :maSanPham")
     List<BienTheSanPham> findBySanPhamId(@Param("maSanPham") Integer maSanPham);
     

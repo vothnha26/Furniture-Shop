@@ -7,7 +7,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "BienTheSanPham")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class BienTheSanPham {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,6 +27,7 @@ public class BienTheSanPham {
     private BigDecimal giaBan;
 
     @Column(name = "SoLuongTon", nullable = false)
+
     private Integer soLuongTon = 0;
 
     // Thêm các trường quản lý kho nâng cao
@@ -100,5 +104,3 @@ public class BienTheSanPham {
         }
     }
 }
-
-

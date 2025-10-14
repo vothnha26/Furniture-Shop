@@ -2,11 +2,13 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.entity.LichSuTonKho;
-import com.noithat.qlnt.backend.service.QuanLyTonKhoService;
+import com.noithat.qlnt.backend.service.IQuanLyTonKhoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +18,7 @@ import java.util.Map;
 public class QuanLyTonKhoController {
 
     @Autowired
-    private QuanLyTonKhoService stockManagementService;
+    private IQuanLyTonKhoService stockManagementService;
 
     // =================== STOCK OPERATIONS (Đã đồng bộ với Postman) ===================
 
@@ -178,6 +180,43 @@ public class QuanLyTonKhoController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
+    /**
+     * Giải phóng hàng (release reservation)
+     * POST /api/v1/quan-ly-ton-kho/giai-phong
+     */
+    @PostMapping("/giai-phong")
+    public ResponseEntity<Map<String, Object>> giaiPhong(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Integer maBienThe = (Integer) request.get("maBienThe");
+            Integer quantity = request.get("soLuong") != null ? (Integer) request.get("soLuong") : (Integer) request.get("quantity");
+            String maThamChieu = request.containsKey("maDonHang") ? "DH" + request.get("maDonHang") : (String) request.get("maThamChieu");
+            String nguoiThucHien = request.get("nguoi") != null ? (String) request.get("nguoi") : (String) request.get("nguoiThucHien");
+
+            if (maBienThe == null || quantity == null) {
+                response.put("success", false);
+                response.put("message", "Thiếu thông tin bắt buộc: maBienThe, soLuong");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            boolean success = stockManagementService.releaseReservation(maBienThe, quantity, maThamChieu, nguoiThucHien);
+
+            if (success) {
+                response.put("success", true);
+                response.put("message", "Giải phóng hàng thành công");
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "Giải phóng hàng thất bại");
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
     
     /**
      * Xác nhận bán
@@ -290,6 +329,12 @@ public class QuanLyTonKhoController {
         }
     }
 
+    // Backwards-compatible route: /lich-su/{maBienThe}
+    @GetMapping("/lich-su/{maBienThe}")
+    public ResponseEntity<Map<String, Object>> getStockHistoryAlias(@PathVariable Integer maBienThe) {
+        return getStockHistory(maBienThe);
+    }
+
     /**
      * Lấy danh sách sản phẩm sắp hết hàng
      * GET /api/v1/quan-ly-ton-kho/san-pham-sap-het
@@ -310,6 +355,12 @@ public class QuanLyTonKhoController {
         }
     }
 
+    // Backwards-compatible: /sap-het-hang
+    @GetMapping("/sap-het-hang")
+    public ResponseEntity<Map<String, Object>> getLowStockProductsAlias() {
+        return getLowStockProducts();
+    }
+
     /**
      * Lấy danh sách sản phẩm hết hàng
      * GET /api/v1/quan-ly-ton-kho/san-pham-het-hang
@@ -328,6 +379,12 @@ public class QuanLyTonKhoController {
             response.put("message", "Lỗi: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    // Backwards-compatible: /het-hang
+    @GetMapping("/het-hang")
+    public ResponseEntity<Map<String, Object>> getOutOfStockProductsAlias() {
+        return getOutOfStockProducts();
     }
 
     /**
@@ -379,6 +436,36 @@ public class QuanLyTonKhoController {
             Double totalValue = stockManagementService.getTotalStockValue();
             response.put("success", true);
             response.put("totalValue", totalValue);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Tổng quan tồn kho (overview)
+     * GET /api/v1/quan-ly-ton-kho/tong-quan
+     */
+    @GetMapping("/tong-quan")
+    public ResponseEntity<Map<String, Object>> getInventoryOverview() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Double totalValue = stockManagementService.getTotalStockValue();
+            List<BienTheSanPham> lowStock = stockManagementService.getLowStockProducts();
+            List<BienTheSanPham> outOfStock = stockManagementService.getOutOfStockProducts();
+            List<Object[]> productSummary = stockManagementService.getStockSummaryByProduct();
+
+            Map<String, Object> overview = new HashMap<>();
+            overview.put("tongGiaTriTonKho", totalValue != null ? totalValue : 0.0);
+            overview.put("soLuongSanPhamSapHet", lowStock != null ? lowStock.size() : 0);
+            overview.put("soLuongSanPhamHetHang", outOfStock != null ? outOfStock.size() : 0);
+            overview.put("soLuongMatHang", productSummary != null ? productSummary.size() : 0);
+            overview.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+            response.put("success", true);
+            response.put("data", overview);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

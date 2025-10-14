@@ -5,7 +5,10 @@ import lombok.*;
 
 @Entity
 @Table(name = "SanPham")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class SanPham {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,6 +40,7 @@ public class SanPham {
     @JoinColumn(name = "MaNhaCungCap")
     private NhaCungCap nhaCungCap;
 
+    // Quan hệ ManyToOne: Nhiều sản phẩm thuộc một bộ sưu tập (1-N)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaBoSuuTap")
     private BoSuuTap boSuuTap;

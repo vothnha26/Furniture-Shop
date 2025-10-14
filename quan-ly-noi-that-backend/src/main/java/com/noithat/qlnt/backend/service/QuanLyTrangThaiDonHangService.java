@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -42,7 +41,7 @@ public class QuanLyTrangThaiDonHangService {
         try {
             Optional<DonHang> optionalDonHang = donHangRepository.findById(maDonHang);
             if (optionalDonHang.isEmpty()) {
-                return false;
+                throw new RuntimeException("Không tìm thấy đơn hàng với mã: " + maDonHang);
             }
             
             DonHang donHang = optionalDonHang.get();
@@ -50,7 +49,9 @@ public class QuanLyTrangThaiDonHangService {
             
             // Kiểm tra có thể chuyển trạng thái không
             if (!canTransition(trangThaiCu, trangThaiMoi)) {
-                return false;
+                String allowedTransitions = getAllowedTransitions(trangThaiCu);
+                throw new RuntimeException("Không thể chuyển từ trạng thái '" + trangThaiCu + 
+                    "' sang '" + trangThaiMoi + "'. " + allowedTransitions);
             }
             
             // Xử lý logic nghiệp vụ theo trạng thái
@@ -101,6 +102,28 @@ public class QuanLyTrangThaiDonHangService {
                 return false; // Trạng thái cuối
             default:
                 return false;
+        }
+    }
+    
+    /**
+     * Lấy danh sách trạng thái hợp lệ có thể chuyển đến
+     */
+    private String getAllowedTransitions(String trangThaiCu) {
+        switch (trangThaiCu) {
+            case CHO_XAC_NHAN:
+                return "Trạng thái hợp lệ: 'XAC_NHAN' hoặc 'HUY_BO'";
+            case XAC_NHAN:
+                return "Trạng thái hợp lệ: 'DANG_CHUAN_BI' hoặc 'HUY_BO'";
+            case DANG_CHUAN_BI:
+                return "Trạng thái hợp lệ: 'DANG_GIAO' hoặc 'HUY_BO'";
+            case DANG_GIAO:
+                return "Trạng thái hợp lệ: 'HOAN_THANH'";
+            case HOAN_THANH:
+                return "Đơn hàng đã hoàn thành, không thể thay đổi trạng thái";
+            case HUY_BO:
+                return "Đơn hàng đã bị hủy, không thể thay đổi trạng thái";
+            default:
+                return "Trạng thái không hợp lệ";
         }
     }
     

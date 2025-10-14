@@ -34,4 +34,20 @@ public interface ChiTietDonHangRepository extends JpaRepository<ChiTietDonHang, 
     @Query("SELECT COUNT(c) > 0 FROM ChiTietDonHang c WHERE c.id.maDonHang = :maDonHang AND c.id.maBienThe = :maBienThe")
     boolean existsByMaDonHangAndMaBienThe(@Param("maDonHang") Integer maDonHang, 
                                           @Param("maBienThe") Integer maBienThe);
+
+    List<ChiTietDonHang> findByDonHang_MaDonHang(Integer maDonHang);
+    
+    // Lấy sản phẩm bán chạy (TOP N sản phẩm có tổng số lượng bán cao nhất)
+    // Trả về: [maBienThe, tenSanPham, sku, tongSoLuong, tongDoanhThu]
+    @Query("SELECT c.bienThe.maBienThe, " +
+           "c.bienThe.sanPham.tenSanPham, " +
+           "c.bienThe.sku, " +
+           "SUM(c.soLuong) as tongSoLuong, " +
+           "SUM(c.donGiaThucTe * c.soLuong) as tongDoanhThu " +
+           "FROM ChiTietDonHang c " +
+           "WHERE c.donHang.trangThai = 'Hoàn thành' " +
+           "GROUP BY c.bienThe.maBienThe, c.bienThe.sanPham.tenSanPham, c.bienThe.sku " +
+           "ORDER BY tongSoLuong DESC")
+    List<Object[]> findTopSellingProducts();
 }
+

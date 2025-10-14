@@ -2,7 +2,7 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.entity.DonHang;
 import com.noithat.qlnt.backend.entity.LichSuTrangThaiDonHang;
-import com.noithat.qlnt.backend.service.QuanLyTrangThaiDonHangService;
+import com.noithat.qlnt.backend.service.IQuanLyTrangThaiDonHangService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +16,7 @@ import java.util.Map;
 public class QuanLyTrangThaiDonHangController {
     
     @Autowired
-    private QuanLyTrangThaiDonHangService orderStatusService;
+    private IQuanLyTrangThaiDonHangService orderStatusService;
     
     // =================== ORDER STATUS MANAGEMENT ===================
     
@@ -126,8 +126,15 @@ public class QuanLyTrangThaiDonHangController {
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Xác nhận đơn hàng");
             
+            // 🔹 Validation: Check if nguoiThayDoi is provided
+            if (nguoiThayDoi == null || nguoiThayDoi.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Thiếu thông tin người thay đổi");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
-                QuanLyTrangThaiDonHangService.XAC_NHAN, nguoiThayDoi, ghiChu);
+                IQuanLyTrangThaiDonHangService.XAC_NHAN, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
@@ -161,7 +168,7 @@ public class QuanLyTrangThaiDonHangController {
             String ghiChu = (String) request.getOrDefault("ghiChu", "Bắt đầu chuẩn bị đơn hàng");
             
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
-                QuanLyTrangThaiDonHangService.DANG_CHUAN_BI, nguoiThayDoi, ghiChu);
+                IQuanLyTrangThaiDonHangService.DANG_CHUAN_BI, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
@@ -195,7 +202,7 @@ public class QuanLyTrangThaiDonHangController {
             String ghiChu = (String) request.getOrDefault("ghiChu", "Bắt đầu giao hàng");
             
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
-                QuanLyTrangThaiDonHangService.DANG_GIAO, nguoiThayDoi, ghiChu);
+                IQuanLyTrangThaiDonHangService.DANG_GIAO, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
@@ -229,7 +236,7 @@ public class QuanLyTrangThaiDonHangController {
             String ghiChu = (String) request.getOrDefault("ghiChu", "Hoàn thành giao hàng");
             
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
-                QuanLyTrangThaiDonHangService.HOAN_THANH, nguoiThayDoi, ghiChu);
+                IQuanLyTrangThaiDonHangService.HOAN_THANH, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
@@ -263,7 +270,7 @@ public class QuanLyTrangThaiDonHangController {
             String ghiChu = (String) request.getOrDefault("ghiChu", "Hủy đơn hàng");
             
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
-                QuanLyTrangThaiDonHangService.HUY_BO, nguoiThayDoi, ghiChu);
+                IQuanLyTrangThaiDonHangService.HUY_BO, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);

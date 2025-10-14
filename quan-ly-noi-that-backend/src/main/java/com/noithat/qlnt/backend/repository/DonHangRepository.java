@@ -6,11 +6,32 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
 public interface DonHangRepository extends JpaRepository<DonHang, Integer> {
+    
+    // =================== STATISTICS QUERIES (Từ HEAD - Native SQL cho báo cáo) ===================
+    
+    @Query(value = "SELECT COUNT(*) FROM DonHang", nativeQuery = true)
+    long countTongDonHang();
+
+    @Query(value = "SELECT COUNT(*) FROM DonHang WHERE TrangThai = N'Chờ xử lý'", nativeQuery = true)
+    long countChoXuLy();
+
+    @Query(value = "SELECT COUNT(*) FROM DonHang WHERE TrangThai = N'Hoàn thành'", nativeQuery = true)
+    long countHoanThanh();
+
+    @Query(value = """
+        SELECT COALESCE(SUM(ThanhTien), 0)
+        FROM DonHang
+        WHERE CAST(NgayDatHang AS DATE) = CAST(GETDATE() AS DATE)
+    """, nativeQuery = true)
+    BigDecimal sumDoanhThuHomNay();
+    
+    // =================== ORDER MANAGEMENT QUERIES (Từ nhánh Phuc - JPQL) ===================
     
     // Tìm theo trạng thái
     @Query("SELECT d FROM DonHang d WHERE d.trangThai = :trangThai ORDER BY d.ngayDatHang DESC")
@@ -40,4 +61,7 @@ public interface DonHangRepository extends JpaRepository<DonHang, Integer> {
            "(d.trangThai = 'DANG_GIAO' AND DATEDIFF(day, d.ngayDatHang, CURRENT_TIMESTAMP) >= 3) " +
            "ORDER BY d.ngayDatHang ASC")
     List<DonHang> findOrdersNeedingAttention();
+    
+    // Đếm số đơn hàng của khách hàng
+    long countByKhachHang_MaKhachHang(Integer maKhachHang);
 }

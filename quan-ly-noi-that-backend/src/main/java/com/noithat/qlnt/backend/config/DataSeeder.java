@@ -5,7 +5,11 @@ import com.noithat.qlnt.backend.repository.*;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.PathResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
+import javax.sql.DataSource;
+import java.io.File;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -13,7 +17,7 @@ import java.time.LocalDateTime;
 public class DataSeeder {
 
     @Bean
-        CommandLineRunner initData(HangThanhVienRepository hangRepo,
+    CommandLineRunner initData(HangThanhVienRepository hangRepo,
                                                            TaiKhoanRepository taiKhoanRepo,
                                                            KhachHangRepository khachHangRepo,
                                                            VoucherRepository voucherRepo,
@@ -43,7 +47,8 @@ public class DataSeeder {
                                                            HoaDonRepository hoaDonRepo,
                                                            NhanVienRepository nhanVienRepo,
                                                            ThongTinGiaoHangRepository thongTinGiaoHangRepo,
-                                                           TrangThaiDonHangRepository trangThaiDonHangRepo) {
+                                                           TrangThaiDonHangRepository trangThaiDonHangRepo,
+                                                           DataSource dataSource) {
         return args -> {
 
             // ================== DỮ LIỆU NỀN TẢNG ==================
@@ -129,6 +134,7 @@ public class DataSeeder {
             donHang1.setNgayDatHang(LocalDateTime.now().minusDays(1));
             donHang1.setTrangThai("Hoàn thành");
             donHang1.setPhuongThucThanhToan("COD"); // 🟢 BẮT BUỘC THÊM
+            donHang1.setPhuongThucGiaoHang("Vận chuyển tiêu chuẩn"); // 🟢 BẮT BUỘC THÊM
             donHang1.setGhiChu("Giao hàng vào giờ hành chính.");
             donHang1.setVoucher(v1);
 
@@ -154,6 +160,7 @@ public class DataSeeder {
             donHang2.setNgayDatHang(LocalDateTime.now());
             donHang2.setTrangThai("Chờ xử lý");
             donHang2.setPhuongThucThanhToan("Chuyển khoản"); // 🟢 BẮT BUỘC THÊM
+            donHang2.setPhuongThucGiaoHang("Vận chuyển tiêu chuẩn"); // 🟢 BẮT BUỘC THÊM
             donHang2.setTongTienGoc(bt2.getGiaBan());
             donHang2.setThanhTien(bt2.getGiaBan());
             donHang2.setChiPhiDichVu(BigDecimal.ZERO);
@@ -170,6 +177,7 @@ public class DataSeeder {
             donHang3.setNgayDatHang(LocalDateTime.now().minusHours(2));
             donHang3.setTrangThai("Đang giao");
             donHang3.setPhuongThucThanhToan("COD"); // 🟢 BẮT BUỘC THÊM
+            donHang3.setPhuongThucGiaoHang("Vận chuyển nhanh"); // 🟢 BẮT BUỘC THÊM
             donHang3.setTongTienGoc(bt3.getGiaBan());
             donHang3.setThanhTien(bt3.getGiaBan());
             donHang3.setChiPhiDichVu(BigDecimal.ZERO);
@@ -327,6 +335,7 @@ public class DataSeeder {
             dh1.setTrangThai("Đang xử lý");
             dh1.setNgayDatHang(LocalDateTime.now());
             dh1.setPhuongThucThanhToan("Chuyển khoản");
+            dh1.setPhuongThucGiaoHang("Vận chuyển tiêu chuẩn");
             dh1.setTongTienGoc(BigDecimal.valueOf(2500000));
             dh1.setGiamGiaVoucher(BigDecimal.valueOf(500000)); // VIP2025 giảm 500k
             dh1.setThanhTien(BigDecimal.valueOf(2000000)); // 2.5tr - 500k = 2tr
@@ -504,6 +513,30 @@ public class DataSeeder {
             trangThaiDonHangRepo.save(ts2);
 
             System.out.println("✅ Seed dữ liệu thành công!");
+
+            // If an external SQL seed file exists in project root, execute it as well.
+            try {
+                File script = new File("h2-full-seed-noquotes.sql");
+                if (script.exists() && script.isFile()) {
+                    System.out.println("🔁 Executing external SQL seed: " + script.getAbsolutePath());
+                    PathResource resource = new PathResource(script.getAbsolutePath());
+                    ResourceDatabasePopulator populator = new ResourceDatabasePopulator(resource);
+                    populator.execute(dataSource);
+                    System.out.println("✅ External SQL seed executed successfully.");
+                } else {
+                    // Try the quoted version as fallback
+                    File script2 = new File("h2-full-seed.sql");
+                    if (script2.exists() && script2.isFile()) {
+                        System.out.println("🔁 Executing external SQL seed: " + script2.getAbsolutePath());
+                        PathResource resource = new PathResource(script2.getAbsolutePath());
+                        ResourceDatabasePopulator populator = new ResourceDatabasePopulator(resource);
+                        populator.execute(dataSource);
+                        System.out.println("✅ External SQL seed executed successfully.");
+                    }
+                }
+            } catch (Exception ex) {
+                System.out.println("⚠️ Failed to execute external SQL seed: " + ex.getMessage());
+            }
         };
     }
 

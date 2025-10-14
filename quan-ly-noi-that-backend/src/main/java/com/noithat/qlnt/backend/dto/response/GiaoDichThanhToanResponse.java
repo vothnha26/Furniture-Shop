@@ -11,4 +11,5 @@ public class GiaoDichThanhToanResponse {
     private BigDecimal soTien;
     private String trangThai;
     private LocalDateTime ngayThanhToan;
+    
 }

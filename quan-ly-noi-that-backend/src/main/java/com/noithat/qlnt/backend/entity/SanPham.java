@@ -44,4 +44,8 @@ public class SanPham {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaBoSuuTap")
     private BoSuuTap boSuuTap;
+
+    // Quan hệ OneToMany: Một sản phẩm có nhiều hình ảnh (1-N)
+    @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<HinhAnhSanPham> hinhAnhList = new java.util.ArrayList<>();
 }

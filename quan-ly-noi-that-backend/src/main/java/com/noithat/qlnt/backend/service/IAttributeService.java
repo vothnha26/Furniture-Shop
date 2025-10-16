@@ -4,9 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.noithat.qlnt.backend.dto.common.GiaTriThuocTinhDto;
 import com.noithat.qlnt.backend.dto.common.ThuocTinhDto;
-import com.noithat.qlnt.backend.entity.GiaTriThuocTinh;
 import com.noithat.qlnt.backend.entity.ThuocTinh;
 
 @Service
@@ -21,15 +19,6 @@ public interface IAttributeService {
     ThuocTinh updateThuocTinh(Integer id, ThuocTinhDto dto);
 
     void deleteThuocTinh(Integer id);
-
-
-    // ----- Quản lý Giá trị thuộc tính -----
-    GiaTriThuocTinh createGiaTri(Integer thuocTinhId, GiaTriThuocTinhDto dto);
-
-    List<GiaTriThuocTinh> getGiaTriByThuocTinh(Integer thuocTinhId);
-
-    // ----- HÀM MỚI -----
-    GiaTriThuocTinh updateGiaTriThuocTinh(Integer id, GiaTriThuocTinhDto dto);
 
     void deleteGiaTriThuocTinh(Integer id);
 }

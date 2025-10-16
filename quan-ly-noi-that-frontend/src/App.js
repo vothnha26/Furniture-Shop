@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { CartProvider } from './contexts/CartContext';
 
 // Import admin components
 import AccountManagement from './components/admin/system/AccountManagement';
@@ -58,6 +59,8 @@ import ProductSlider from './components/shared/ProductSlider';
 import TestimonialSlider from './components/shared/TestimonialSlider';
 import Newsletter from './components/shared/Newsletter';
 import Footer from './components/shared/Footer';
+
+import MembershipTierManagement from './components/admin/products/MembershipTierManagement';
 
 // Import styles
 import './slider.css';
@@ -142,268 +145,272 @@ const HomePage = () => {
 
 const App = () => {
   return (
-    <Router>
-      <Routes>
-        {/* ============================================
+    <CartProvider>
+      <Router>
+        <Routes>
+          {/* ============================================
             PUBLIC ROUTES - Không cần đăng nhập
         ============================================ */}
-        
-        {/* Home & Landing Pages */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/home" element={<Navigate to="/" replace />} />
-        
-        {/* Authentication */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Login />} /> {/* Có thể tạo component Register riêng */}
-        <Route path="/forgot-password" element={<Login />} /> {/* Có thể tạo component ForgotPassword riêng */}
-        
-        {/* Public Shop Pages */}
-        <Route path="/shop" element={<CustomerLayout><CustomerShop /></CustomerLayout>} />
-        <Route path="/shop/products" element={<CustomerLayout><CustomerShopPage /></CustomerLayout>} />
-        <Route path="/shop/products/:id" element={<CustomerLayout><CustomerProductDetail /></CustomerLayout>} />
-        <Route path="/products" element={<Navigate to="/shop/products" replace />} />
-        <Route path="/products/:id" element={<Navigate to="/shop/products/:id" replace />} />
+
+          {/* Home & Landing Pages */}
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<Navigate to="/" replace />} />
+
+          {/* Authentication */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Login />} /> {/* Có thể tạo component Register riêng */}
+          <Route path="/forgot-password" element={<Login />} /> {/* Có thể tạo component ForgotPassword riêng */}
+
+          {/* Public Shop Pages (nested under CustomerLayout) */}
+          <Route path="/shop" element={<CustomerLayout />}>
+            <Route index element={<CustomerShop />} />
+            <Route path="products" element={<CustomerShopPage />} />
+            <Route path="products/:id" element={<CustomerProductDetail />} />
+          </Route>
+          <Route path="/products" element={<Navigate to="/shop/products" replace />} />
+          <Route path="/products/:id" element={<Navigate to="/shop/products/:id" replace />} />
 
 
-        {/* ============================================
+          {/* ============================================
             CUSTOMER ROUTES - Yêu cầu đăng nhập
         ============================================ */}
-        
-        {/* Shopping Cart & Checkout */}
-        <Route path="/cart" element={<CustomerLayout><CustomerCart /></CustomerLayout>} />
-        <Route path="/checkout" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
-        <Route path="/checkout/success" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
-        <Route path="/checkout/cancel" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
-        
-        {/* Customer Profile & Account */}
-        <Route path="/profile" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-        <Route path="/account" element={<Navigate to="/profile" replace />} />
-        <Route path="/profile/edit" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-        <Route path="/profile/password" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-        <Route path="/profile/addresses" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-        
-        {/* Customer Orders */}
-        <Route path="/orders" element={<CustomerLayout><CustomerOrders /></CustomerLayout>} />
-        <Route path="/orders/:id" element={<CustomerLayout><CustomerOrderTracking /></CustomerLayout>} />
-        <Route path="/orders/track/:id" element={<CustomerLayout><CustomerOrderTracking /></CustomerLayout>} />
-        <Route path="/order-history" element={<Navigate to="/orders" replace />} />
-        
-        {/* Customer Favorites & Wishlist */}
-        <Route path="/favorites" element={<CustomerLayout><CustomerFavorites /></CustomerLayout>} />
-        <Route path="/wishlist" element={<Navigate to="/favorites" replace />} />
-        
-        {/* Customer Notifications */}
-        <Route path="/notifications" element={<CustomerLayout><CustomerNotifications /></CustomerLayout>} />
-        
-        {/* Customer Loyalty & Points */}
-        <Route path="/loyalty" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-        <Route path="/points" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-        <Route path="/vouchers" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+
+          {/* Shopping Cart & Checkout */}
+          <Route path="/cart" element={<CustomerLayout><CustomerCart /></CustomerLayout>} />
+          <Route path="/checkout" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
+          <Route path="/checkout/success" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
+          <Route path="/checkout/cancel" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
+
+          {/* Customer Profile & Account */}
+          <Route path="/profile" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+          <Route path="/account" element={<Navigate to="/profile" replace />} />
+          <Route path="/profile/edit" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+          <Route path="/profile/password" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+          <Route path="/profile/addresses" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+
+          {/* Customer Orders */}
+          <Route path="/orders" element={<CustomerLayout><CustomerOrders /></CustomerLayout>} />
+          <Route path="/orders/:id" element={<CustomerLayout><CustomerOrderTracking /></CustomerLayout>} />
+          <Route path="/orders/track/:id" element={<CustomerLayout><CustomerOrderTracking /></CustomerLayout>} />
+          <Route path="/order-history" element={<Navigate to="/orders" replace />} />
+
+          {/* Customer Favorites & Wishlist */}
+          <Route path="/favorites" element={<CustomerLayout><CustomerFavorites /></CustomerLayout>} />
+          <Route path="/wishlist" element={<Navigate to="/favorites" replace />} />
+
+          {/* Customer Notifications */}
+          <Route path="/notifications" element={<CustomerLayout><CustomerNotifications /></CustomerLayout>} />
+
+          {/* Customer Loyalty & Points */}
+          <Route path="/loyalty" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+          <Route path="/points" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+          <Route path="/vouchers" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
 
 
-        {/* ============================================
+          {/* ============================================
             ADMIN ROUTES - Quản trị viên
         ============================================ */}
-        
-        {/* Admin Dashboard */}
-        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/admin/dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
-        
-        {/* Product Management */}
-        <Route path="/admin/products" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-        <Route path="/admin/products/add" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-        <Route path="/admin/products/:id" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-        <Route path="/admin/products/:id/edit" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-        <Route path="/admin/products/:id/images" element={<AdminLayout><ImageManagement /></AdminLayout>} />
-        <Route path="/admin/products/:id/variants" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-        <Route path="/admin/products/variants" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-        <Route path="/admin/products/variants/add" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-        <Route path="/admin/products/variants/:id" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-        
-        {/* Category Management */}
-        <Route path="/admin/categories" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-        <Route path="/admin/categories/add" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-        <Route path="/admin/categories/:id" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-        <Route path="/admin/categories/:id/edit" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-        
-        {/* Collection Management */}
-        <Route path="/admin/collections" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-        <Route path="/admin/collections/add" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-        <Route path="/admin/collections/:id" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-        <Route path="/admin/collections/:id/edit" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-        
-        {/* Attribute Management */}
-        <Route path="/admin/attributes" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-        <Route path="/admin/attributes/add" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-        <Route path="/admin/attributes/:id" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-        <Route path="/admin/attributes/:id/edit" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-        <Route path="/admin/attribute-values" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
-        <Route path="/admin/attribute-values/add" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
-        <Route path="/admin/attribute-values/:id" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
-        
-        {/* Customer Management */}
-        <Route path="/admin/customers" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-        <Route path="/admin/customers/add" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-        <Route path="/admin/customers/:id" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-        <Route path="/admin/customers/:id/edit" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-        <Route path="/admin/customers/:id/orders" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-        <Route path="/admin/customers/:id/points" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-        
-        {/* VIP & Membership Management */}
-        <Route path="/admin/vip" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-        <Route path="/admin/vip/levels" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-        <Route path="/admin/vip/levels/add" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-        <Route path="/admin/vip/levels/:id" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-        <Route path="/admin/vip/customers" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-        <Route path="/admin/membership" element={<Navigate to="/admin/vip" replace />} />
-        
-        {/* Order Management */}
-        <Route path="/admin/orders" element={<AdminLayout><OrderManagement /></AdminLayout>} />
-        <Route path="/admin/orders/add" element={<AdminLayout><OrderManagement /></AdminLayout>} />
-        <Route path="/admin/orders/:id" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-        <Route path="/admin/orders/:id/edit" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-        <Route path="/admin/orders/:id/status" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-        <Route path="/admin/orders/:id/cancel" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-        
-        {/* Invoice Management */}
-        <Route path="/admin/invoices" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
-        <Route path="/admin/invoices/:id" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
-        <Route path="/admin/invoices/:id/print" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
-        
-        {/* Payment Management */}
-        <Route path="/admin/payments" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-        <Route path="/admin/payments/:id" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-        <Route path="/admin/payments/pending" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-        <Route path="/admin/payments/completed" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-        <Route path="/admin/transactions" element={<Navigate to="/admin/payments" replace />} />
-        
-        {/* Promotion & Discount Management */}
-        <Route path="/admin/promotions" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-        <Route path="/admin/promotions/add" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-        <Route path="/admin/promotions/:id" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-        <Route path="/admin/promotions/:id/edit" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-        
-        <Route path="/admin/discounts" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-        <Route path="/admin/discounts/add" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-        <Route path="/admin/discounts/:id" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-        <Route path="/admin/discounts/:id/edit" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-        
-        {/* Voucher Management */}
-        <Route path="/admin/vouchers" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-        <Route path="/admin/vouchers/add" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-        <Route path="/admin/vouchers/:id" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-        <Route path="/admin/vouchers/:id/edit" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-        <Route path="/admin/vouchers/:id/assign" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-        
-        {/* Inventory Management */}
-        <Route path="/admin/inventory" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-        <Route path="/admin/inventory/alerts" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-        <Route path="/admin/inventory/stock" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-        <Route path="/admin/inventory/import" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-        <Route path="/admin/inventory/export" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-        
-        {/* Sales Management */}
-        <Route path="/admin/sales" element={<AdminLayout><SalesManagement /></AdminLayout>} />
-        <Route path="/admin/sales/pos" element={<AdminLayout><SalesManagement /></AdminLayout>} />
-        <Route path="/admin/sales/statistics" element={<AdminLayout><SalesManagement /></AdminLayout>} />
-        
-        {/* Reports & Analytics */}
-        <Route path="/admin/reports" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-        <Route path="/admin/reports/revenue" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-        <Route path="/admin/reports/products" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-        <Route path="/admin/reports/customers" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-        <Route path="/admin/reports/inventory" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-        <Route path="/admin/analytics" element={<Navigate to="/admin/reports" replace />} />
-        
-        {/* Account & User Management */}
-        <Route path="/admin/accounts" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-        <Route path="/admin/accounts/add" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-        <Route path="/admin/accounts/:id" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-        <Route path="/admin/accounts/:id/edit" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-        <Route path="/admin/users" element={<Navigate to="/admin/accounts" replace />} />
-        
-        {/* System Settings */}
-        <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
-        <Route path="/admin/settings/general" element={<AdminLayout><Settings /></AdminLayout>} />
-        <Route path="/admin/settings/payment" element={<AdminLayout><Settings /></AdminLayout>} />
-        <Route path="/admin/settings/shipping" element={<AdminLayout><Settings /></AdminLayout>} />
-        <Route path="/admin/settings/email" element={<AdminLayout><Settings /></AdminLayout>} />
-        <Route path="/admin/settings/sms" element={<AdminLayout><Settings /></AdminLayout>} />
-        
-        {/* Backup & Restore */}
-        <Route path="/admin/backup" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-        <Route path="/admin/backup/create" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-        <Route path="/admin/backup/restore" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-        <Route path="/admin/backup/schedule" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-        
-        {/* Notifications */}
-        <Route path="/admin/notifications" element={<AdminLayout><Notifications /></AdminLayout>} />
-        <Route path="/admin/notifications/send" element={<AdminLayout><Notifications /></AdminLayout>} />
-        
-        {/* Backend Explorer - Development Tool */}
-        <Route path="/admin/backend-explorer" element={<AdminLayout><BackendExplorer /></AdminLayout>} />
-        <Route path="/admin/api-explorer" element={<Navigate to="/admin/backend-explorer" replace />} />
+
+          {/* Admin Dashboard */}
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/admin/dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
+
+          {/* Product Management */}
+          <Route path="/admin/products" element={<AdminLayout><ProductManagement /></AdminLayout>} />
+          <Route path="/admin/products/add" element={<AdminLayout><ProductManagement /></AdminLayout>} />
+          <Route path="/admin/products/:id" element={<AdminLayout><ProductManagement /></AdminLayout>} />
+          <Route path="/admin/products/:id/edit" element={<AdminLayout><ProductManagement /></AdminLayout>} />
+          <Route path="/admin/products/:id/images" element={<AdminLayout><ImageManagement /></AdminLayout>} />
+          <Route path="/admin/products/:id/variants" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
+          <Route path="/admin/products/variants" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
+          <Route path="/admin/products/variants/add" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
+          <Route path="/admin/products/variants/:id" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
+
+          {/* Category Management */}
+          <Route path="/admin/categories" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
+          <Route path="/admin/categories/add" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
+          <Route path="/admin/categories/:id" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
+          <Route path="/admin/categories/:id/edit" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
+
+          {/* Collection Management */}
+          <Route path="/admin/collections" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
+          <Route path="/admin/collections/add" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
+          <Route path="/admin/collections/:id" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
+          <Route path="/admin/collections/:id/edit" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
+
+          {/* Attribute Management */}
+          <Route path="/admin/attributes" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
+          <Route path="/admin/attributes/add" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
+          <Route path="/admin/attributes/:id" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
+          <Route path="/admin/attributes/:id/edit" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
+          <Route path="/admin/attribute-values" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
+          <Route path="/admin/attribute-values/add" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
+          <Route path="/admin/attribute-values/:id" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
+
+          {/* Customer Management */}
+          <Route path="/admin/customers" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+          <Route path="/admin/customers/add" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+          <Route path="/admin/customers/:id" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+          <Route path="/admin/customers/:id/edit" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+          <Route path="/admin/customers/:id/orders" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+          <Route path="/admin/customers/:id/points" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+
+          {/* VIP & Membership Management */}
+          <Route path="/admin/vip" element={<AdminLayout><VIPManagement /></AdminLayout>} />
+          <Route path="/admin/vip/levels" element={<AdminLayout><VIPManagement /></AdminLayout>} />
+          <Route path="/admin/vip/levels/add" element={<AdminLayout><VIPManagement /></AdminLayout>} />
+          <Route path="/admin/vip/levels/:id" element={<AdminLayout><VIPManagement /></AdminLayout>} />
+          <Route path="/admin/vip/customers" element={<AdminLayout><VIPManagement /></AdminLayout>} />
+          <Route path="/admin/membership" element={<Navigate to="/admin/vip" replace />} />
+
+          {/* Order Management */}
+          <Route path="/admin/orders" element={<AdminLayout><OrderManagement /></AdminLayout>} />
+          <Route path="/admin/orders/add" element={<AdminLayout><OrderManagement /></AdminLayout>} />
+          <Route path="/admin/orders/:id" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
+          <Route path="/admin/orders/:id/edit" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
+          <Route path="/admin/orders/:id/status" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
+          <Route path="/admin/orders/:id/cancel" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
+
+          {/* Invoice Management */}
+          <Route path="/admin/invoices" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
+          <Route path="/admin/invoices/:id" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
+          <Route path="/admin/invoices/:id/print" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
+
+          {/* Payment Management */}
+          <Route path="/admin/payments" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
+          <Route path="/admin/payments/:id" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
+          <Route path="/admin/payments/pending" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
+          <Route path="/admin/payments/completed" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
+          <Route path="/admin/transactions" element={<Navigate to="/admin/payments" replace />} />
+
+          {/* Promotion & Discount Management */}
+          <Route path="/admin/promotions" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
+          <Route path="/admin/promotions/add" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
+          <Route path="/admin/promotions/:id" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
+          <Route path="/admin/promotions/:id/edit" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
+
+          <Route path="/admin/discounts" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
+          <Route path="/admin/discounts/add" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
+          <Route path="/admin/discounts/:id" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
+          <Route path="/admin/discounts/:id/edit" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
+
+          {/* Voucher Management */}
+          <Route path="/admin/vouchers" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
+          <Route path="/admin/vouchers/add" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
+          <Route path="/admin/vouchers/:id" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
+          <Route path="/admin/vouchers/:id/edit" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
+          <Route path="/admin/vouchers/:id/assign" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
+
+          {/* Inventory Management */}
+          <Route path="/admin/inventory" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
+          <Route path="/admin/inventory/alerts" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
+          <Route path="/admin/inventory/stock" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
+          <Route path="/admin/inventory/import" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
+          <Route path="/admin/inventory/export" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
+
+          {/* Sales Management */}
+          <Route path="/admin/sales" element={<AdminLayout><SalesManagement /></AdminLayout>} />
+          <Route path="/admin/sales/pos" element={<AdminLayout><SalesManagement /></AdminLayout>} />
+          <Route path="/admin/sales/statistics" element={<AdminLayout><SalesManagement /></AdminLayout>} />
+
+          {/* Reports & Analytics */}
+          <Route path="/admin/reports" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
+          <Route path="/admin/reports/revenue" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
+          <Route path="/admin/reports/products" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
+          <Route path="/admin/reports/customers" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
+          <Route path="/admin/reports/inventory" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
+          <Route path="/admin/analytics" element={<Navigate to="/admin/reports" replace />} />
+
+          {/* Account & User Management */}
+          <Route path="/admin/accounts" element={<AdminLayout><AccountManagement /></AdminLayout>} />
+          <Route path="/admin/accounts/add" element={<AdminLayout><AccountManagement /></AdminLayout>} />
+          <Route path="/admin/accounts/:id" element={<AdminLayout><AccountManagement /></AdminLayout>} />
+          <Route path="/admin/accounts/:id/edit" element={<AdminLayout><AccountManagement /></AdminLayout>} />
+          <Route path="/admin/users" element={<Navigate to="/admin/accounts" replace />} />
+
+          {/* System Settings */}
+          <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
+          <Route path="/admin/settings/general" element={<AdminLayout><Settings /></AdminLayout>} />
+          <Route path="/admin/settings/payment" element={<AdminLayout><Settings /></AdminLayout>} />
+          <Route path="/admin/settings/shipping" element={<AdminLayout><Settings /></AdminLayout>} />
+          <Route path="/admin/settings/email" element={<AdminLayout><Settings /></AdminLayout>} />
+          <Route path="/admin/settings/sms" element={<AdminLayout><Settings /></AdminLayout>} />
+
+          {/* Backup & Restore */}
+          <Route path="/admin/backup" element={<AdminLayout><BackupRestore /></AdminLayout>} />
+          <Route path="/admin/backup/create" element={<AdminLayout><BackupRestore /></AdminLayout>} />
+          <Route path="/admin/backup/restore" element={<AdminLayout><BackupRestore /></AdminLayout>} />
+          <Route path="/admin/backup/schedule" element={<AdminLayout><BackupRestore /></AdminLayout>} />
+
+          {/* Notifications */}
+          <Route path="/admin/notifications" element={<AdminLayout><Notifications /></AdminLayout>} />
+          <Route path="/admin/notifications/send" element={<AdminLayout><Notifications /></AdminLayout>} />
+
+          {/* Backend Explorer - Development Tool */}
+          <Route path="/admin/backend-explorer" element={<AdminLayout><BackendExplorer /></AdminLayout>} />
+          <Route path="/admin/api-explorer" element={<Navigate to="/admin/backend-explorer" replace />} />
 
 
-        {/* ============================================
+          {/* ============================================
             STAFF ROUTES - Nhân viên
         ============================================ */}
-        
-        {/* Staff Dashboard */}
-        <Route path="/staff" element={<StaffLayout />} />
-        <Route path="/staff/dashboard" element={<StaffLayout />} />
-        
-        {/* Staff Order Management */}
-        <Route path="/staff/orders" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-        <Route path="/staff/orders/:id" element={<StaffLayout><OrderDetailManagement /></StaffLayout>} />
-        <Route path="/staff/orders/pending" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-        <Route path="/staff/orders/processing" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-        <Route path="/staff/orders/completed" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-        
-        {/* Staff Sales */}
-        <Route path="/staff/sales" element={<StaffLayout><SalesManagement /></StaffLayout>} />
-        <Route path="/staff/sales/pos" element={<StaffLayout><SalesManagement /></StaffLayout>} />
-        
-        {/* Staff Invoices */}
-        <Route path="/staff/invoices" element={<StaffLayout><InvoiceManagement /></StaffLayout>} />
-        <Route path="/staff/invoices/:id" element={<StaffLayout><InvoiceManagement /></StaffLayout>} />
-        
-        {/* Staff Payments */}
-        <Route path="/staff/payments" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
-        <Route path="/staff/payments/:id" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
-        
-        {/* Staff Inventory */}
-        <Route path="/staff/inventory" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
-        <Route path="/staff/inventory/alerts" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
-        <Route path="/staff/inventory/check" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
+
+          {/* Staff Dashboard */}
+          <Route path="/staff" element={<StaffLayout />} />
+          <Route path="/staff/dashboard" element={<StaffLayout />} />
+
+          {/* Staff Order Management */}
+          <Route path="/staff/orders" element={<StaffLayout><OrderManagement /></StaffLayout>} />
+          <Route path="/staff/orders/:id" element={<StaffLayout><OrderDetailManagement /></StaffLayout>} />
+          <Route path="/staff/orders/pending" element={<StaffLayout><OrderManagement /></StaffLayout>} />
+          <Route path="/staff/orders/processing" element={<StaffLayout><OrderManagement /></StaffLayout>} />
+          <Route path="/staff/orders/completed" element={<StaffLayout><OrderManagement /></StaffLayout>} />
+
+          {/* Staff Sales */}
+          <Route path="/staff/sales" element={<StaffLayout><SalesManagement /></StaffLayout>} />
+          <Route path="/staff/sales/pos" element={<StaffLayout><SalesManagement /></StaffLayout>} />
+
+          {/* Staff Invoices */}
+          <Route path="/staff/invoices" element={<StaffLayout><InvoiceManagement /></StaffLayout>} />
+          <Route path="/staff/invoices/:id" element={<StaffLayout><InvoiceManagement /></StaffLayout>} />
+
+          {/* Staff Payments */}
+          <Route path="/staff/payments" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
+          <Route path="/staff/payments/:id" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
+
+          {/* Staff Inventory */}
+          <Route path="/staff/inventory" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
+          <Route path="/staff/inventory/alerts" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
+          <Route path="/staff/inventory/check" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
 
 
-        {/* ============================================
+          {/* ============================================
             UTILITY ROUTES
         ============================================ */}
-        
-        {/* Pending Tasks */}
-        <Route path="/pending" element={<PendingTasks />} />
-        <Route path="/tasks" element={<Navigate to="/pending" replace />} />
-        
-        {/* Main Dashboard (Role-based redirect) */}
-        <Route path="/main-dashboard" element={<MainDashboard />} />
-        <Route path="/dashboard" element={<MainDashboard />} />
 
+          {/* Pending Tasks */}
+          <Route path="/pending" element={<PendingTasks />} />
+          <Route path="/tasks" element={<Navigate to="/pending" replace />} />
 
-        {/* ============================================
+          {/* Main Dashboard (Role-based redirect) */}
+          <Route path="/main-dashboard" element={<MainDashboard />} />
+          <Route path="/dashboard" element={<MainDashboard />} />
+
+          <Route path="/admin/membership/tiers" element={<AdminLayout><MembershipTierManagement /></AdminLayout>} />
+
+          {/* ============================================
             ERROR & FALLBACK ROUTES
         ============================================ */}
-        
-        {/* 404 - Not Found - Redirect to home */}
-        <Route path="/404" element={<Navigate to="/" replace />} />
-        
-        {/* Catch all - redirect to home */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
-  );
 
+          {/* 404 - Not Found - Redirect to home */}
+          <Route path="/404" element={<Navigate to="/" replace />} />
+
+          {/* Catch all - redirect to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </CartProvider>
+  );
 };
 
 export default App;

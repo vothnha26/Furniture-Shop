@@ -22,4 +22,7 @@ public class BienTheGiamGiaResponse {
     private BigDecimal giaGoc;
     private BigDecimal giaSauGiam;
     private BigDecimal phanTramGiam;
+    // parent product info (when included in list responses)
+    private Integer maSanPham;
+    private String tenSanPham;
 }

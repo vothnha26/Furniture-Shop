@@ -1,262 +1,110 @@
 import React, { useState, useEffect } from 'react';
-import { IoArrowBack, IoStar, IoStarOutline, IoHeart, IoHeartOutline, IoShare, IoCart, IoEye, IoCheckmarkCircle, IoWarning, IoImage, IoResize, IoColorPalette, IoTime } from 'react-icons/io5';
+import { useParams } from 'react-router-dom';
 import api from '../../api';
+import { useCart } from '../../contexts/CartContext';
+import { IoArrowBack, IoStar, IoStarOutline, IoHeart, IoHeartOutline, IoShare, IoCart, IoEye, IoCheckmarkCircle, IoWarning } from 'react-icons/io5';
 
 const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, onToggleFavorite, onToggleWishlist }) => {
-  const [product, setProduct] = useState(initialProduct);
+  const { addToCart, isInCart, getItemQuantity } = useCart();
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [reviews, setReviews] = useState([]);
-  const [relatedProducts, setRelatedProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [newReview, setNewReview] = useState({
-    rating: 5,
-    title: '',
-    content: '',
-    name: '',
-    photos: []
-  });
+  const [addedToCart, setAddedToCart] = useState(false);
+  // Use the fetched product detail (from API) when available
+  const [productState, setProductState] = useState(initialProduct || {});
 
-  // Map product detail from API
-  const mapProductDetailFromApi = (productData) => ({
-    id: productData.maSanPham || productData.id,
-    name: productData.tenSanPham || productData.name,
-    category: productData.danhMuc?.tenDanhMuc || productData.category,
-    price: productData.giaBan || productData.price || 0,
-    originalPrice: productData.giaGoc || productData.originalPrice || 0,
-    discount: productData.phanTramGiamGia || 0,
-    rating: productData.danhGiaTrungBinh || productData.rating || 5,
-    reviewCount: productData.soLuongDanhGia || productData.reviewCount || 0,
-    description: productData.moTaChiTiet || productData.description || '',
-    specifications: productData.thongSoKyThuat || productData.specifications || {},
-    images: productData.hinhAnhList?.map(img => img.duongDan) || productData.images || [],
-    variants: productData.bienTheList?.map(variant => ({
-      id: variant.maBienThe,
-      name: variant.tenBienThe,
-      price: variant.giaBan,
-      originalPrice: variant.giaGoc,
-      stock: variant.tonKho,
-      attributes: variant.thuocTinhList?.map(attr => ({
-        name: attr.thuocTinh?.tenThuocTinh,
-        value: attr.giaTri?.giaTri
-      })) || []
-    })) || [],
-    inStock: productData.tonKho > 0,
-    stockCount: productData.tonKho || 0
-  });
-
-  // Fetch product details
+  // If mounted via route /shop/products/:id, fetch full product details with variants
+  const params = useParams();
   useEffect(() => {
-    const fetchProductDetail = async () => {
-      if (!initialProduct?.id) return;
-      
-      setIsLoading(true);
-      try {
-        const data = await api.get(`/api/products/${initialProduct.id}/detail`);
-        setProduct(mapProductDetailFromApi(data));
-      } catch (err) {
-        console.error('Fetch product detail error', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchProductDetail();
-  }, [initialProduct?.id]);
-
-  // Fetch product reviews
-  useEffect(() => {
-    const fetchReviews = async () => {
-      if (!initialProduct?.id) return;
-      
-      try {
-        const data = await api.get(`/api/products/${initialProduct.id}/reviews`);
-        if (Array.isArray(data)) {
-          setReviews(data.map(review => ({
-            id: review.maDanhGia,
-            customerName: review.khachHang?.hoTen || 'Ẩn danh',
-            rating: review.danhGia,
-            title: review.tieuDe,
-            content: review.noiDung,
-            date: review.ngayTao,
-            images: review.hinhAnhList || []
-          })));
+    const id = params?.id;
+    if (id && (!initialProduct || (!initialProduct.id && !initialProduct.maSanPham))) {
+      (async () => {
+        try {
+          // Gọi API mới để lấy chi tiết đầy đủ với biến thể và giảm giá
+          const res = await api.get(`/api/products/${id}/detail`);
+          setProductState(res?.data ?? res);
+        } catch (err) {
+          console.error('Failed to fetch product detail', err);
         }
-      } catch (err) {
-        console.error('Fetch reviews error', err);
-      }
-    };
-    fetchReviews();
-  }, [initialProduct?.id]);
-
-  // Fetch related products
-  useEffect(() => {
-    const fetchRelatedProducts = async () => {
-      if (!initialProduct?.id) return;
-      
-      try {
-        const data = await api.get(`/api/products/${initialProduct.id}/related`);
-        if (Array.isArray(data)) {
-          setRelatedProducts(data.map(prod => ({
-            id: prod.maSanPham,
-            name: prod.tenSanPham,
-            price: prod.giaBan,
-            originalPrice: prod.giaGoc,
-            image: prod.hinhAnhChinh,
-            rating: prod.danhGiaTrungBinh || 5,
-            reviewCount: prod.soLuongDanhGia || 0
-          })));
-        }
-      } catch (err) {
-        console.error('Fetch related products error', err);
-      }
-    };
-    fetchRelatedProducts();
-  }, [initialProduct?.id]);
+      })();
+    }
+  }, [params?.id, initialProduct]);
+  // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
-
-  // Mock product data with full details
-  const productDetail = {
-    maSanPham: 'SP001',
-    tenSanPham: 'Bộ sofa góc L hiện đại Milan',
-    giaBan: 15500000,
-    giaGoc: 18500000,
-    moTa: 'Bộ sofa góc L hiện đại Milan được thiết kế với phong cách tối giản, sang trọng. Khung gỗ thông cao cấp kết hợp với đệm mút memory foam mang lại cảm giác êm ái, thoải mái. Bọc da PU cao cấp chống thấm nước, dễ vệ sinh. Thiết kế góc L tối ưu không gian phòng khách.',
-    moTaChiTiet: `
-      <h3>Đặc điểm nổi bật:</h3>
-      <ul>
-        <li>Khung gỗ thông tự nhiên cao cấp, chịu lực tốt</li>
-        <li>Đệm mút memory foam dày 12cm, ôm sát cơ thể</li>
-        <li>Bọc da PU cao cấp, chống thấm nước và dễ vệ sinh</li>
-        <li>Thiết kế góc L tối ưu hóa không gian phòng khách</li>
-        <li>Màu sắc đa dạng phù hợp mọi phong cách nội thất</li>
-      </ul>
-      
-      <h3>Hướng dẫn bảo quản:</h3>
-      <ul>
-        <li>Vệ sinh định kỳ bằng khăn ẩm</li>
-        <li>Tránh để nơi ẩm ướt hoặc ánh nắng trực tiếp</li>
-        <li>Sử dụng chất tẩy rửa chuyên dụng khi cần thiết</li>
-      </ul>
-    `,
-    hinhAnh: [
-      '/api/placeholder/600/400',
-      '/api/placeholder/600/400', 
-      '/api/placeholder/600/400',
-      '/api/placeholder/600/400',
-      '/api/placeholder/600/400'
-    ],
-    danhGia: 4.5,
-    soLuotDanhGia: 128,
-    soLuongTonKho: 15,
-    trangThai: 'con_hang',
-    bienThe: [
-      {
-        maBienThe: 'BT001',
-        mauSac: 'Nâu đậm',
-        kichThuoc: '220x160x85cm',
-        soLuong: 8,
-        gia: 15500000
-      },
-      {
-        maBienThe: 'BT002', 
-        mauSac: 'Xám nhạt',
-        kichThuoc: '220x160x85cm',
-        soLuong: 5,
-        gia: 15500000
-      },
-      {
-        maBienThe: 'BT003',
-        mauSac: 'Đen',
-        kichThuoc: '240x180x85cm', 
-        soLuong: 2,
-        gia: 17500000
-      }
-    ],
-    thongSoKyThuat: {
-      'Chất liệu khung': 'Gỗ thông tự nhiên',
-      'Chất liệu đệm': 'Mút memory foam',
-      'Chất liệu bọc': 'Da PU cao cấp',
-      'Kích thước': '220x160x85cm (DxRxC)',
-      'Trọng lượng': '95kg',
-      'Màu sắc': 'Nâu, Xám, Đen',
-      'Xuất xứ': 'Việt Nam',
-      'Bảo hành': '24 tháng',
-      'Phong cách': 'Hiện đại, tối giản'
-    },
-    danhGiaKhachHang: [
-      {
-        id: 1,
-        tenKhachHang: 'Nguyễn Văn An',
-        danhGia: 5,
-        tieuDe: 'Sản phẩm tuyệt vời!',
-        noiDung: 'Chất lượng sofa rất tốt, đúng như mô tả. Giao hàng nhanh, lắp đặt tận nơi. Gia đình tôi rất hài lòng.',
-        ngayDanhGia: '2024-01-10',
-        hinhAnh: ['/api/placeholder/150/150', '/api/placeholder/150/150'],
-        bienThe: 'Nâu đậm - 220x160x85cm'
-      },
-      {
-        id: 2,
-        tenKhachHang: 'Trần Thị Bình', 
-        danhGia: 4,
-        tieuDe: 'Đẹp và chất lượng',
-        noiDung: 'Sofa đẹp, ngồi thoải mái. Màu sắc đúng như hình. Chỉ có điều thời gian giao hàng hơi lâu.',
-        ngayDanhGia: '2024-01-08',
-        hinhAnh: ['/api/placeholder/150/150'],
-        bienThe: 'Xám nhạt - 220x160x85cm'
-      },
-      {
-        id: 3,
-        tenKhachHang: 'Lê Minh Cường',
-        danhGia: 5,
-        tieuDe: 'Đáng tiền',
-        noiDung: 'Giá cả hợp lý so với chất lượng. Thiết kế hiện đại, phù hợp với phòng khách nhà tôi.',
-        ngayDanhGia: '2024-01-05',
-        hinhAnh: [],
-        bienThe: 'Đen - 240x180x85cm'
-      }
-    ],
-    sanPhamLienQuan: [
-      {
-        maSanPham: 'SP002',
-        tenSanPham: 'Bàn trà kính cường lực',
-        giaBan: 2500000,
-        giaGoc: 3000000,
-        hinhAnh: '/api/placeholder/300/200',
-        danhGia: 4.3
-      },
-      {
-        maSanPham: 'SP003', 
-        tenSanPham: 'Thảm trải sàn cao cấp',
-        giaBan: 1200000,
-        giaGoc: 1500000,
-        hinhAnh: '/api/placeholder/300/200',
-        danhGia: 4.7
-      },
-      {
-        maSanPham: 'SP004',
-        tenSanPham: 'Đèn trang trí phòng khách',
-        giaBan: 800000,
-        giaGoc: 1000000,
-        hinhAnh: '/api/placeholder/300/200', 
-        danhGia: 4.2
-      }
-    ],
-    isFavorite: false,
-    isInWishlist: false
-  };
-
-  const [productState, setProductState] = useState(productDetail);
+  const [newReview, setNewReview] = useState({ rating: 5, title: '', content: '', name: '', photos: [] });
 
   const handleVariantSelect = (variant) => {
-    setSelectedVariant(variant);
+    // normalize variant fields to a predictable shape
+    const norm = normalizeVariant(variant);
+    setSelectedVariant(norm);
+  };
+
+  // Normalize different variant shapes from backend
+  const normalizeVariant = (v) => {
+    if (!v) return null;
+    const id = v.maBienThe ?? v.id ?? v.variantId ?? v._id ?? null;
+    
+    // Ưu tiên giá sau khi giảm nếu có
+    const price = Number(v.giaSauGiam ?? v.giaBan ?? v.gia ?? v.price ?? v.unitPrice) || 0;
+    const originalPrice = Number(v.giaBan ?? v.giaGoc ?? v.gia_goc ?? v.originalPrice ?? 0) || 0;
+    const stock = Number(v.soLuong ?? v.soLuongTon ?? v.tonKho ?? v.stockQuantity ?? v.quantity ?? 0) || 0;
+    
+    // Build tên biến thể từ thuộc tính
+    let name = v.tenBienThe ?? v.ten ?? v.name;
+    if (!name && v.thuocTinh && Array.isArray(v.thuocTinh) && v.thuocTinh.length > 0) {
+      name = v.thuocTinh.map(attr => attr.giaTri).join(' - ');
+    }
+    if (!name && v.mauSac) {
+      name = `${v.mauSac}${v.kichThuoc ? ' - ' + v.kichThuoc : ''}`;
+    }
+    if (!name) name = 'Phiên bản';
+    
+    // Tính phần trăm giảm giá
+    const discountPercent = v.phanTramGiam ? Math.round(Number(v.phanTramGiam)) : 
+                           (originalPrice > price && originalPrice > 0 ? Math.round((1 - price/originalPrice) * 100) : 0);
+    
+    return { 
+      ...v, 
+      id, 
+      price, 
+      originalPrice, 
+      stock, 
+      name,
+      discountPercent,
+      attributes: v.thuocTinh ?? [],
+      discount: v.giamGia
+    };
   };
 
   const handleAddToCart = () => {
+    // Check if variant is selected
+    if (!selectedVariant) {
+      alert('Vui lòng chọn phiên bản sản phẩm!');
+      return;
+    }
+
+    // Check stock
+    if (selectedVariant.stock === 0) {
+      alert('Sản phẩm này hiện đang hết hàng!');
+      return;
+    }
+
+    // Check quantity
+    if (quantity > selectedVariant.stock) {
+      alert(`Số lượng tối đa: ${selectedVariant.stock}`);
+      return;
+    }
+
+    // Add to cart using context
+    addToCart(productState, selectedVariant, quantity);
+
+    // Show success message
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2000);
+
+    // Call parent callback if provided (for backward compatibility)
     const cartItem = {
       ...productState,
       bienTheChon: selectedVariant,
@@ -273,13 +121,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
     onToggleFavorite?.(productState.maSanPham);
   };
 
-  const toggleWishlist = () => {
-    setProductState(prev => ({
-      ...prev,
-      isInWishlist: !prev.isInWishlist
-    }));
-    onToggleWishlist?.(productState.maSanPham);
-  };
+  
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -287,11 +129,22 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
       currency: 'VND'
     }).format(amount);
   };
+  // Determine active price/stock based on selected variant or product-level values
+  const basePrice = Number(productState.giaBan ?? productState.gia ?? productState.price) || 0;
+  const baseOriginal = Number(productState.giaGoc ?? productState.gia_goc ?? productState.originalPrice) || 0;
+  const baseStock = Number(productState.soLuongTonKho ?? productState.tongSoLuong ?? productState.stockQuantity ?? 0) || 0;
+  const activePrice = selectedVariant ? (Number(selectedVariant.price) || 0) : basePrice;
+  const activeOriginal = selectedVariant ? (Number(selectedVariant.originalPrice) || 0) : baseOriginal;
+  const activeStock = selectedVariant ? (Number(selectedVariant.stock) || 0) : baseStock;
 
-  const getDiscountPercent = () => {
-    if (!productState.giaGoc || productState.giaGoc <= productState.giaBan) return 0;
-    return Math.round((1 - productState.giaBan / productState.giaGoc) * 100);
-  };
+  // If productState carries variants and none is selected yet, pick the first one
+  useEffect(() => {
+    const variantsArr = Array.isArray(productState.bienThe) ? productState.bienThe : (Array.isArray(productState.variants) ? productState.variants : []);
+    if ((!selectedVariant || !selectedVariant.id) && variantsArr.length > 0) {
+      setSelectedVariant(normalizeVariant(variantsArr[0]));
+    }
+    // include selectedVariant in deps to satisfy exhaustive-deps; change is idempotent
+  }, [productState, selectedVariant]);
 
   const renderStars = (rating, size = 'w-4 h-4') => {
     const stars = [];
@@ -322,8 +175,28 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
     });
   };
 
+  // Resolve possibly-relative backend image paths to absolute URLs
+  const resolveImageUrl = (img) => {
+    if (!img) return api.buildUrl('/default-product.jpg');
+    if (typeof img === 'string') {
+      const s = img.trim();
+      if (s.startsWith('http://') || s.startsWith('https://')) return s;
+      return api.buildUrl(s);
+    }
+    if (img.duongDanHinhAnh) return resolveImageUrl(img.duongDanHinhAnh);
+    return api.buildUrl('/default-product.jpg');
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6">
+      {/* Success notification */}
+      {addedToCart && (
+        <div className="fixed top-20 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-down">
+          <IoCheckmarkCircle className="w-5 h-5" />
+          <span>Đã thêm vào giỏ hàng!</span>
+        </div>
+      )}
+
       {/* Back Button */}
       <button
         onClick={onBack}
@@ -338,14 +211,23 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
         <div className="space-y-4">
           <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
             <img
-              src={productState.hinhAnh[selectedImage]}
+              src={resolveImageUrl(
+                // prefer array present at hinhAnh or images, otherwise single image
+                Array.isArray(productState.hinhAnh) ? (productState.hinhAnh[selectedImage] || productState.hinhAnh[0]) :
+                (Array.isArray(productState.images) ? (productState.images[selectedImage] || productState.images[0]) : productState.image)
+              )}
               alt={productState.tenSanPham}
               className="w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = api.buildUrl('/logo192.png'); }}
             />
           </div>
-          
+
           <div className="grid grid-cols-5 gap-2">
-            {productState.hinhAnh.map((image, index) => (
+            {(
+              Array.isArray(productState.hinhAnh) ? productState.hinhAnh : (
+                Array.isArray(productState.images) ? productState.images : []
+              )
+            ).map((image, index) => (
               <button
                 key={index}
                 onClick={() => setSelectedImage(index)}
@@ -354,9 +236,10 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                 }`}
               >
                 <img
-                  src={image}
+                  src={resolveImageUrl(image)}
                   alt={`${productState.tenSanPham} ${index + 1}`}
                   className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = api.buildUrl('/logo192.png'); }}
                 />
               </button>
             ))}
@@ -388,27 +271,25 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
             <div className="space-y-2 mb-6">
               <div className="flex items-center gap-3">
                 <span className="text-3xl font-bold text-red-600">
-                  {formatCurrency(productState.giaBan)}
+                  {formatCurrency(activePrice)}
                 </span>
-                {productState.giaGoc > productState.giaBan && (
+                {activeOriginal > activePrice && (
                   <>
                     <span className="text-lg text-gray-500 line-through">
-                      {formatCurrency(productState.giaGoc)}
+                      {formatCurrency(activeOriginal)}
                     </span>
                     <span className="bg-red-100 text-red-600 px-2 py-1 rounded text-sm font-medium">
-                      -{getDiscountPercent()}%
+                      -{Math.round((1 - (activePrice / activeOriginal || 1)) * 100)}%
                     </span>
                   </>
                 )}
               </div>
               
               <div className="flex items-center gap-2">
-                {productState.soLuongTonKho > 0 ? (
+                {activeStock > 0 ? (
                   <>
                     <IoCheckmarkCircle className="w-5 h-5 text-green-500" />
-                    <span className="text-green-600 font-medium">
-                      Còn hàng ({productState.soLuongTonKho} sản phẩm)
-                    </span>
+                    <span className="text-green-600 font-medium">Còn hàng ({activeStock} sản phẩm)</span>
                   </>
                 ) : (
                   <>
@@ -421,36 +302,68 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
           </div>
 
           {/* Variants Selection */}
-          {productState.bienThe && productState.bienThe.length > 0 && (
+          {((productState.bienThe || productState.variants) || []).length > 0 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Chọn phiên bản:</h3>
               <div className="space-y-3">
-                {productState.bienThe.map((variant) => (
-                  <div
-                    key={variant.maBienThe}
-                    onClick={() => handleVariantSelect(variant)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedVariant?.maBienThe === variant.maBienThe
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="font-medium">{variant.mauSac}</div>
-                        <div className="text-sm text-gray-600">{variant.kichThuoc}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-red-600">
-                          {formatCurrency(variant.gia)}
+                {(productState.bienThe || productState.variants || []).map((variantRaw) => {
+                  const v = normalizeVariant(variantRaw);
+                  const isSelected = selectedVariant && (selectedVariant.id === v.id || selectedVariant.maBienThe === v.id);
+                  return (
+                    <div
+                      key={v.id ?? JSON.stringify(v)}
+                      onClick={() => handleVariantSelect(variantRaw)}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="font-medium">{v.name}</div>
+                          {/* Hiển thị thuộc tính của biến thể */}
+                          {v.attributes && v.attributes.length > 0 && (
+                            <div className="text-sm text-gray-600 mt-1">
+                              {v.attributes.map((attr, idx) => (
+                                <span key={idx}>
+                                  {attr.tenThuocTinh}: <span className="font-medium">{attr.giaTri}</span>
+                                  {idx < v.attributes.length - 1 ? ' • ' : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Fallback: show old format if no attributes array */}
+                          {(!v.attributes || v.attributes.length === 0) && variantRaw.mauSac && (
+                            <div className="text-sm text-gray-600">{variantRaw.mauSac}{variantRaw.kichThuoc ? ' • ' + variantRaw.kichThuoc : ''}</div>
+                          )}
+                          {/* Hiển thị giảm giá nếu có */}
+                          {v.discount && (
+                            <div className="text-xs text-green-600 mt-1">
+                              🎉 {v.discount.tenChuongTrinh}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          Còn {variant.soLuong} sản phẩm
+                        <div className="text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="font-semibold text-red-600">
+                              {formatCurrency(v.price)}
+                            </div>
+                            {v.originalPrice > v.price && (
+                              <>
+                                <div className="text-sm text-gray-500 line-through">
+                                  {formatCurrency(v.originalPrice)}
+                                </div>
+                                <div className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">
+                                  -{v.discountPercent}%
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">Còn {v.stock} sản phẩm</div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -458,9 +371,16 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
           {/* Quantity & Actions */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số lượng:
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Số lượng:
+                </label>
+                {selectedVariant && isInCart(selectedVariant.id) && (
+                  <span className="text-sm text-blue-600">
+                    Đã có {getItemQuantity(selectedVariant.id)} trong giỏ
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center border rounded-lg">
                   <button
@@ -478,7 +398,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                   </button>
                 </div>
                 <span className="text-sm text-gray-600">
-                  (Tối đa {selectedVariant?.soLuong || productState.soLuongTonKho} sản phẩm)
+                  (Tối đa {selectedVariant?.stock ?? productState.soLuongTonKho ?? productState.stockQuantity ?? 0} sản phẩm)
                 </span>
               </div>
             </div>
@@ -486,11 +406,26 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
             <div className="flex gap-3">
               <button
                 onClick={handleAddToCart}
-                disabled={productState.soLuongTonKho === 0}
-                className="flex-1 bg-red-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={activeStock === 0 || !selectedVariant}
+                className={`flex-1 py-3 px-6 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors ${
+                  activeStock === 0 || !selectedVariant
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : addedToCart
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-red-600 text-white hover:bg-red-700'
+                }`}
               >
-                <IoCart className="w-5 h-5" />
-                Thêm vào giỏ hàng
+                {addedToCart ? (
+                  <>
+                    <IoCheckmarkCircle className="w-5 h-5" />
+                    Đã thêm vào giỏ
+                  </>
+                ) : (
+                  <>
+                    <IoCart className="w-5 h-5" />
+                    {!selectedVariant ? 'Chọn phiên bản' : 'Thêm vào giỏ hàng'}
+                  </>
+                )}
               </button>
               
               <button
@@ -583,12 +518,34 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
 
           {activeTab === 'specifications' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(productState.thongSoKyThuat).map(([key, value]) => (
-                <div key={key} className="flex py-3 border-b border-gray-200">
-                  <div className="w-1/2 text-gray-600 font-medium">{key}:</div>
-                  <div className="w-1/2 text-gray-900">{value}</div>
+              {productState.thongSoKyThuat && Array.isArray(productState.thongSoKyThuat) ? (
+                // New format: array of {tenThuocTinh, giaTriList}
+                productState.thongSoKyThuat.map((spec, index) => (
+                  <div key={index} className="flex py-3 border-b border-gray-200">
+                    <div className="w-1/2 text-gray-600 font-medium">{spec.tenThuocTinh}:</div>
+                    <div className="w-1/2 text-gray-900">
+                      {Array.isArray(spec.giaTriList) 
+                        ? spec.giaTriList.join(', ') 
+                        : spec.giaTriList}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // Old format: object with key-value pairs
+                Object.entries(productState.thongSoKyThuat || {}).map(([key, value]) => (
+                  <div key={key} className="flex py-3 border-b border-gray-200">
+                    <div className="w-1/2 text-gray-600 font-medium">{key}:</div>
+                    <div className="w-1/2 text-gray-900">{value}</div>
+                  </div>
+                ))
+              )}
+              {(!productState.thongSoKyThuat || 
+                (Array.isArray(productState.thongSoKyThuat) && productState.thongSoKyThuat.length === 0) ||
+                (!Array.isArray(productState.thongSoKyThuat) && Object.keys(productState.thongSoKyThuat).length === 0)) && (
+                <div className="col-span-2 text-center text-gray-500 py-8">
+                  Chưa có thông số kỹ thuật
                 </div>
-              ))}
+              )}
             </div>
           )}
 
@@ -611,8 +568,9 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                   
                   <div className="space-y-2">
                     {[5, 4, 3, 2, 1].map((star) => {
-                      const count = productState.danhGiaKhachHang.filter(r => r.danhGia === star).length;
-                      const percentage = (count / productState.danhGiaKhachHang.length) * 100;
+                      const ratings = productState.danhGiaKhachHang || [];
+                      const count = ratings.filter(r => r.danhGia === star).length;
+                      const percentage = ratings.length === 0 ? 0 : (count / ratings.length) * 100;
                       
                       return (
                         <div key={star} className="flex items-center gap-2">
@@ -644,7 +602,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
 
               {/* Reviews List */}
               <div className="space-y-6">
-                {productState.danhGiaKhachHang.map((review) => (
+                {(productState.danhGiaKhachHang || []).map((review) => (
                   <div key={review.id} className="border-b border-gray-200 pb-6">
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -671,7 +629,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                           </p>
                         )}
                         
-                        {review.hinhAnh.length > 0 && (
+                        {(review.hinhAnh || []).length > 0 && (
                           <div className="flex gap-2">
                             {review.hinhAnh.map((img, index) => (
                               <img
@@ -696,34 +654,81 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
       {/* Related Products */}
       <div className="border-t pt-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Sản phẩm liên quan</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {productState.sanPhamLienQuan.map((relatedProduct) => (
-            <div key={relatedProduct.maSanPham} className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-              <img
-                src={relatedProduct.hinhAnh}
-                alt={relatedProduct.tenSanPham}
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h3 className="font-semibold mb-2 line-clamp-2">{relatedProduct.tenSanPham}</h3>
-                <div className="flex items-center gap-1 mb-2">
-                  {renderStars(relatedProduct.danhGia)}
-                  <span className="text-sm text-gray-600">({relatedProduct.danhGia})</span>
+        {productState.sanPhamLienQuan && productState.sanPhamLienQuan.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {productState.sanPhamLienQuan.map((relatedProduct) => {
+              const relPrice = relatedProduct.giaMin || relatedProduct.giaBan || 0;
+              const relOriginal = relatedProduct.giaMax || relatedProduct.giaGoc || relPrice;
+              const relImage = resolveImageUrl(relatedProduct.hinhAnh || relatedProduct.image);
+              
+              return (
+                <div 
+                  key={relatedProduct.maSanPham} 
+                  className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => {
+                    // Navigate to related product
+                    window.location.href = `/shop/products/${relatedProduct.maSanPham}`;
+                  }}
+                >
+                  <img
+                    src={relImage}
+                    alt={relatedProduct.tenSanPham}
+                    className="w-full h-48 object-cover"
+                    onError={(e) => { 
+                      e.currentTarget.onerror = null; 
+                      e.currentTarget.src = api.buildUrl('/logo192.png'); 
+                    }}
+                  />
+                  <div className="p-4">
+                    <h3 className="font-semibold mb-2 line-clamp-2 h-12">{relatedProduct.tenSanPham}</h3>
+                    
+                    {relatedProduct.danhGia && (
+                      <div className="flex items-center gap-1 mb-2">
+                        {renderStars(relatedProduct.danhGia)}
+                        <span className="text-sm text-gray-600">
+                          ({relatedProduct.soLuotDanhGia || 0})
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {relatedProduct.giaMin && relatedProduct.giaMax && relatedProduct.giaMin !== relatedProduct.giaMax ? (
+                        <span className="text-lg font-bold text-red-600">
+                          {formatCurrency(relatedProduct.giaMin)} - {formatCurrency(relatedProduct.giaMax)}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-lg font-bold text-red-600">
+                            {formatCurrency(relPrice)}
+                          </span>
+                          {relOriginal > relPrice && (
+                            <span className="text-sm text-gray-500 line-through">
+                              {formatCurrency(relOriginal)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    
+                    {relatedProduct.soLuongTon !== undefined && (
+                      <div className="text-sm text-gray-600 mt-2">
+                        {relatedProduct.soLuongTon > 0 ? (
+                          <span className="text-green-600">Còn hàng</span>
+                        ) : (
+                          <span className="text-red-600">Hết hàng</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-red-600">
-                    {formatCurrency(relatedProduct.giaBan)}
-                  </span>
-                  {relatedProduct.giaGoc > relatedProduct.giaBan && (
-                    <span className="text-sm text-gray-500 line-through">
-                      {formatCurrency(relatedProduct.giaGoc)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center text-gray-500 py-8">
+            Không có sản phẩm liên quan
+          </div>
+        )}
       </div>
 
       {/* Review Modal */}

@@ -19,24 +19,63 @@ const DataTable = ({
   const [sortDirection, setSortDirection] = useState('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({});
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [pendingFilterField, setPendingFilterField] = useState('');
+  const [pendingFilterValue, setPendingFilterValue] = useState('');
+  // keep reference to filters to avoid unused-lint and for future filter UI
+  React.useEffect(() => {
+    // no-op, placeholder so linter knows filters is used
+    if (Object.keys(filters).length === 0) return;
+  }, [filters]);
 
-  // Filter data
+  // Helper to resolve field value (supports function and nested path)
+  const resolveValue = (obj, field) => {
+    if (!field) return undefined;
+    if (typeof field === 'function') return field(obj);
+    if (typeof field === 'string' && field.indexOf('.') > -1) {
+      return field.split('.').reduce((o, k) => (o ? o[k] : undefined), obj);
+    }
+    return obj[field];
+  };
+
+  // Filter data (search + filters)
   const filteredData = data.filter(item => {
+    // Search term
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      return Object.values(item).some(value => 
-        String(value).toLowerCase().includes(searchLower)
-      );
+      const matched = Object.values(item).some(value => String(value).toLowerCase().includes(searchLower));
+      if (!matched) return false;
     }
+
+    // Apply structured filters
+    if (filters && Object.keys(filters).length > 0) {
+      for (const key of Object.keys(filters)) {
+        const f = filters[key];
+        if (!f || !f.field) continue;
+        const val = resolveValue(item, f.field);
+        if (val == null) return false;
+        if (!String(val).toLowerCase().includes(String(f.value).toLowerCase())) return false;
+      }
+    }
+
     return true;
   });
 
   // Sort data
   const sortedData = [...filteredData].sort((a, b) => {
     if (!sortField) return 0;
-    
-    const aValue = a[sortField];
-    const bValue = b[sortField];
+    // helper to support nested fields (dot notation) and function fields
+    const getValue = (obj, field) => {
+      if (!field) return undefined;
+      if (typeof field === 'function') return field(obj);
+      if (field.indexOf('.') > -1) {
+        return field.split('.').reduce((o, k) => (o ? o[k] : undefined), obj);
+      }
+      return obj[field];
+    };
+
+    const aValue = getValue(a, sortField);
+    const bValue = getValue(b, sortField);
     
     if (sortDirection === 'asc') {
       return aValue > bValue ? 1 : -1;
@@ -92,10 +131,47 @@ const DataTable = ({
               </div>
             )}
             {filterable && (
-              <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <IoFilter className="w-4 h-4" />
-                <span>Lọc</span>
-              </button>
+              <div className="relative">
+                <button onClick={() => setShowFilterPanel(s => !s)} className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                  <IoFilter className="w-4 h-4" />
+                  <span>Lọc</span>
+                </button>
+                {showFilterPanel && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded shadow-lg p-3 z-10">
+                    <div className="text-sm font-medium mb-2">Thêm bộ lọc</div>
+                    <select className="w-full p-2 border rounded mb-2" value={pendingFilterField} onChange={e => setPendingFilterField(e.target.value)}>
+                      <option value="">Chọn trường</option>
+                      {columns.map((c, i) => (
+                        <option key={i} value={i}>{c.header}</option>
+                      ))}
+                    </select>
+                    <input className="w-full p-2 border rounded mb-2" placeholder="Giá trị lọc" value={pendingFilterValue} onChange={e => setPendingFilterValue(e.target.value)} />
+                    <div className="flex justify-end space-x-2">
+                      <button className="px-3 py-1 border rounded" onClick={() => { setShowFilterPanel(false); setPendingFilterField(''); setPendingFilterValue(''); }}>Hủy</button>
+                      <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={() => {
+                        if (!pendingFilterField) return;
+                        const col = columns[Number(pendingFilterField)];
+                        const key = `${col.header}-${pendingFilterField}`;
+                        setFilters(prev => ({ ...prev, [key]: { field: col.field, value: pendingFilterValue } }));
+                        setPendingFilterField(''); setPendingFilterValue(''); setShowFilterPanel(false);
+                      }}>Áp dụng</button>
+                    </div>
+                    {Object.keys(filters).length > 0 && (
+                      <div className="mt-3 text-sm">
+                        <div className="font-medium mb-1">Bộ lọc hiện tại</div>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(filters).map(([k, v]) => (
+                            <div key={k} className="px-2 py-1 bg-gray-100 rounded-full text-xs flex items-center space-x-2">
+                              <span>{k}: {v.value}</span>
+                              <button className="text-red-500" onClick={() => setFilters(prev => { const n = { ...prev }; delete n[k]; return n; })}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <div className="flex items-center space-x-2">
@@ -136,11 +212,23 @@ const DataTable = ({
           <tbody className="bg-white divide-y divide-gray-200">
             {paginatedData.map((row, rowIndex) => (
               <tr key={rowIndex} className="hover:bg-gray-50">
-                {columns.map((column, colIndex) => (
-                  <td key={colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {column.render ? column.render(row[column.field], row) : row[column.field]}
-                  </td>
-                ))}
+                {columns.map((column, colIndex) => {
+                  // resolve value (support function or nested path)
+                  const resolveValue = (r, field) => {
+                    if (!field) return undefined;
+                    if (typeof field === 'function') return field(r);
+                    if (typeof field === 'string' && field.indexOf('.') > -1) {
+                      return field.split('.').reduce((o, k) => (o ? o[k] : undefined), r);
+                    }
+                    return r[field];
+                  };
+                  const value = resolveValue(row, column.field);
+                  return (
+                    <td key={colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {column.render ? column.render(value, row) : (value ?? '')}
+                    </td>
+                  );
+                })}
                 {(onEdit || onDelete || onView) && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
@@ -162,7 +250,7 @@ const DataTable = ({
                       )}
                       {onDelete && (
                         <button
-                          onClick={() => onDelete(row)}
+                          onClick={() => onDelete(row && (row.id || row.maSanPham || row.maSanPham) ? (row.id || row.maSanPham) : row)}
                           className="text-red-600 hover:text-red-800"
                         >
                           Xóa

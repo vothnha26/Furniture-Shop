@@ -22,7 +22,6 @@ public class VipBenefitResponse {
     
     // Ưu đãi đã áp dụng
     private BigDecimal giamGiaVip;
-    private BigDecimal phanTramGiamGia;
     private Integer diemVipThuong;
     private boolean mienPhiVanChuyen;
     private boolean uuTienGiaoHang;

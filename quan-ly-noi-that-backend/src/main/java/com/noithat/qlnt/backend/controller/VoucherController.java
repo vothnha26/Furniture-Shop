@@ -170,12 +170,18 @@ public class VoucherController {
     }
 
     /**
-     * Cập nhật voucher
+     * Cập nhật voucher (PATCH)
      */
-    @PutMapping("/{id}")
-    public ResponseEntity<VoucherResponse> update(@PathVariable Integer id, @Valid @RequestBody VoucherCreationRequest request) {
-        var v = voucherService.updateVoucher(id, request);
-        return ResponseEntity.ok(voucherService.getVoucherDetail(v.getMaVoucher()));
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable Integer id, @RequestBody VoucherCreationRequest request) {
+        try {
+            var v = voucherService.updateVoucher(id, request);
+            return ResponseEntity.ok(voucherService.getVoucherDetail(v.getMaVoucher()));
+        } catch (Exception ex) {
+            // Return a 400 with the exception message to avoid generic 500 and help
+            // debugging from frontend
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", ex.getMessage()));
+        }
     }
 
     /**

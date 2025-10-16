@@ -2,13 +2,12 @@ package com.noithat.qlnt.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "SanPham")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class SanPham {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,18 +19,6 @@ public class SanPham {
     @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
-    @Column(name = "ChieuDai")
-    private Integer chieuDai;
-
-    @Column(name = "ChieuRong")
-    private Integer chieuRong;
-
-    @Column(name = "ChieuCao")
-    private Integer chieuCao;
-
-    @Column(name = "CanNang")
-    private Integer canNang;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaDanhMuc")
     private DanhMuc danhMuc;
@@ -40,12 +27,16 @@ public class SanPham {
     @JoinColumn(name = "MaNhaCungCap")
     private NhaCungCap nhaCungCap;
 
-    // Quan hệ ManyToOne: Nhiều sản phẩm thuộc một bộ sưu tập (1-N)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaBoSuuTap")
     private BoSuuTap boSuuTap;
 
-    // Quan hệ OneToMany: Một sản phẩm có nhiều hình ảnh (1-N)
     @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
-    private java.util.List<HinhAnhSanPham> hinhAnhList = new java.util.ArrayList<>();
+    private List<BienTheSanPham> bienTheList = new ArrayList<>();
+
+    @OneToMany(mappedBy = "sanPham", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<HinhAnhSanPham> hinhAnhList = new ArrayList<>();
+    
+    @Column(name = "DiemThuong", nullable = false)
+    private Integer diemThuong = 0;
 }

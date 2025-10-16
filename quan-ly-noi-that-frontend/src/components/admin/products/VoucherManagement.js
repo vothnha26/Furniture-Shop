@@ -8,6 +8,7 @@ const VoucherManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState(null);
+  const [editingOriginalApplicable, setEditingOriginalApplicable] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [newVoucher, setNewVoucher] = useState({
@@ -21,18 +22,24 @@ const VoucherManagement = () => {
     startDate: '',
     endDate: '',
     description: '',
-    conditions: []
+    applicableTo: 'everyone', // 'everyone' or 'tiers'
+    selectedTiers: []
   });
 
   const [vouchers, setVouchers] = useState([]);
+  const [membershipTiers, setMembershipTiers] = useState([]);
 
   const [usageHistory, setUsageHistory] = useState([]);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningVoucher, setAssigningVoucher] = useState(null);
 
+  // Use backend status tokens as keys here so UI directly reflects server-side enum-like values.
+  // Expected tokens: "CHUA_BAT_DAU", "DANG_HOAT_DONG", "DA_HET_HAN", "KHONG_HOAT_DONG"
   const statusConfig = {
-    active: { color: 'text-green-600', bg: 'bg-green-100', icon: IoCheckmarkCircle, label: 'Hoạt động' },
-    expired: { color: 'text-red-600', bg: 'bg-red-100', icon: IoTime, label: 'Hết hạn' },
-    paused: { color: 'text-yellow-600', bg: 'bg-yellow-100', icon: IoTime, label: 'Tạm dừng' },
-    draft: { color: 'text-gray-600', bg: 'bg-gray-100', icon: IoTime, label: 'Nháp' }
+    DANG_HOAT_DONG: { color: 'text-green-600', bg: 'bg-green-100', icon: IoCheckmarkCircle, label: 'Hoạt động' },
+    DA_HET_HAN: { color: 'text-red-600', bg: 'bg-red-100', icon: IoTime, label: 'Hết hạn' },
+    KHONG_HOAT_DONG: { color: 'text-yellow-600', bg: 'bg-yellow-100', icon: IoTime, label: 'Không hoạt động' },
+    CHUA_BAT_DAU: { color: 'text-gray-600', bg: 'bg-gray-100', icon: IoTime, label: 'Chưa bắt đầu' }
   };
 
   const typeConfig = {
@@ -41,7 +48,7 @@ const VoucherManagement = () => {
   };
 
   const getStatusInfo = (status) => {
-    return statusConfig[status] || statusConfig.draft;
+    return statusConfig[status] || statusConfig.CHUA_BAT_DAU;
   };
 
   const getTypeInfo = (type) => {
@@ -49,64 +56,168 @@ const VoucherManagement = () => {
   };
 
   // Map voucher from API to UI
-  const mapVoucherFromApi = (voucher) => ({
-    id: voucher.maVoucher || voucher.id,
-    code: voucher.maCode || voucher.code,
-    name: voucher.tenVoucher || voucher.name,
-    type: voucher.loaiGiamGia === 'PERCENTAGE' ? 'percentage' : 'fixed',
-    value: voucher.giaTriGiam || voucher.value || 0,
-    minOrderValue: voucher.giaTriDonHangToiThieu || voucher.minOrderValue || 0,
-    maxDiscount: voucher.giaTriGiamToiDa || voucher.maxDiscount || 0,
-    usageLimit: voucher.soLuongToiDa || voucher.usageLimit || 0,
-    usedCount: voucher.soLuongDaSuDung || voucher.usedCount || 0,
-    status: voucher.trangThai ? 'active' : 'expired',
-    startDate: voucher.ngayBatDau?.split('T')[0] || voucher.startDate || '',
-    endDate: voucher.ngayKetThuc?.split('T')[0] || voucher.endDate || '',
-    applicableProducts: voucher.sanPhamApDung || 'Tất cả sản phẩm',
-    applicableCustomers: voucher.khachHangApDung || 'Tất cả khách hàng',
-    description: voucher.moTa || voucher.description || '',
-    createdBy: voucher.nguoiTao || 'Admin',
-    createdAt: voucher.ngayTao || voucher.createdAt || ''
-  });
+  const mapVoucherFromApi = (voucher) => {
+    const fmtDate = (v) => {
+      if (v === null || v === undefined || v === '') return '';
+      // If it's already a string like '2023-10-16T00:00:00' or '2023-10-16'
+      if (typeof v === 'string') {
+        if (v.includes('T')) return v.split('T')[0];
+        // try parseable string
+        const p = new Date(v);
+        if (!isNaN(p.getTime())) return p.toISOString().split('T')[0];
+        return v;
+      }
+      // If it's a number or Date-like
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      return '';
+    };
+
+    return ({
+      id: voucher.maVoucher || voucher.id,
+      code: voucher.maCode || voucher.code,
+      name: voucher.tenVoucher || voucher.name,
+      type: voucher.loaiGiamGia === 'PERCENTAGE' ? 'percentage' : 'fixed',
+      value: voucher.giaTriGiam || voucher.value || 0,
+      minOrderValue: voucher.giaTriDonHangToiThieu || voucher.minOrderValue || 0,
+      maxDiscount: voucher.giaTriGiamToiDa || voucher.maxDiscount || 0,
+      usageLimit: voucher.soLuongToiDa || voucher.usageLimit || 0,
+      usedCount: voucher.soLuongDaSuDung || voucher.usedCount || 0,
+      // quantity is used by the edit form (labelled "Số lượng")
+      quantity: voucher.soLuongToiDa || voucher.quantity || voucher.usageLimit || 0,
+      // Expect backend to return an effective status token in `trangThai` (string).
+      // Fall back to stored admin override or a default token when missing.
+      status: voucher.trangThai || voucher.trangThaiAdmin || 'DANG_HOAT_DONG',
+      startDate: fmtDate(voucher.ngayBatDau) || voucher.startDate || '',
+      endDate: fmtDate(voucher.ngayKetThuc) || voucher.endDate || '',
+      // Products: keep as array of names when provided, otherwise show default text
+      applicableProducts: Array.isArray(voucher.sanPhamApDung)
+        ? voucher.sanPhamApDung.map(p => (p?.tenSanPham || p?.name || String(p?.maSanPham || p?.id || p)))
+        : (typeof voucher.sanPhamApDung === 'string' ? voucher.sanPhamApDung : 'Tất cả sản phẩm'),
+      // Customers: either a list or default text
+      applicableCustomers: Array.isArray(voucher.khachHangApDung)
+        ? voucher.khachHangApDung.map(c => (c?.tenKhachHang || c?.name || String(c?.maKhachHang || c?.id || c)))
+        : (voucher.khachHangApDung ? String(voucher.khachHangApDung) : 'Tất cả khách hàng'),
+      // Tiers applied (names) — backend may return tenHangThanhVienApDung or hanCheHangThanhVien
+      appliedTierNames: Array.isArray(voucher.tenHangThanhVienApDung)
+        ? voucher.tenHangThanhVienApDung.map(t => (t?.tenHang || t?.name || String(t?.maHangThanhVien || t?.id || t))).join(', ')
+        : (Array.isArray(voucher.hanCheHangThanhVien)
+          ? voucher.hanCheHangThanhVien.map(t => (t?.tenHang || t?.name || String(t?.maHangThanhVien || t?.id || t))).join(', ')
+          : ''),
+      apDungChoMoiNguoi: voucher.apDungChoMoiNguoi === undefined ? true : Boolean(voucher.apDungChoMoiNguoi),
+      description: voucher.moTa || voucher.description || '',
+      createdBy: voucher.nguoiTao || 'Admin',
+      createdAt: voucher.ngayTao || voucher.createdAt || ''
+    });
+  };
 
   // Map voucher from UI to API
   const mapVoucherToApi = (voucher) => ({
     maCode: voucher.code,
     tenVoucher: voucher.name,
     moTa: voucher.description,
-    giaTriGiam: parseFloat(voucher.value),
     loaiGiamGia: voucher.type === 'percentage' ? 'PERCENTAGE' : 'FIXED',
-    giaTriDonHangToiThieu: parseFloat(voucher.minOrderValue),
-    giaTriGiamToiDa: voucher.type === 'percentage' ? parseFloat(voucher.maxDiscount) : null,
-    ngayBatDau: voucher.startDate + 'T00:00:00',
-    ngayKetThuc: voucher.endDate + 'T23:59:59',
-    soLuongToiDa: parseInt(voucher.usageLimit),
-    apDungChoMoiNguoi: true
+    // Only include numeric fields when they parse to valid numbers
+    giaTriGiam: (() => {
+      const v = parseFloat(voucher.value);
+      return Number.isNaN(v) ? undefined : v;
+    })(),
+    giaTriDonHangToiThieu: (() => {
+      const v = parseFloat(voucher.minOrderValue);
+      return Number.isNaN(v) ? undefined : v;
+    })(),
+    giaTriGiamToiDa: (() => {
+      if (voucher.type !== 'percentage') return undefined;
+      const v = parseFloat(voucher.maxDiscount);
+      return Number.isNaN(v) ? undefined : v;
+    })(),
+    // Only include dates when provided to avoid sending invalid empty strings
+    ...(voucher.startDate ? { ngayBatDau: String(voucher.startDate).includes('T') ? voucher.startDate : `${voucher.startDate}T00:00:00` } : {}),
+    ...(voucher.endDate ? { ngayKetThuc: String(voucher.endDate).includes('T') ? voucher.endDate : `${voucher.endDate}T23:59:59` } : {}),
+    // support both create UI (usageLimit) and edit UI (quantity)
+    soLuongToiDa: (() => {
+      const v = parseInt(voucher.quantity ?? voucher.usageLimit ?? 0);
+      return Number.isNaN(v) ? undefined : v;
+    })(),
+    apDungChoMoiNguoi: voucher.applicableTo === 'everyone',
+    // If applying to specific tiers, include the selected tier IDs so backend update can create links
+    maHangThanhVienIds: voucher.applicableTo === 'tiers' && Array.isArray(voucher.selectedTiers)
+      ? voucher.selectedTiers.map(s => Number(s))
+      : undefined
+    ,
+    // send admin-selected status token back to API if present
+    ...(voucher.status ? { trangThai: voucher.status } : {})
   });
 
   // API Functions
   const fetchVouchers = async () => {
     try {
-      const response = await api.get('/api/v1/voucher/all');
+      // Use the detailed endpoint so we receive apDungChoMoiNguoi and tenHangThanhVienApDung
+      const response = await api.get('/api/v1/voucher/details');
+      // Normal case: array of VoucherResponse
       if (Array.isArray(response)) {
         setVouchers(response.map(mapVoucherFromApi));
+        return;
       }
+
+      // Sometimes backend returns a paginated object (content) or wrapped data
+      if (response && Array.isArray(response.content)) {
+        setVouchers(response.content.map(mapVoucherFromApi));
+        return;
+      }
+
+      if (response && Array.isArray(response.data)) {
+        setVouchers(response.data.map(mapVoucherFromApi));
+        return;
+      }
+
+      // As a last resort try the simpler entity endpoint
+      try {
+        const fallback = await api.get('/api/v1/voucher');
+        if (Array.isArray(fallback)) {
+          setVouchers(fallback.map(mapVoucherFromApi));
+          return;
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback /api/v1/voucher failed', fallbackErr);
+      }
+
+      console.warn('Unexpected /api/v1/voucher/details response shape', response);
     } catch (err) {
+      // Log helpful debugging info for the developer
       console.error('Fetch vouchers error', err);
-      setError('Không thể tải danh sách voucher');
+      if (err && err.status) console.error('Fetch vouchers HTTP status:', err.status);
+      if (err && err.data) console.error('Fetch vouchers error body:', err.data);
+      setError('Không thể tải danh sách voucher (xem console để biết chi tiết)');
     }
   };
 
-  const fetchVoucherUsageHistory = async () => {
+  // Note: initial data for usageHistory and membershipTiers is fetched inline in useEffect.
+
+  const fetchVoucherDetail = async (id) => {
     try {
-      const response = await api.get('/api/v1/voucher/usage-history');
-      if (Array.isArray(response)) {
-        setUsageHistory(response);
-      }
+      // Call the detailed endpoint to get tenHangThanhVienApDung and apDungChoMoiNguoi
+      const response = await api.get(`/api/v1/voucher/${id}/details`);
+      // Build editing object including applicability and selected tiers
+      const base = mapVoucherFromApi(response);
+      const applicableTo = response.apDungChoMoiNguoi ? 'everyone' : 'tiers';
+      const rawTiers = response.tenHangThanhVienApDung || response.hanCheHangThanhVien || [];
+      const selectedTiers = Array.isArray(rawTiers)
+        ? rawTiers.map(t => String(t?.maHangThanhVien ?? t?.id ?? t))
+        : [];
+      return { ...base, applicableTo, selectedTiers };
     } catch (err) {
-      console.error('Fetch voucher usage history error', err);
-      // Không set error vì đây là optional data
+      console.error('Fetch voucher detail error', err);
+      throw err;
     }
+  };
+
+  // Simple voucher code generator
+  const generateVoucherCode = (prefix = 'VCHR') => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    return `${prefix}-${code}`;
   };
 
   const createVoucher = async (voucherData) => {
@@ -123,7 +234,7 @@ const VoucherManagement = () => {
 
   const updateVoucher = async (voucherId, voucherData) => {
     try {
-      const response = await api.put(`/api/v1/voucher/${voucherId}`, voucherData);
+      const response = await api.patch(`/api/v1/voucher/${voucherId}`, { body: voucherData });
       const updatedVoucher = mapVoucherFromApi(response);
       setVouchers(prev => prev.map(voucher =>
         voucher.id === voucherId ? updatedVoucher : voucher
@@ -131,6 +242,8 @@ const VoucherManagement = () => {
       return updatedVoucher;
     } catch (err) {
       console.error('Update voucher error', err);
+      // If the API wrapper attached a parsed response body, log it for easier debugging
+      if (err && err.data) console.error('Update voucher error body:', err.data);
       throw new Error('Không thể cập nhật voucher');
     }
   };
@@ -145,34 +258,68 @@ const VoucherManagement = () => {
     }
   };
 
-  // Fetch vouchers on component mount
+  // Fetch vouchers and related data once on mount. Inline the calls to avoid
+  // hook dependency warnings for locally defined helper functions.
+  // We intentionally call `fetchVouchers()` here and do not want the
+  // exhaustive-deps rule to force it into the dependency list.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const fetchData = async () => {
+    let mounted = true;
+    (async () => {
       setIsLoading(true);
       try {
-        await Promise.all([fetchVouchers(), fetchVoucherUsageHistory()]);
+        // Use the robust fetchVouchers to get helpful logging on failure
+        await fetchVouchers();
+        if (!mounted) return;
+        const [hResp, tResp] = await Promise.all([
+          api.get('/api/v1/voucher/usage-history'),
+          api.get('/api/hang-thanh-vien/all')
+        ]);
+        if (Array.isArray(hResp)) setUsageHistory(hResp);
+        if (Array.isArray(tResp)) setMembershipTiers(tResp.map(t => ({ id: t.maHangThanhVien ?? t.id, name: t.tenHang ?? t.name })));
       } catch (err) {
         console.error('Fetch data error', err);
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
-    };
-    fetchData();
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const handleViewVoucher = (voucher) => {
-    setSelectedVoucher(voucher);
-    setShowVoucherModal(true);
+    // load full voucher details (including dates and applied tiers) before opening modal
+    (async () => {
+      try {
+        const detailed = await fetchVoucherDetail(voucher.id);
+        setSelectedVoucher(detailed);
+        setShowVoucherModal(true);
+      } catch (err) {
+        console.error('Fetch voucher detail (view) error', err);
+        setError('Không tải được chi tiết voucher');
+      }
+    })();
   };
 
   const handleAddVoucher = () => {
+    setNewVoucher(prev => ({ ...prev, code: generateVoucherCode(), applicableTo: 'everyone', selectedTiers: [] }));
     setShowAddModal(true);
   };
 
   const handleSaveVoucher = async () => {
     try {
       const payload = mapVoucherToApi(newVoucher);
-      await createVoucher(payload);
+      const created = await createVoucher(payload);
+      // assign tiers when applicable
+      if (newVoucher.applicableTo === 'tiers' && Array.isArray(newVoucher.selectedTiers) && newVoucher.selectedTiers.length > 0) {
+        try {
+          const voucherId = created.maVoucher || created.id;
+          const payload = newVoucher.selectedTiers.map((s) => Number(s));
+          await api.post(`/api/v1/voucher/${voucherId}/assign-tiers`, { body: payload });
+        } catch (err) {
+          console.error('Assign tiers error', err);
+          setError('Tạo voucher thành công nhưng gán hạng thất bại');
+        }
+      }
       setShowAddModal(false);
       setNewVoucher({
         name: '',
@@ -185,7 +332,8 @@ const VoucherManagement = () => {
         startDate: '',
         endDate: '',
         description: '',
-        conditions: []
+        applicableTo: 'everyone',
+        selectedTiers: []
       });
     } catch (err) {
       setError(err.message);
@@ -193,13 +341,30 @@ const VoucherManagement = () => {
   };
 
   const handleEditVoucher = (voucher) => {
-    setEditingVoucher(voucher);
-    setShowEditModal(true);
+    // load full voucher details (including applied tiers) before opening modal
+    (async () => {
+      try {
+        const detailed = await fetchVoucherDetail(voucher.id);
+        setEditingVoucher(detailed);
+        setEditingOriginalApplicable(detailed.applicableTo);
+        setShowEditModal(true);
+      } catch (err) {
+        setError('Không tải được chi tiết voucher');
+      }
+    })();
   };
 
   const handleSaveEdit = async () => {
     try {
-      const payload = mapVoucherToApi(editingVoucher);
+      // Prevent changing applicability from the edit form. Applicability (apDungChoMoiNguoi)
+      // and assigned tiers must be managed via the separate "Gán hạng" flow.
+      // Use the original applicability and selected tiers when building the payload so
+      // that we don't unintentionally remove or change tier assignments here.
+      const payloadObj = { ...editingVoucher };
+      // force applicability fields to original values
+      payloadObj.applicableTo = editingOriginalApplicable ?? editingVoucher.applicableTo;
+      payloadObj.selectedTiers = editingOriginalApplicable === 'tiers' ? (editingVoucher.selectedTiers || []) : [];
+      const payload = mapVoucherToApi(payloadObj);
       await updateVoucher(editingVoucher.id, payload);
       setShowEditModal(false);
       setEditingVoucher(null);
@@ -232,6 +397,18 @@ const VoucherManagement = () => {
       style: 'currency',
       currency: 'VND'
     }).format(amount);
+  };
+
+  const fmtDisplayDate = (d) => d && String(d).trim() !== '' ? d : '—';
+
+  const fmtMinOrderDisplay = (v) => {
+    if (!v || parseFloat(v) === 0) return 'Không yêu cầu';
+    return formatCurrency(v);
+  };
+
+  const fmtUsageDisplay = (used, limit) => {
+    if (!limit || parseInt(limit) === 0) return `${used}/Không giới hạn`;
+    return `${used}/${limit}`;
   };
 
   const getUsagePercentage = (used, limit) => {
@@ -292,7 +469,7 @@ const VoucherManagement = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Đang hoạt động</p>
-                <p className="text-2xl font-bold text-gray-900">{vouchers.filter(v => v.status === 'active').length}</p>
+                <p className="text-2xl font-bold text-gray-900">{vouchers.filter(v => v.status === 'DANG_HOAT_DONG').length}</p>
               </div>
             </div>
           </div>
@@ -331,7 +508,7 @@ const VoucherManagement = () => {
                 <IoRefresh className="w-4 h-4" />
                 Làm mới
               </button>
-              <button 
+              <button
                 onClick={handleAddVoucher}
                 className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
               >
@@ -373,7 +550,7 @@ const VoucherManagement = () => {
                   const typeInfo = getTypeInfo(voucher.type);
                   const StatusIcon = statusInfo.icon;
                   const usagePercentage = getUsagePercentage(voucher.usedCount, voucher.usageLimit);
-                  
+
                   return (
                     <tr key={voucher.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -398,21 +575,21 @@ const VoucherManagement = () => {
                           {voucher.type === 'percentage' ? `${voucher.value}%` : formatCurrency(voucher.value)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          Tối thiểu: {formatCurrency(voucher.minOrderValue)}
+                          Tối thiểu: {fmtMinOrderDisplay(voucher.minOrderValue)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{voucher.usedCount}/{voucher.usageLimit}</div>
+                        <div className="text-sm text-gray-900">{fmtUsageDisplay(voucher.usedCount, voucher.usageLimit)}</div>
                         <div className="w-20 bg-gray-200 rounded-full h-2 mt-1">
-                          <div 
+                          <div
                             className="bg-blue-500 h-2 rounded-full"
                             style={{ width: `${usagePercentage}%` }}
                           ></div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{voucher.startDate}</div>
-                        <div className="text-sm text-gray-500">đến {voucher.endDate}</div>
+                        <div className="text-sm text-gray-900">{fmtDisplayDate(voucher.startDate)}</div>
+                        <div className="text-sm text-gray-500">đến {fmtDisplayDate(voucher.endDate)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.bg} ${statusInfo.color}`}>
@@ -428,13 +605,31 @@ const VoucherManagement = () => {
                           >
                             <IoEye className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleEditVoucher(voucher)}
                             className="text-green-600 hover:text-green-800"
                           >
                             <IoCreate className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
+                            onClick={() => {
+                              // Open assign tiers modal, prefill with voucher selected tiers if available
+                              (async () => {
+                                try {
+                                  const detail = await fetchVoucherDetail(voucher.id);
+                                  // normalize for assign modal: applyToEveryone based on apDungChoMoiNguoi
+                                  setAssigningVoucher({ ...detail, applyToEveryone: Boolean(detail.apDungChoMoiNguoi), selectedTiers: Array.isArray(detail.selectedTiers) ? detail.selectedTiers : (Array.isArray(detail.tenHangThanhVienApDung) ? detail.tenHangThanhVienApDung.map(t => String(t?.maHangThanhVien ?? t?.id ?? t)) : []) });
+                                  setShowAssignModal(true);
+                                } catch (err) {
+                                  setError('Không tải được chi tiết voucher để gán hạng');
+                                }
+                              })();
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800"
+                          >
+                            Gán hạng
+                          </button>
+                          <button
                             onClick={() => handleDeleteVoucher(voucher)}
                             className="text-red-600 hover:text-red-800"
                           >
@@ -505,23 +700,15 @@ const VoucherManagement = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Đơn hàng tối thiểu:</span>
-                          <span className="text-sm font-medium">{formatCurrency(selectedVoucher.minOrderValue)}</span>
+                          <span className="text-sm font-medium">{fmtMinOrderDisplay(selectedVoucher.minOrderValue)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Giảm tối đa:</span>
-                          <span className="text-sm font-medium">{formatCurrency(selectedVoucher.maxDiscount)}</span>
+                          <span className="text-sm font-medium">{selectedVoucher.maxDiscount ? formatCurrency(selectedVoucher.maxDiscount) : '—'}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Giới hạn sử dụng:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.usageLimit}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Đã sử dụng:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.usedCount}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Còn lại:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.usageLimit - selectedVoucher.usedCount}</span>
+                          <span className="text-sm text-gray-600">Sử dụng:</span>
+                          <span className="text-sm font-medium">{fmtUsageDisplay(selectedVoucher.usedCount, selectedVoucher.usageLimit)}</span>
                         </div>
                       </div>
                     </div>
@@ -534,11 +721,11 @@ const VoucherManagement = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Bắt đầu:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.startDate}</span>
+                          <span className="text-sm font-medium">{fmtDisplayDate(selectedVoucher.startDate)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Kết thúc:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.endDate}</span>
+                          <span className="text-sm font-medium">{fmtDisplayDate(selectedVoucher.endDate)}</span>
                         </div>
                       </div>
                     </div>
@@ -548,12 +735,33 @@ const VoucherManagement = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Sản phẩm:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.applicableProducts}</span>
+                          <span className="text-sm font-medium">
+                            {Array.isArray(selectedVoucher.applicableProducts)
+                              ? (selectedVoucher.applicableProducts.length > 0 ? selectedVoucher.applicableProducts.join(', ') : 'Tất cả sản phẩm')
+                              : (selectedVoucher.applicableProducts || 'Tất cả sản phẩm')}
+                          </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Khách hàng:</span>
-                          <span className="text-sm font-medium">{selectedVoucher.applicableCustomers}</span>
-                        </div>
+
+                        {/* If voucher is not for everyone, show applied membership tiers explicitly. Otherwise show customer applicability. */}
+                        {selectedVoucher.apDungChoMoiNguoi === false ? (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Áp dụng hạng thành viên:</span>
+                            <span className="text-sm font-medium">
+                              {selectedVoucher.appliedTierNames && selectedVoucher.appliedTierNames.trim() !== ''
+                                ? selectedVoucher.appliedTierNames
+                                : 'Không có hạng cụ thể'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Khách hàng:</span>
+                            <span className="text-sm font-medium">
+                              {Array.isArray(selectedVoucher.applicableCustomers)
+                                ? (selectedVoucher.applicableCustomers.length > 0 ? selectedVoucher.applicableCustomers.join(', ') : 'Tất cả khách hàng')
+                                : (selectedVoucher.applicableCustomers || 'Tất cả khách hàng')}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -628,7 +836,7 @@ const VoucherManagement = () => {
                         <input
                           type="text"
                           value={newVoucher.name}
-                          onChange={(e) => setNewVoucher({...newVoucher, name: e.target.value})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, name: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập tên voucher"
                           required
@@ -639,7 +847,7 @@ const VoucherManagement = () => {
                         <input
                           type="text"
                           value={newVoucher.code}
-                          onChange={(e) => setNewVoucher({...newVoucher, code: e.target.value.toUpperCase()})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, code: e.target.value.toUpperCase() })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập mã voucher"
                           required
@@ -652,7 +860,7 @@ const VoucherManagement = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Loại giảm giá</label>
                         <select
                           value={newVoucher.type}
-                          onChange={(e) => setNewVoucher({...newVoucher, type: e.target.value})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, type: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           required
                         >
@@ -667,7 +875,7 @@ const VoucherManagement = () => {
                         <input
                           type="number"
                           value={newVoucher.value}
-                          onChange={(e) => setNewVoucher({...newVoucher, value: parseFloat(e.target.value)})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, value: parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           min="0"
                           max={newVoucher.type === 'percentage' ? 100 : undefined}
@@ -682,7 +890,7 @@ const VoucherManagement = () => {
                         <input
                           type="number"
                           value={newVoucher.minOrderValue}
-                          onChange={(e) => setNewVoucher({...newVoucher, minOrderValue: parseFloat(e.target.value)})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, minOrderValue: parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           min="0"
                         />
@@ -692,7 +900,7 @@ const VoucherManagement = () => {
                         <input
                           type="number"
                           value={newVoucher.maxDiscount}
-                          onChange={(e) => setNewVoucher({...newVoucher, maxDiscount: parseFloat(e.target.value)})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, maxDiscount: parseFloat(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           min="0"
                         />
@@ -705,7 +913,7 @@ const VoucherManagement = () => {
                         <input
                           type="number"
                           value={newVoucher.usageLimit}
-                          onChange={(e) => setNewVoucher({...newVoucher, usageLimit: parseInt(e.target.value)})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, usageLimit: parseInt(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           min="0"
                           placeholder="0 = không giới hạn"
@@ -716,7 +924,7 @@ const VoucherManagement = () => {
                         <input
                           type="date"
                           value={newVoucher.startDate}
-                          onChange={(e) => setNewVoucher({...newVoucher, startDate: e.target.value})}
+                          onChange={(e) => setNewVoucher({ ...newVoucher, startDate: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           required
                         />
@@ -728,7 +936,7 @@ const VoucherManagement = () => {
                       <input
                         type="date"
                         value={newVoucher.endDate}
-                        onChange={(e) => setNewVoucher({...newVoucher, endDate: e.target.value})}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, endDate: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         required
                       />
@@ -738,22 +946,42 @@ const VoucherManagement = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
                       <textarea
                         value={newVoucher.description}
-                        onChange={(e) => setNewVoucher({...newVoucher, description: e.target.value})}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, description: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         rows="3"
                         placeholder="Mô tả chi tiết về voucher..."
                       />
                     </div>
 
+                    {/* 'Điều kiện sử dụng' removed (unused) */}
+
+                    {/* Applicability: everyone or specific tiers */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Điều kiện sử dụng</label>
-                      <input
-                        type="text"
-                        value={newVoucher.conditions.join(', ')}
-                        onChange={(e) => setNewVoucher({...newVoucher, conditions: e.target.value.split(',').map(condition => condition.trim()).filter(condition => condition)})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="Nhập điều kiện cách nhau bởi dấu phẩy"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Áp dụng cho</label>
+                      <div className="flex items-center gap-4">
+                        <label className="inline-flex items-center">
+                          <input type="radio" name="applicableTo" checked={newVoucher.applicableTo === 'everyone'} onChange={() => setNewVoucher({ ...newVoucher, applicableTo: 'everyone', selectedTiers: [] })} />
+                          <span className="ml-2">Tất cả mọi người</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input type="radio" name="applicableTo" checked={newVoucher.applicableTo === 'tiers'} onChange={() => setNewVoucher({ ...newVoucher, applicableTo: 'tiers' })} />
+                          <span className="ml-2">Theo hạng thành viên</span>
+                        </label>
+                      </div>
+
+                      {newVoucher.applicableTo === 'tiers' && (
+                        <div className="mt-2">
+                          <label className="block text-sm text-gray-600 mb-1">Chọn hạng thành viên</label>
+                          <select multiple value={newVoucher.selectedTiers} onChange={(e) => {
+                            const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+                            setNewVoucher({ ...newVoucher, selectedTiers: opts });
+                          }} className="w-full h-32 p-2 border rounded">
+                            {membershipTiers.map(t => (
+                              <option key={t.id} value={String(t.id)}>{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -773,6 +1001,55 @@ const VoucherManagement = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Assign tiers Modal */}
+        {showAssignModal && assigningVoucher && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900">Gán hạng cho voucher</h3>
+                  <button onClick={() => setShowAssignModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-600 mb-3">Voucher: <span className="font-medium">{assigningVoucher.name}</span></p>
+                  <div className="mb-3">
+                    <label className="inline-flex items-center">
+                      <input type="checkbox" checked={Boolean(assigningVoucher.applyToEveryone)} onChange={(e) => setAssigningVoucher({ ...assigningVoucher, applyToEveryone: e.target.checked, selectedTiers: e.target.checked ? [] : (assigningVoucher.selectedTiers || []) })} />
+                      <span className="ml-2">Áp dụng cho mọi người</span>
+                    </label>
+                  </div>
+                  <label className="block text-sm text-gray-600 mb-2">Chọn hạng thành viên</label>
+                  <select multiple value={assigningVoucher.selectedTiers || []} onChange={(e) => {
+                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+                    setAssigningVoucher({ ...assigningVoucher, selectedTiers: opts, applyToEveryone: false });
+                  }} className="w-full h-40 p-2 border rounded" disabled={Boolean(assigningVoucher.applyToEveryone)}>
+                    {membershipTiers.map(t => (
+                      <option key={t.id} value={String(t.id)}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
+                  <button type="button" onClick={() => setShowAssignModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Hủy</button>
+                  <button type="button" onClick={async () => {
+                    try {
+                      const ids = assigningVoucher.applyToEveryone ? [] : (assigningVoucher.selectedTiers || []).map(s => Number(s));
+                      await api.post(`/api/v1/voucher/${assigningVoucher.id}/assign-tiers`, { body: ids });
+                      // refresh vouchers list
+                      await fetchVouchers();
+                      setShowAssignModal(false);
+                    } catch (err) {
+                      console.error('Assign tiers error', err);
+                      setError('Gán hạng thất bại');
+                    }
+                  }} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">Gán</button>
+                </div>
               </div>
             </div>
           </div>
@@ -804,7 +1081,7 @@ const VoucherManagement = () => {
                       <input
                         type="text"
                         value={editingVoucher.name}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, name: e.target.value})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, name: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Nhập tên voucher"
                         required
@@ -818,7 +1095,7 @@ const VoucherManagement = () => {
                       <input
                         type="text"
                         value={editingVoucher.code}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, code: e.target.value})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, code: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Nhập mã voucher"
                         required
@@ -831,7 +1108,7 @@ const VoucherManagement = () => {
                       </label>
                       <select
                         value={editingVoucher.type}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, type: e.target.value})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, type: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         <option value="percentage">Phần trăm</option>
@@ -846,7 +1123,7 @@ const VoucherManagement = () => {
                       <input
                         type="number"
                         value={editingVoucher.value}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, value: parseInt(e.target.value)})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, value: parseInt(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Nhập giá trị giảm"
                         required
@@ -860,7 +1137,7 @@ const VoucherManagement = () => {
                       <input
                         type="date"
                         value={editingVoucher.startDate}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, startDate: e.target.value})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, startDate: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         required
                       />
@@ -873,7 +1150,7 @@ const VoucherManagement = () => {
                       <input
                         type="date"
                         value={editingVoucher.endDate}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, endDate: e.target.value})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, endDate: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         required
                       />
@@ -886,7 +1163,7 @@ const VoucherManagement = () => {
                       <input
                         type="number"
                         value={editingVoucher.quantity}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, quantity: parseInt(e.target.value)})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, quantity: parseInt(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Nhập số lượng"
                         required
@@ -899,12 +1176,13 @@ const VoucherManagement = () => {
                       </label>
                       <select
                         value={editingVoucher.status}
-                        onChange={(e) => setEditingVoucher({...editingVoucher, status: e.target.value})}
+                        onChange={(e) => setEditingVoucher({ ...editingVoucher, status: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       >
-                        <option value="active">Hoạt động</option>
-                        <option value="inactive">Không hoạt động</option>
-                        <option value="expired">Hết hạn</option>
+                        <option value="DANG_HOAT_DONG">Hoạt động</option>
+                        <option value="KHONG_HOAT_DONG">Không hoạt động</option>
+                        <option value="DA_HET_HAN">Hết hạn</option>
+                        <option value="CHUA_BAT_DAU">Chưa bắt đầu</option>
                       </select>
                     </div>
                   </div>
@@ -915,11 +1193,39 @@ const VoucherManagement = () => {
                     </label>
                     <textarea
                       value={editingVoucher.description}
-                      onChange={(e) => setEditingVoucher({...editingVoucher, description: e.target.value})}
+                      onChange={(e) => setEditingVoucher({ ...editingVoucher, description: e.target.value })}
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="Nhập mô tả voucher"
                     />
+                  </div>
+
+                  {/* Applicability is read-only in the Edit modal. Use the separate "Gán hạng" flow to manage tier assignments. */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Áp dụng cho</label>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium">
+                          {(editingVoucher.applicableTo === 'everyone' ? 'Tất cả mọi người' : 'Theo hạng thành viên')}
+                        </div>
+                        {editingVoucher.appliedTierNames && editingVoucher.appliedTierNames.length > 0 && (
+                          <div className="text-sm text-gray-600 mt-1">Hạng đã gán: {editingVoucher.appliedTierNames}</div>
+                        )}
+                      </div>
+                      <div>
+                        <button type="button" onClick={async () => {
+                          // Open assign modal to allow assigning/clearing tiers
+                          try {
+                            const detail = await fetchVoucherDetail(editingVoucher.id);
+                            setAssigningVoucher({ ...detail, applyToEveryone: Boolean(detail.apDungChoMoiNguoi), selectedTiers: Array.isArray(detail.selectedTiers) ? detail.selectedTiers : (Array.isArray(detail.tenHangThanhVienApDung) ? detail.tenHangThanhVienApDung.map(t => String(t?.maHangThanhVien ?? t?.id ?? t)) : []) });
+                            setShowAssignModal(true);
+                            // Keep edit modal open underneath; admin can close when done
+                          } catch (err) {
+                            setError('Không tải được chi tiết voucher để gán hạng');
+                          }
+                        }} className="px-3 py-1 bg-indigo-600 text-white rounded">Gán hạng</button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">

@@ -15,9 +15,7 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.noithat.qlnt.backend.dto.common.GiaTriThuocTinhDto;
 import com.noithat.qlnt.backend.dto.common.ThuocTinhDto;
-import com.noithat.qlnt.backend.entity.GiaTriThuocTinh;
 import com.noithat.qlnt.backend.entity.ThuocTinh;
 import com.noithat.qlnt.backend.service.IAttributeService;
 
@@ -47,24 +45,6 @@ public class AttributeController {
     public ResponseEntity<Void> deleteThuocTinh(@PathVariable Integer id) {
         attributeService.deleteThuocTinh(id);
         return ResponseEntity.noContent().build();
-    }
-
-
-    // ===== Giá trị thuộc tính (Attribute Value) =====
-    @PostMapping("/{thuocTinhId}/values")
-    public ResponseEntity<GiaTriThuocTinh> createGiaTri(@PathVariable Integer thuocTinhId, @RequestBody GiaTriThuocTinhDto dto) {
-        return new ResponseEntity<>(attributeService.createGiaTri(thuocTinhId, dto), HttpStatus.CREATED);
-    }
-
-    @GetMapping("/{thuocTinhId}/values")
-    public ResponseEntity<List<GiaTriThuocTinh>> getGiaTri(@PathVariable Integer thuocTinhId) {
-        return ResponseEntity.ok(attributeService.getGiaTriByThuocTinh(thuocTinhId));
-    }
-
-    // ----- ENDPOINT MỚI -----
-    @PutMapping("/values/{id}")
-    public ResponseEntity<GiaTriThuocTinh> updateGiaTri(@PathVariable Integer id, @RequestBody GiaTriThuocTinhDto dto) {
-        return ResponseEntity.ok(attributeService.updateGiaTriThuocTinh(id, dto));
     }
 
     @DeleteMapping("/values/{id}")

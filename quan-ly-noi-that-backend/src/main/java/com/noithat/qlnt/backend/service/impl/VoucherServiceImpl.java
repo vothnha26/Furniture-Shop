@@ -32,7 +32,8 @@ public class VoucherServiceImpl implements IVoucherService {
     private final HangThanhVienRepository hangThanhVienRepository;
     private final IChuongTrinhGiamGiaService chuongTrinhGiamGiaService;
 
-    public VoucherServiceImpl(VoucherRepository voucherRepository, IKhachHangService khachHangService, HangThanhVienRepository hangThanhVienRepository, IChuongTrinhGiamGiaService chuongTrinhGiamGiaService) {
+    public VoucherServiceImpl(VoucherRepository voucherRepository, IKhachHangService khachHangService,
+            HangThanhVienRepository hangThanhVienRepository, IChuongTrinhGiamGiaService chuongTrinhGiamGiaService) {
         this.voucherRepository = voucherRepository;
         this.khachHangService = khachHangService;
         this.hangThanhVienRepository = hangThanhVienRepository;
@@ -47,7 +48,8 @@ public class VoucherServiceImpl implements IVoucherService {
             Integer maHang = hang.getMaHangThanhVien();
             List<Voucher> matched = voucherRepository.findAll().stream()
                     .filter(v -> {
-                        if (Boolean.TRUE.equals(v.getApDungChoMoiNguoi())) return true;
+                        if (Boolean.TRUE.equals(v.getApDungChoMoiNguoi()))
+                            return true;
                         return v.getHanCheHangThanhVien().stream()
                                 .anyMatch(link -> link.getHangThanhVien().getMaHangThanhVien().equals(maHang));
                     })
@@ -77,11 +79,13 @@ public class VoucherServiceImpl implements IVoucherService {
     @Override
     public List<VoucherResponse> getVouchersForTier(Integer maHangThanhVien) {
         hangThanhVienRepository.findById(maHangThanhVien)
-                .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + maHangThanhVien + " không tồn tại."));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Hạng thành viên ID: " + maHangThanhVien + " không tồn tại."));
 
         List<Voucher> matched = voucherRepository.findAll().stream()
                 .filter(v -> {
-                    if (Boolean.TRUE.equals(v.getApDungChoMoiNguoi())) return true;
+                    if (Boolean.TRUE.equals(v.getApDungChoMoiNguoi()))
+                        return true;
                     return v.getHanCheHangThanhVien().stream()
                             .anyMatch(link -> link.getHangThanhVien().getMaHangThanhVien().equals(maHangThanhVien));
                 })
@@ -95,18 +99,25 @@ public class VoucherServiceImpl implements IVoucherService {
     public Voucher assignTiersToVoucher(Integer maVoucher, List<Integer> maHangIds) {
         Voucher voucher = getById(maVoucher);
         voucher.getHanCheHangThanhVien().clear();
+        if (maHangIds == null) {
+            throw new InvalidVoucherException("Danh sách hạng không được null.");
+        }
 
-        if (maHangIds == null || maHangIds.isEmpty()) {
-            throw new InvalidVoucherException("Danh sách hạng không được để trống.");
+        // If empty list -> clear associations and make voucher apply to everyone
+        if (maHangIds.isEmpty()) {
+            voucher.setApDungChoMoiNguoi(true);
+            return voucherRepository.save(voucher);
         }
 
         for (Integer hangId : maHangIds) {
             HangThanhVien hang = hangThanhVienRepository.findById(hangId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
             VoucherHangThanhVien link = new VoucherHangThanhVien();
             link.setVoucher(voucher);
             link.setHangThanhVien(hang);
-            link.setId(new VoucherHangThanhVien.VoucherHangThanhVienId(voucher.getMaVoucher(), hang.getMaHangThanhVien()));
+            link.setId(
+                    new VoucherHangThanhVien.VoucherHangThanhVienId(voucher.getMaVoucher(), hang.getMaHangThanhVien()));
             voucher.getHanCheHangThanhVien().add(link);
         }
 
@@ -178,7 +189,8 @@ public class VoucherServiceImpl implements IVoucherService {
         BigDecimal giaTriGiam = voucher.getGiaTriGiam();
         BigDecimal soTienGiam;
 
-        if ("PERCENTAGE".equalsIgnoreCase(voucher.getLoaiGiamGia()) || "PERCENT".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
+        if ("PERCENTAGE".equalsIgnoreCase(voucher.getLoaiGiamGia())
+                || "PERCENT".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
             soTienGiam = tongTien.multiply(giaTriGiam.divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
         } else if ("FIXED".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
             soTienGiam = giaTriGiam;
@@ -227,20 +239,21 @@ public class VoucherServiceImpl implements IVoucherService {
         voucher.setMoTa(req.getMoTa());
         voucher.setLoaiGiamGia(req.getLoaiGiamGia());
         voucher.setGiaTriGiam(req.getGiaTriGiam());
-        voucher.setGiaTriDonHangToiThieu(req.getGiaTriDonHangToiThieu() != null ? req.getGiaTriDonHangToiThieu() : BigDecimal.ZERO);
+        voucher.setGiaTriDonHangToiThieu(
+                req.getGiaTriDonHangToiThieu() != null ? req.getGiaTriDonHangToiThieu() : BigDecimal.ZERO);
         voucher.setGiaTriGiamToiDa(req.getGiaTriGiamToiDa() != null ? req.getGiaTriGiamToiDa() : req.getGiaTriGiam());
         voucher.setNgayBatDau(req.getNgayBatDau());
         voucher.setNgayKetThuc(req.getNgayKetThuc());
         voucher.setSoLuongToiDa(req.getSoLuongToiDa() != null ? req.getSoLuongToiDa() : 1000);
         voucher.setSoLuongDaSuDung(0);
-        voucher.setTrangThai(true);
+        voucher.setTrangThai(req.getTrangThai());
         voucher.setApDungChoMoiNguoi(req.getApDungChoMoiNguoi());
 
         if (Boolean.FALSE.equals(req.getApDungChoMoiNguoi())) {
             var provided = req.getMaHangThanhVienIds();
             var hangIds = new java.util.HashSet<Integer>();
-            if (provided != null) hangIds.addAll(provided);
-            hangIds.add(3);
+            if (provided != null)
+                hangIds.addAll(provided);
 
             if (hangIds.isEmpty()) {
                 throw new InvalidVoucherException("Cần cấu hình danh sách hạng thành viên được áp dụng.");
@@ -249,7 +262,8 @@ public class VoucherServiceImpl implements IVoucherService {
             var links = new HashSet<VoucherHangThanhVien>();
             for (Integer hangId : hangIds) {
                 HangThanhVien hang = hangThanhVienRepository.findById(hangId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Hạng thành viên ID: " + hangId + " không tồn tại."));
                 VoucherHangThanhVien link = new VoucherHangThanhVien();
                 link.setVoucher(voucher);
                 link.setHangThanhVien(hang);
@@ -267,30 +281,67 @@ public class VoucherServiceImpl implements IVoucherService {
     @Override
     @Transactional
     public Voucher updateVoucher(Integer id, VoucherCreationRequest req) {
-        validateDateRange(req.getNgayBatDau(), req.getNgayKetThuc());
-
+        // Support partial updates: if a field in req is null, keep existing value
         Voucher voucher = getById(id);
-        voucher.setMaCode(req.getMaCode());
-        voucher.setLoaiGiamGia(req.getLoaiGiamGia());
-        voucher.setGiaTriGiam(req.getGiaTriGiam());
-        voucher.setNgayBatDau(req.getNgayBatDau());
-        voucher.setNgayKetThuc(req.getNgayKetThuc());
-        voucher.setApDungChoMoiNguoi(req.getApDungChoMoiNguoi());
 
-        voucher.getHanCheHangThanhVien().clear();
+        // Merge fields (only overwrite non-null fields)
+        if (req.getMaCode() != null)
+            voucher.setMaCode(req.getMaCode());
+        if (req.getLoaiGiamGia() != null)
+            voucher.setLoaiGiamGia(req.getLoaiGiamGia());
+        if (req.getGiaTriGiam() != null)
+            voucher.setGiaTriGiam(req.getGiaTriGiam());
+        if (req.getGiaTriDonHangToiThieu() != null)
+            voucher.setGiaTriDonHangToiThieu(req.getGiaTriDonHangToiThieu());
+        if (req.getGiaTriGiamToiDa() != null)
+            voucher.setGiaTriGiamToiDa(req.getGiaTriGiamToiDa());
+        if (req.getSoLuongToiDa() != null)
+            voucher.setSoLuongToiDa(req.getSoLuongToiDa());
+        if (req.getTenVoucher() != null)
+            voucher.setTenVoucher(req.getTenVoucher());
+        if (req.getMoTa() != null)
+            voucher.setMoTa(req.getMoTa());
+        // If client provided a trangThai string, store it on entity (string enum)
+        if (req.getTrangThai() != null) {
+            voucher.setTrangThai(req.getTrangThai());
+        }
 
-        if (Boolean.FALSE.equals(req.getApDungChoMoiNguoi())) {
-            if (req.getMaHangThanhVienIds() == null || req.getMaHangThanhVienIds().isEmpty()) {
-                throw new InvalidVoucherException("Cần cấu hình danh sách hạng thành viên được áp dụng.");
-            }
-            for (Integer hangId : req.getMaHangThanhVienIds()) {
-                HangThanhVien hang = hangThanhVienRepository.findById(hangId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
-                VoucherHangThanhVien link = new VoucherHangThanhVien();
-                link.setVoucher(voucher);
-                link.setHangThanhVien(hang);
-                link.setId(new VoucherHangThanhVien.VoucherHangThanhVienId(voucher.getMaVoucher(), hang.getMaHangThanhVien()));
-                voucher.getHanCheHangThanhVien().add(link);
+        // Merge & validate dates (use existing values when not provided)
+        LocalDateTime newStart = req.getNgayBatDau() != null ? req.getNgayBatDau() : voucher.getNgayBatDau();
+        LocalDateTime newEnd = req.getNgayKetThuc() != null ? req.getNgayKetThuc() : voucher.getNgayKetThuc();
+        validateDateRange(newStart, newEnd);
+        voucher.setNgayBatDau(newStart);
+        voucher.setNgayKetThuc(newEnd);
+
+        if (req.getApDungChoMoiNguoi() != null) {
+            voucher.setApDungChoMoiNguoi(req.getApDungChoMoiNguoi());
+        }
+
+        // Only update tier links if client explicitly provided maHangThanhVienIds
+        // (PATCH semantics)
+        if (req.getMaHangThanhVienIds() != null) {
+            voucher.getHanCheHangThanhVien().clear();
+            if (Boolean.FALSE.equals(voucher.getApDungChoMoiNguoi())) {
+                if (req.getMaHangThanhVienIds().isEmpty()) {
+                    // empty list means clear and set to everyone
+                    voucher.setApDungChoMoiNguoi(true);
+                } else {
+                    for (Integer hangId : req.getMaHangThanhVienIds()) {
+                        HangThanhVien hang = hangThanhVienRepository.findById(hangId)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                        "Hạng thành viên ID: " + hangId + " không tồn tại."));
+                        VoucherHangThanhVien link = new VoucherHangThanhVien();
+                        link.setVoucher(voucher);
+                        link.setHangThanhVien(hang);
+                        link.setId(new VoucherHangThanhVien.VoucherHangThanhVienId(voucher.getMaVoucher(),
+                                hang.getMaHangThanhVien()));
+                        voucher.getHanCheHangThanhVien().add(link);
+                    }
+                    voucher.setApDungChoMoiNguoi(false);
+                }
+            } else {
+                // if apDungChoMoiNguoi is true, ensure links cleared
+                voucher.getHanCheHangThanhVien().clear();
             }
         }
 
@@ -331,14 +382,14 @@ public class VoucherServiceImpl implements IVoucherService {
     }
 
     private VoucherResponse convertToResponse(Voucher voucher) {
+        String trangThai = voucher.getTrangThai();
         LocalDateTime now = LocalDateTime.now();
-        String trangThai;
         if (voucher.getNgayBatDau().isAfter(now)) {
             trangThai = "CHUA_BAT_DAU";
         } else if (voucher.getNgayKetThuc().isBefore(now)) {
             trangThai = "DA_HET_HAN";
         } else {
-            trangThai = "DANG_HOAT_DONG";
+            trangThai = voucher.getTrangThai();
         }
 
         List<String> tenHangThanhVienApDung = new java.util.ArrayList<>();
@@ -351,13 +402,20 @@ public class VoucherServiceImpl implements IVoucherService {
 
         return VoucherResponse.builder()
                 .maVoucher(voucher.getMaVoucher())
+                .tenVoucher(voucher.getTenVoucher())
                 .maCode(voucher.getMaCode())
                 .loaiGiamGia(voucher.getLoaiGiamGia())
                 .giaTriGiam(voucher.getGiaTriGiam())
+                .giaTriDonHangToiThieu(voucher.getGiaTriDonHangToiThieu())
+                .giaTriGiamToiDa(voucher.getGiaTriGiamToiDa())
+                .soLuongToiDa(voucher.getSoLuongToiDa())
+                .soLuongDaSuDung(voucher.getSoLuongDaSuDung())
                 .ngayBatDau(voucher.getNgayBatDau())
                 .ngayKetThuc(voucher.getNgayKetThuc())
-                .trangThai(trangThai)
+                .trangThai(voucher.getTrangThai())
                 .apDungChoMoiNguoi(voucher.getApDungChoMoiNguoi())
+                .moTa(voucher.getMoTa())
+                .trangThai(trangThai)
                 .tenHangThanhVienApDung(tenHangThanhVienApDung)
                 .build();
     }

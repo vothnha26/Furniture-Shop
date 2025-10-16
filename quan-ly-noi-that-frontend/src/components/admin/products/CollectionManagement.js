@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { IoAdd, IoSearch, IoCreate, IoTrash, IoSave, IoClose, IoLayers, IoText } from 'react-icons/io5';
 import Modal from '../../shared/Modal';
 import ConfirmDialog from '../../shared/ConfirmDialog';
@@ -25,24 +25,26 @@ const CollectionManagement = () => {
     trangThai: collection.trangThai
   });
 
-  // Fetch collections
-  useEffect(() => {
-    const fetchCollections = async () => {
-      setIsLoading(true);
-      try {
-        const data = await api.get('/api/bo-suu-tap');
-        if (Array.isArray(data)) {
-          setCollections(data.map(mapCollectionFromApi));
-        }
-      } catch (err) {
-        console.error('Fetch collections error', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
+  // Fetch collections (exposed so handlers can refresh after edit/delete)
+  const fetchCollections = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Backend controller exposes /api/collections
+      const data = await api.get('/api/collections');
+      if (Array.isArray(data)) {
+        setCollections(data.map(mapCollectionFromApi));
+      } else if (data && data.content) {
+        setCollections(data.content.map(mapCollectionFromApi));
       }
-    };
-    fetchCollections();
+    } catch (err) {
+      console.error('Fetch collections error', err);
+      setError(err);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchCollections(); }, [fetchCollections]);
 
   const [collections, setCollections] = useState([]);
 
@@ -88,32 +90,26 @@ const CollectionManagement = () => {
       return;
     }
 
-    if (editingCollection) {
-      // Update existing collection
-      setCollections(collections.map(collection =>
-        collection.maBoSuuTap === editingCollection.maBoSuuTap
-          ? { 
-              ...collection, 
-              tenBoSuuTap: formData.tenBoSuuTap,
-              moTa: formData.moTa
-            }
-          : collection
-      ));
-      showToast('Cập nhật bộ sưu tập thành công');
-    } else {
-      // Add new collection
-      const newCollection = {
-        maBoSuuTap: Math.max(...collections.map(c => c.maBoSuuTap), 0) + 1,
-        tenBoSuuTap: formData.tenBoSuuTap,
-        moTa: formData.moTa,
-        soLuongSanPham: 0,
-        ngayTao: new Date().toISOString().split('T')[0]
-      };
-      setCollections([...collections, newCollection]);
-      showToast('Thêm bộ sưu tập thành công');
-    }
-
-    closeModal();
+    // Persist to backend
+    (async () => {
+      setIsLoading(true);
+      try {
+        if (editingCollection) {
+          await api.put(`/api/collections/${editingCollection.maBoSuuTap}`, { body: mapCollectionToApi(formData) });
+          showToast('Cập nhật bộ sưu tập thành công');
+        } else {
+          await api.post('/api/collections', { body: mapCollectionToApi(formData) });
+          showToast('Thêm bộ sưu tập thành công');
+        }
+        await fetchCollections();
+        closeModal();
+      } catch (err) {
+        console.error('Save collection error', err);
+        showToast('Lưu bộ sưu tập thất bại', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   };
 
   const openModal = (collection = null) => {
@@ -137,10 +133,21 @@ const CollectionManagement = () => {
   };
 
   const confirmDelete = () => {
-    setCollections(collections.filter(collection => collection.maBoSuuTap !== deleteId));
-    setShowConfirmDialog(false);
-    setDeleteId(null);
-    showToast('Xóa bộ sưu tập thành công');
+    (async () => {
+      setIsLoading(true);
+      try {
+        await api.del(`/api/collections/${deleteId}`);
+        showToast('Xóa bộ sưu tập thành công');
+        await fetchCollections();
+      } catch (err) {
+        console.error('Delete collection error', err);
+        showToast('Xóa bộ sưu tập thất bại', 'error');
+      } finally {
+        setIsLoading(false);
+        setShowConfirmDialog(false);
+        setDeleteId(null);
+      }
+    })();
   };
 
   const formatDate = (dateString) => {

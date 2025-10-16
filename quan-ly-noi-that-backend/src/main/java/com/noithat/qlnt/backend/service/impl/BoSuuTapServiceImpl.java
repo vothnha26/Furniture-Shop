@@ -20,6 +20,7 @@ public class BoSuuTapServiceImpl implements IBoSuuTapService {
     private BoSuuTapRepository boSuuTapRepository;
     @Autowired
     private SanPhamRepository sanPhamRepository;
+
     public List<BoSuuTap> getAll() {
         return boSuuTapRepository.findAll();
     }
@@ -46,6 +47,7 @@ public class BoSuuTapServiceImpl implements IBoSuuTapService {
         }
         boSuuTapRepository.deleteById(id);
     }
+
     public void addProductToCollection(Integer collectionId, Integer productId) {
         BoSuuTap bst = boSuuTapRepository.findById(collectionId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy bộ sưu tập: " + collectionId));
@@ -60,12 +62,12 @@ public class BoSuuTapServiceImpl implements IBoSuuTapService {
     public void removeProductFromCollection(Integer collectionId, Integer productId) {
         SanPham sp = sanPhamRepository.findById(productId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm: " + productId));
-        
+
         // Kiểm tra sản phẩm có thuộc bộ sưu tập này không
         if (sp.getBoSuuTap() == null || !sp.getBoSuuTap().getMaBoSuuTap().equals(collectionId)) {
             throw new IllegalArgumentException("Sản phẩm không thuộc bộ sưu tập này");
         }
-        
+
         // Xóa bộ sưu tập khỏi sản phẩm
         sp.setBoSuuTap(null);
         sanPhamRepository.save(sp);
@@ -76,7 +78,7 @@ public class BoSuuTapServiceImpl implements IBoSuuTapService {
         if (!boSuuTapRepository.existsById(collectionId)) {
             throw new EntityNotFoundException("Không tìm thấy bộ sưu tập: " + collectionId);
         }
-        
+
         // Tìm tất cả sản phẩm thuộc bộ sưu tập này
         return sanPhamRepository.findByBoSuuTap_MaBoSuuTap(collectionId);
     }

@@ -18,7 +18,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/hang-thanh-vien")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "${app.cors.allowed-origins}", allowCredentials = "true")
 public class HangThanhVienController {
 
     @Autowired

@@ -85,8 +85,30 @@ const VIPManagement = () => {
   const mapVipLevelToApi = (level) => ({
     tenHang: level.name,
     diemToiThieu: parseInt(level.minSpent),
-    moTa: level.benefits.join(', ')
+    // send structured vipBenefits array; each benefit is an object expected by backend
+    vipBenefits: (level.benefits || []).map(b => ({
+      benefitType: 'CUSTOM',
+      params: {},
+      description: b,
+      active: true
+    }))
   });
+
+  const parseParams = (params) => {
+    if (!params && params !== 0) return {};
+    if (typeof params === 'object') return params;
+    try { return JSON.parse(params); } catch { return {}; }
+  };
+
+  const formatBenefit = (benefit) => {
+    if (!benefit) return '';
+    const type = benefit.benefitType || 'CUSTOM';
+    const p = parseParams(benefit.params);
+    if (type === 'PERCENT_DISCOUNT') return benefit.description || `Giảm ${p.percent}%`;
+    if (type === 'FREE_SHIPPING') return benefit.description || `Miễn phí ship (đơn trên ${p.minOrder || 0})`;
+    if (type === 'BONUS_POINTS') return benefit.description || (p.points ? `Tặng ${p.points} điểm` : `Tặng ${p.percent || 0}% điểm`);
+    return benefit.description || (typeof benefit.params === 'string' ? benefit.params : JSON.stringify(benefit.params || {}));
+  };
 
   const getVipLevelInfo = (level) => {
     return vipBenefits.find(vip => vip.level === level) || vipBenefits[0];
@@ -100,7 +122,9 @@ const VIPManagement = () => {
       level: level.tenHang ? level.tenHang.toLowerCase().replace(' ', '') : 'silver',
       name: level.tenHang || level.name || '',
       minSpent: level.diemToiThieu || level.soTienToiThieu || 0,
-      benefits: level.moTa ? [level.moTa] : [],
+      benefits: (level.vipBenefits && Array.isArray(level.vipBenefits) && level.vipBenefits.length > 0)
+        ? level.vipBenefits.map(b => b.description || '')
+        : (level.moTa ? [level.moTa] : []),
       color: getColorForLevel(level.tenHang || ''),
       icon: getIconForLevel(level.tenHang || '')
     });
@@ -379,7 +403,7 @@ const VIPManagement = () => {
                     {benefit.benefits.map((benefitItem, index) => (
                       <div key={index} className="flex items-center text-sm text-gray-600">
                         <IoCheckmark className="w-4 h-4 text-green-500 mr-2" />
-                        {benefitItem}
+                        {formatBenefit(benefitItem)}
                       </div>
                     ))}
                   </div>

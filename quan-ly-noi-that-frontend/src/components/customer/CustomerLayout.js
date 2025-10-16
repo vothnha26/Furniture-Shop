@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { IoHome, IoCart, IoPerson, IoSearch, IoMenu, IoClose, IoHeart, IoNotifications, IoStorefront, IoReceipt } from 'react-icons/io5';
+import { useOutlet } from 'react-router-dom';
+import { IoCart, IoPerson, IoSearch, IoMenu, IoClose, IoHeart, IoNotifications, IoStorefront, IoReceipt } from 'react-icons/io5';
 import CustomerShop from './CustomerShop';
 import CustomerCart from './CustomerCart';
 import CustomerOrders from './CustomerOrders';
@@ -26,7 +27,12 @@ const CustomerLayout = () => {
     { id: 'profile', name: 'Tài khoản', icon: IoPerson, component: CustomerProfile }
   ];
 
+  // If this layout is used as a parent route, `useOutlet()` returns the nested element.
+  const outlet = useOutlet();
+
   const renderCurrentView = () => {
+    // If a nested route element is present, render it instead of the internal tab view
+    if (outlet) return outlet;
     const view = views.find(v => v.id === currentView);
     if (view) {
       const Component = view.component;

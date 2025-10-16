@@ -13,8 +13,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +41,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "${app.cors.allowed-origins}", allowCredentials = "true")
 @RequiredArgsConstructor
 public class HinhAnhSanPhamController {
 
@@ -127,6 +135,113 @@ public class HinhAnhSanPhamController {
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(HinhAnhSanPhamResponseDto.fromEntity(created));
+    }
+
+    /**
+     * Upload nhiều ảnh thực tế cho sản phẩm (MultipartFile)
+     * POST /api/products/{productId}/images/upload
+     * Content-Type: multipart/form-data
+     * Form data:
+     *   - images: MultipartFile[] (danh sách file ảnh)
+     *   - thuTu: Integer[] (optional - thứ tự các ảnh, mặc định theo index)
+     *   - laAnhChinh: Boolean[] (optional - ảnh nào là ảnh chính, mặc định ảnh đầu)
+     */
+    @CrossOrigin(origins = "${app.cors.allowed-origins}", allowCredentials = "true", allowedHeaders = "*")
+    @PostMapping("/products/{productId}/images/upload")
+    public ResponseEntity<?> uploadImages(
+            @PathVariable Integer productId,
+            @RequestParam("images") MultipartFile[] images,
+            @RequestParam(value = "thuTu", required = false) Integer[] thuTuArray,
+            @RequestParam(value = "laAnhChinh", required = false) Boolean[] laAnhChinhArray) {
+        
+        try {
+            System.out.println("[DEBUG] uploadImages called for productId=" + productId + ", images.length=" + (images == null ? 0 : images.length));
+            if (images != null && images.length > 0) {
+                for (int i = 0; i < images.length; i++) {
+                    try {
+                        System.out.println("[DEBUG] incoming file[" + i + "] name=" + images[i].getOriginalFilename()
+                                + ", contentType=" + images[i].getContentType() + ", size=" + images[i].getSize());
+                    } catch (Exception ex) {
+                        System.out.println("[DEBUG] cannot read incoming file metadata: " + ex.getMessage());
+                    }
+                }
+            }
+            // Tạo thư mục lưu ảnh nếu chưa có
+            String uploadDir = "uploads/products/" + productId;
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            List<HinhAnhSanPhamResponseDto> uploadedImages = new ArrayList<>();
+            
+            for (int i = 0; i < images.length; i++) {
+                MultipartFile file = images[i];
+                
+                // Validate file
+                if (file.isEmpty()) {
+                    continue;
+                }
+                
+                // Kiểm tra định dạng ảnh
+                String contentType = file.getContentType();
+                if (contentType == null || !contentType.startsWith("image/")) {
+                    continue; // Bỏ qua file không phải ảnh
+                }
+
+                // Tạo tên file unique
+                String originalFilename = file.getOriginalFilename();
+                String extension = originalFilename != null && originalFilename.contains(".") 
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".jpg";
+                String uniqueFilename = UUID.randomUUID().toString() + extension;
+                
+                // Lưu file vào disk
+                Path filePath = uploadPath.resolve(uniqueFilename);
+                Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+                
+                // Tạo URL tương đối để lưu vào DB
+                String imageUrl = "/uploads/products/" + productId + "/" + uniqueFilename;
+                
+                // Xác định thứ tự
+                Integer thuTu = (thuTuArray != null && i < thuTuArray.length) 
+                    ? thuTuArray[i] 
+                    : i;
+                
+                // Xác định ảnh chính (mặc định ảnh đầu tiên)
+                Boolean laAnhChinh = (laAnhChinhArray != null && i < laAnhChinhArray.length) 
+                    ? laAnhChinhArray[i] 
+                    : (i == 0);
+                
+                // Tạo DTO và lưu vào database
+                HinhAnhSanPhamRequestDto dto = new HinhAnhSanPhamRequestDto(
+                    imageUrl,
+                    thuTu,
+                    laAnhChinh,
+                    "Ảnh sản phẩm " + (i + 1),
+                    true
+                );
+                
+                HinhAnhSanPham saved = hinhAnhService.createHinhAnh(productId, dto);
+                uploadedImages.add(HinhAnhSanPhamResponseDto.fromEntity(saved));
+            }
+            
+            if (uploadedImages.isEmpty()) {
+                return ResponseEntity.badRequest().body("Không có ảnh hợp lệ nào được upload");
+            }
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(uploadedImages);
+            
+        } catch (IOException e) {
+            // Log stack trace for debugging
+            java.io.StringWriter sw = new java.io.StringWriter();
+            java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+            e.printStackTrace(pw);
+            String stack = sw.toString();
+            System.out.println("[ERROR] uploadImages exception: " + stack);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of("error", "Lỗi khi upload ảnh", "exception", stack));
+        }
     }
 
     /**

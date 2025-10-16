@@ -1,53 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { IoAdd, IoSearch, IoCreate, IoTrash, IoEye, IoTrendingUp, IoTrendingDown, IoRefresh, IoFilter, IoColorPalette, IoResize } from 'react-icons/io5';
+import { IoAdd, IoSearch, IoTrash, IoTrendingUp, IoTrendingDown, IoRefresh } from 'react-icons/io5';
 import api from '../../../api';
 
 const InventoryManagement = () => {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showVariantModal, setShowVariantModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [variants, setVariants] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [selectedVariant, setSelectedVariant] = useState(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [newVariant, setNewVariant] = useState({
-    maBienThe: '',
-    sanPham: null,
-    sku: '',
-    giaBan: 0,
-    soLuongTon: 0,
-    thuocTinh: []
+  // Note: modal and search state are declared further down to keep related state grouped together
+
+  const [importForm, setImportForm] = useState({
+    soLuong: '',
+    nguoiNhap: localStorage.getItem('username') || 'admin',
+    lyDo: ''
   });
+
+  const [exportForm, setExportForm] = useState({
+    soLuong: '',
+    nguoiXuat: localStorage.getItem('username') || 'admin',
+    lyDo: '',
+    maThamChieu: ''
+  });
+
+  // UI state: modals, search and transaction forms
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [newTransaction, setNewTransaction] = useState({
+    productId: '',
+    quantity: '',
+    unitPrice: '',
+    note: ''
+  });
+
+  // Temp state used when creating new products/variants via this UI
   const [newItem, setNewItem] = useState({
+    productCode: '',
     productName: '',
     category: '',
     currentStock: 0,
     minStock: 0,
     maxStock: 0,
-    unitPrice: 0
+    unitPrice: 0,
+    variants: []
   });
 
-  // Map inventory item from API to UI
-  const mapInventoryFromApi = (item) => ({
-    maBienThe: item.maBienThe || item.id,
-    sanPham: {
-      maSanPham: item.sanPham?.maSanPham || item.productId,
-      tenSanPham: item.sanPham?.tenSanPham || item.productName,
-      danhMuc: item.sanPham?.danhMuc || item.category
-    },
-    sku: item.sku || '',
-    giaBan: item.giaBan || item.price || 0,
-    soLuongTon: item.soLuongTon || item.stock || 0,
-    tonKhoToiThieu: item.tonKhoToiThieu || 5,
-    tonKhoToiDa: item.tonKhoToiDa || 100,
-    giaTriTongKho: (item.giaBan || 0) * (item.soLuongTon || 0),
-    ngayCapNhat: item.ngayCapNhat || new Date().toISOString().split('T')[0],
-    trangThai: getStockStatus(item.soLuongTon || 0),
-    thuocTinh: item.thuocTinh || []
-  });
+  // Lấy danh sách biến thể
+  useEffect(() => {
+    fetchVariants();
+  }, []);
 
-  const getStockStatus = (stock) => {
-    if (stock === 0) return 'het_hang';
-    if (stock <= 5) return 'thap';
-    return 'binh_thuong';
+  const fetchVariants = async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.get('/api/bien-the-san-pham', { params: { size: 1000 } });
+      const list = Array.isArray(data) ? data : (data?.content || []);
+      setVariants(list);
+      setError(null);
+    } catch (err) {
+      console.error('Lỗi tải danh sách biến thể:', err);
+      setError('Không thể tải danh sách biến thể');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getStockStatus = (variant) => {
+    const { soLuongTon, mucTonToiThieu } = variant;
+    if (soLuongTon === 0) return 'out_of_stock';
+    if (soLuongTon <= (mucTonToiThieu || 5)) return 'low';
+    return 'normal';
+  };
+
+  // Map raw API item to UI inventory shape
+  const mapInventoryFromApi = (item) => {
+    const soLuong = item.soLuongTon ?? item.stock ?? 0;
+    const gia = item.giaBan ?? item.price ?? 0;
+    const mucTon = item.mucTonToiThieu ?? item.tonKhoToiThieu ?? 5;
+    return {
+      maBienThe: item.maBienThe ?? item.id,
+      sanPham: {
+        maSanPham: item.sanPham?.maSanPham ?? item.productId,
+        tenSanPham: item.sanPham?.tenSanPham ?? item.productName,
+        danhMuc: item.sanPham?.danhMuc?.tenDanhMuc ?? item.category
+      },
+      sku: item.sku ?? '',
+      giaBan: gia,
+      soLuongTon: soLuong,
+      tonKhoToiThieu: mucTon,
+      tonKhoToiDa: item.tonKhoToiDa ?? 100,
+      giaTriTongKho: gia * soLuong,
+      ngayCapNhat: item.ngayCapNhat ?? item.updatedAt ?? new Date().toISOString().split('T')[0],
+      trangThai: getStockStatus({ soLuongTon: soLuong, mucTonToiThieu: mucTon }),
+      thuocTinh: item.thuocTinh ?? item.attributes ?? []
+    };
   };
 
   // Fetch inventory data
@@ -70,6 +122,7 @@ const InventoryManagement = () => {
       }
     };
     fetchInventory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [inventory, setInventory] = useState([
@@ -182,17 +235,6 @@ const InventoryManagement = () => {
     }
   ]);
 
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showAdjustModal, setShowAdjustModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [newTransaction, setNewTransaction] = useState({
-    productId: '',
-    quantity: '',
-    unitPrice: '',
-    note: ''
-  });
 
   const getStatusColor = (status) => {
     switch (status) {

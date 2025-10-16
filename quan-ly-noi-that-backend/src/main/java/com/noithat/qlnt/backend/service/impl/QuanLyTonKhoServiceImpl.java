@@ -91,28 +91,10 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
     @Override
     public boolean reserveProduct(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
         try {
-            Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
-            if (optionalBienThe.isEmpty()) {
+                // Reservation functionality was removed (soLuongDatTruoc field removed).
+                // Keep API but return false to indicate reservation is not supported.
+                logger.warn("reserveProduct called but reservation feature was removed. maBienThe={}", maBienThe);
                 return false;
-            }
-
-            BienTheSanPham bienThe = optionalBienThe.get();
-
-            if (!bienThe.canReserve(quantity)) {
-                return false;
-            }
-
-            bienThe.reserveStock(quantity);
-            bienTheSanPhamRepository.save(bienThe);
-
-            LichSuTonKho lichSu = new LichSuTonKho(
-                bienThe, bienThe.getSoLuongTon(), 0, bienThe.getSoLuongTon(),
-                "DAT_TRUOC", maThamChieu,
-                "Đặt trước " + quantity + " sản phẩm", nguoiThucHien
-            );
-            lichSuTonKhoRepository.save(lichSu);
-
-            return true;
         } catch (Exception e) {
             return false;
         }
@@ -121,28 +103,9 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
     @Override
     public boolean releaseReservation(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
         try {
-            Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
-            if (optionalBienThe.isEmpty()) {
+                // Release reservation not supported after removing reservation fields.
+                logger.warn("releaseReservation called but reservation feature was removed. maBienThe={}", maBienThe);
                 return false;
-            }
-
-            BienTheSanPham bienThe = optionalBienThe.get();
-
-            if (bienThe.getSoLuongDatTruoc() < quantity) {
-                return false;
-            }
-
-            bienThe.releaseStock(quantity);
-            bienTheSanPhamRepository.save(bienThe);
-
-            LichSuTonKho lichSu = new LichSuTonKho(
-                bienThe, bienThe.getSoLuongTon(), 0, bienThe.getSoLuongTon(),
-                "HUY_DAT_TRUOC", maThamChieu,
-                "Hủy đặt trước " + quantity + " sản phẩm", nguoiThucHien
-            );
-            lichSuTonKhoRepository.save(lichSu);
-
-            return true;
         } catch (Exception e) {
             return false;
         }
@@ -159,12 +122,13 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
             BienTheSanPham bienThe = optionalBienThe.get();
             Integer soLuongTruoc = bienThe.getSoLuongTon();
 
-            if (bienThe.getSoLuongTon() < quantity) {
-                return false;
-            }
+                if (bienThe.getSoLuongTon() < quantity) {
+                    return false;
+                }
 
-            bienThe.confirmSale(quantity);
-            bienTheSanPhamRepository.save(bienThe);
+                // Confirm sale: directly reduce stock (no reservation logic)
+                bienThe.updateStock(-quantity);
+                bienTheSanPhamRepository.save(bienThe);
 
             LichSuTonKho lichSu = new LichSuTonKho(
                 bienThe, soLuongTruoc, -quantity, bienThe.getSoLuongTon(),
@@ -297,10 +261,7 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
             stockInfo.put("tenSanPham", bienThe.getSanPham().getTenSanPham());
             stockInfo.put("sku", bienThe.getSku());
             stockInfo.put("soLuongTon", bienThe.getSoLuongTon());
-            stockInfo.put("soLuongDatTruoc", bienThe.getSoLuongDatTruoc());
-            stockInfo.put("soLuongCoSan", bienThe.getSoLuongCoSan());
             stockInfo.put("giaBan", bienThe.getGiaBan());
-            stockInfo.put("viTriKho", bienThe.getViTriKho());
             stockInfo.put("trangThaiKho", bienThe.getTrangThaiKho());
 
             response.put("success", true);

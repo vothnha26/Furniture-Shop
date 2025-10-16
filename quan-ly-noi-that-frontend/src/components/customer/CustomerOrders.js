@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IoSearch, IoEye, IoRefresh, IoLocation, IoTime, IoCheckmarkCircle, IoClose, IoCall } from 'react-icons/io5';
+import { IoSearch, IoEye, IoRefresh, IoLocation, IoTime, IoCheckmarkCircle, IoClose } from 'react-icons/io5';
 import api from '../../api';
 
 // Mapping functions for Vietnamese API field names
@@ -43,6 +43,7 @@ const CustomerOrders = () => {
   const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [trackingHistory, setTrackingHistory] = useState([]);
 
   // API Functions
   const fetchCustomerOrders = async () => {
@@ -90,61 +91,6 @@ const CustomerOrders = () => {
     fetchCustomerOrders();
   }, []);
 
-  const mockOrders = [
-    {
-      id: 'ORD001',
-      orderDate: '2024-01-15',
-      status: 'delivered',
-      total: 2500000,
-      items: [
-        { name: 'Ghế gỗ cao cấp', quantity: 1, price: 2500000 }
-      ],
-      shippingAddress: '123 Đường ABC, Quận 1, TP.HCM',
-      trackingNumber: 'VN123456789',
-      estimatedDelivery: '2024-01-20',
-      actualDelivery: '2024-01-18'
-    },
-    {
-      id: 'ORD002',
-      orderDate: '2024-01-10',
-      status: 'shipping',
-      total: 4500000,
-      items: [
-        { name: 'Bàn ăn 6 người', quantity: 1, price: 4500000 }
-      ],
-      shippingAddress: '456 Đường XYZ, Quận 2, TP.HCM',
-      trackingNumber: 'VN987654321',
-      estimatedDelivery: '2024-01-25',
-      actualDelivery: null
-    },
-    {
-      id: 'ORD003',
-      orderDate: '2024-01-05',
-      status: 'processing',
-      total: 6500000,
-      items: [
-        { name: 'Giường ngủ gỗ', quantity: 1, price: 6500000 }
-      ],
-      shippingAddress: '789 Đường DEF, Quận 3, TP.HCM',
-      trackingNumber: null,
-      estimatedDelivery: '2024-01-30',
-      actualDelivery: null
-    },
-    {
-      id: 'ORD004',
-      orderDate: '2023-12-20',
-      status: 'cancelled',
-      total: 3200000,
-      items: [
-        { name: 'Tủ quần áo 3 cánh', quantity: 1, price: 3200000 }
-      ],
-      shippingAddress: '321 Đường GHI, Quận 4, TP.HCM',
-      trackingNumber: null,
-      estimatedDelivery: '2023-12-25',
-      actualDelivery: null
-    }
-  ];
-
   const statusConfig = {
     processing: { 
       color: 'text-blue-600', 
@@ -176,14 +122,38 @@ const CustomerOrders = () => {
     return statusConfig[status] || statusConfig.processing;
   };
 
-  const handleViewDetail = (order) => {
-    setSelectedOrder(order);
-    setShowOrderDetail(true);
+  const handleViewDetail = async (order) => {
+    try {
+      const detail = await getOrderDetail(order.id);
+      setSelectedOrder(detail);
+      setShowOrderDetail(true);
+    } catch (err) {
+      console.error('Failed to fetch order detail', err);
+      setError('Không thể tải chi tiết đơn hàng');
+    }
   };
 
-  const handleTrackOrder = (order) => {
-    setSelectedOrder(order);
-    setShowTracking(true);
+  const handleTrackOrder = async (order) => {
+    try {
+      const history = await trackOrder(order.id);
+      // API may return array or object; normalize to array
+      setTrackingHistory(Array.isArray(history) ? history : (history?.events || []));
+      setSelectedOrder(order);
+      setShowTracking(true);
+    } catch (err) {
+      console.error('Failed to fetch tracking info', err);
+      setError('Không thể lấy thông tin vận chuyển');
+    }
+  };
+
+  const handleCancelOrder = async (order) => {
+    try {
+      const updated = await cancelOrder(order.id);
+      setOrders(prev => prev.map(o => (o.id === updated.id ? updated : o)));
+    } catch (err) {
+      console.error('Failed to cancel order', err);
+      setError('Không thể hủy đơn hàng');
+    }
   };
 
   const filteredOrders = orders.filter(order => {
@@ -390,7 +360,7 @@ const CustomerOrders = () => {
                       </button>
                     )}
                     {order.status === 'processing' && (
-                      <button className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                      <button onClick={() => handleCancelOrder(order)} className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
                         Hủy đơn hàng
                       </button>
                     )}
@@ -529,32 +499,29 @@ const CustomerOrders = () => {
                   <div>
                     <h4 className="font-medium text-gray-900 mb-4">Lịch sử vận chuyển</h4>
                     <div className="space-y-4">
-                      {[
-                        { status: 'confirmed', time: '2024-01-15 09:00', location: 'Cửa hàng', description: 'Đơn hàng đã được xác nhận' },
-                        { status: 'processing', time: '2024-01-15 14:30', location: 'Kho hàng', description: 'Đang chuẩn bị hàng' },
-                        { status: 'shipping', time: '2024-01-16 08:00', location: 'Trung tâm phân phối', description: 'Đã xuất kho' },
-                        { status: 'delivered', time: '2024-01-18 15:45', location: selectedOrder.shippingAddress, description: 'Giao hàng thành công' }
-                      ].map((step, index) => {
-                        const statusInfo = getStatusInfo(step.status);
-                        const StatusIcon = statusInfo.icon;
-                        const isLast = index === 3;
-                        
-                        return (
-                          <div key={index} className="flex items-start space-x-4">
-                            <div className={`p-2 rounded-full ${statusInfo.bg} ${statusInfo.color}`}>
-                              <StatusIcon className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between">
-                                <h5 className="font-medium text-gray-900">{statusInfo.label}</h5>
-                                <span className="text-sm text-gray-500">{step.time}</span>
+                      {trackingHistory.length === 0 ? (
+                        <p className="text-sm text-gray-500">Chưa có lịch sử vận chuyển</p>
+                      ) : (
+                        trackingHistory.map((step, index) => {
+                          const statusInfo = getStatusInfo(step.status || step.state || 'processing');
+                          const StatusIcon = statusInfo.icon;
+                          return (
+                            <div key={index} className="flex items-start space-x-4">
+                              <div className={`p-2 rounded-full ${statusInfo.bg} ${statusInfo.color}`}>
+                                <StatusIcon className="w-4 h-4" />
                               </div>
-                              <p className="text-sm text-gray-600 mt-1">{step.description}</p>
-                              <p className="text-sm text-gray-500 mt-1">{step.location}</p>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between">
+                                  <h5 className="font-medium text-gray-900">{statusInfo.label}</h5>
+                                  <span className="text-sm text-gray-500">{step.time || step.timestamp || step.date}</span>
+                                </div>
+                                <p className="text-sm text-gray-600 mt-1">{step.description || step.note || ''}</p>
+                                <p className="text-sm text-gray-500 mt-1">{step.location || step.place || ''}</p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 </div>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { IoCheckmarkCircle, IoWarning, IoInformation, IoClose } from 'react-icons/io5';
 
-const Toast = ({ 
-  isVisible, 
-  onClose, 
-  type = 'success', 
-  title, 
-  message, 
-  duration = 5000 
+const Toast = ({
+  isVisible,
+  onClose,
+  type = 'success',
+  title,
+  message,
+  duration = 5000
 }) => {
   useEffect(() => {
     if (isVisible && duration > 0) {
@@ -98,45 +98,77 @@ export const ToastContainer = ({ toasts, onRemove }) => {
 
 // Hook for managing toasts
 export const useToast = () => {
-  const [toasts, setToasts] = useState([]);
+  // keep local hook behaviour but delegate to global API
+  const [toastsState, setToastsState] = useState(ToastInternal.getToasts());
 
-  const addToast = (toast) => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { ...toast, id, isVisible: true }]);
-  };
-
-  const removeToast = (id) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  };
-
-  const showSuccess = (message, title = 'Thành công') => {
-    addToast({ type: 'success', title, message });
-  };
-
-  const showError = (message, title = 'Lỗi') => {
-    addToast({ type: 'error', title, message });
-  };
-
-  const showWarning = (message, title = 'Cảnh báo') => {
-    addToast({ type: 'warning', title, message });
-  };
-
-  const showInfo = (message, title = 'Thông tin') => {
-    addToast({ type: 'info', title, message });
-  };
+  useEffect(() => {
+    const handle = () => setToastsState(ToastInternal.getToasts());
+    ToastInternal.subscribe(handle);
+    return () => ToastInternal.unsubscribe(handle);
+  }, []);
 
   return {
-    toasts,
-    addToast,
-    removeToast,
-    showSuccess,
-    showError,
-    showWarning,
-    showInfo
+    toasts: toastsState,
+    addToast: ToastInternal.addToast,
+    removeToast: ToastInternal.removeToast,
+    showSuccess: (message, title = 'Thành công') => ToastInternal.show(message, 'success', title),
+    showError: (message, title = 'Lỗi') => ToastInternal.show(message, 'error', title),
+    showWarning: (message, title = 'Cảnh báo') => ToastInternal.show(message, 'warning', title),
+    showInfo: (message, title = 'Thông tin') => ToastInternal.show(message, 'info', title)
   };
 };
+// Simple internal toast manager used by the ToastContainer and exported API
+const ToastInternal = (function () {
+  let toasts = [];
+  const listeners = new Set();
 
-export default Toast;
+  function notify() {
+    listeners.forEach(fn => fn());
+  }
+
+  function getToasts() {
+    return [...toasts];
+  }
+
+  function addToast(toast) {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    const t = { ...toast, id, isVisible: true };
+    toasts = [...toasts, t];
+    notify();
+    return id;
+  }
+
+  function removeToast(id) {
+    toasts = toasts.filter(t => t.id !== id);
+    notify();
+  }
+
+  function show(message, type = 'info', title) {
+    const toast = { type, title, message, duration: 5000 };
+    addToast(toast);
+  }
+
+  function subscribe(fn) { listeners.add(fn); }
+  function unsubscribe(fn) { listeners.delete(fn); }
+
+  return { getToasts, addToast, removeToast, show, subscribe, unsubscribe };
+})();
+
+// Default export: object with show convenience method for legacy uses (Toast.show(...))
+const ToastAPI = {
+  show: ToastInternal.show,
+  showSuccess: (message, title = 'Thành công') => ToastInternal.show(message, 'success', title),
+  showError: (message, title = 'Lỗi') => ToastInternal.show(message, 'error', title),
+  showWarning: (message, title = 'Cảnh báo') => ToastInternal.show(message, 'warning', title),
+  showInfo: (message, title = 'Thông tin') => ToastInternal.show(message, 'info', title),
+  // allow programmatic control if needed
+  addToast: ToastInternal.addToast,
+  removeToast: ToastInternal.removeToast,
+  useToast: useToast
+};
+
+export { ToastInternal };
+export default ToastAPI;
 
 
 

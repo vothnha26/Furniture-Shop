@@ -23,8 +23,12 @@ function authHeader() {
 
 async function request(method, path, { body, query, headers } = {}) {
   const url = buildUrl(path, query);
+  
+  // Kiểm tra nếu body là FormData thì không set Content-Type (browser tự set)
+  const isFormData = body instanceof FormData;
+  
   const baseHeaders = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...authHeader(),
     ...headers
   };
@@ -35,7 +39,8 @@ async function request(method, path, { body, query, headers } = {}) {
   };
 
   if (body !== undefined && body !== null) {
-    opts.body = typeof body === 'string' ? body : JSON.stringify(body);
+    // Nếu là FormData hoặc string thì gửi trực tiếp, không thì JSON.stringify
+    opts.body = isFormData || typeof body === 'string' ? body : JSON.stringify(body);
   }
 
   const res = await fetch(url, opts);
@@ -62,6 +67,7 @@ export const api = {
   get: (path, opts) => request('GET', path, opts),
   post: (path, opts) => request('POST', path, opts),
   put: (path, opts) => request('PUT', path, opts),
+  patch: (path, opts) => request('PATCH', path, opts),
   del: (path, opts) => request('DELETE', path, opts),
   buildUrl
 };

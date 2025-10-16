@@ -86,26 +86,7 @@ const CustomerOrderTracking = () => {
     }
   };
 
-  // Mock result for fallback
-  const getMockResult = () => ({
-    id: 'ORD001',
-    trackingNumber: trackingNumber,
-    customer: 'Nguyễn Văn A',
-    phone: '0901234567',
-    address: '123 Đường ABC, Quận 1, TP.HCM',
-    status: 'in_transit',
-    estimatedDelivery: '2024-01-22',
-    actualDelivery: null,
-    carrier: 'Viettel Post',
-    driver: 'Trần Văn B',
-    driverPhone: '0987654321',
-    timeline: [
-      { status: 'confirmed', time: '2024-01-15 09:00', location: 'Cửa hàng', description: 'Đơn hàng đã được xác nhận' },
-      { status: 'processing', time: '2024-01-15 14:30', location: 'Kho hàng', description: 'Đang chuẩn bị hàng' },
-      { status: 'shipped', time: '2024-01-16 08:00', location: 'Trung tâm phân phối', description: 'Đã xuất kho' },
-      { status: 'in_transit', time: '2024-01-17 10:30', location: 'Đang vận chuyển', description: 'Đang giao hàng' }
-    ]
-  });
+  // When no search result, keep searchResult null and show message in UI
 
   const getStatusInfo = (status) => {
     return statusConfig[status] || statusConfig.confirmed;

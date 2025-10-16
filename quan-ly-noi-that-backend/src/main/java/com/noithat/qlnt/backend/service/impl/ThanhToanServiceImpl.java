@@ -40,6 +40,7 @@ public class ThanhToanServiceImpl implements ThanhToanService {
     private final VoucherRepository voucherRepository;
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final HoaDonService hoaDonService;
+    private final com.noithat.qlnt.backend.service.VipBenefitProcessor vipBenefitProcessor;
     
 
     @Override
@@ -311,10 +312,28 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         }
 
         // Tính thành tiền cuối cùng
+        // Determine original shipping/service cost from request's phuongThucGiaoHang
+        BigDecimal originalShippingCost = BigDecimal.ZERO;
+        String phuongThucGiaoHang = request.getPhuongThucGiaoHang();
+        if (phuongThucGiaoHang != null) {
+            switch (phuongThucGiaoHang) {
+                case "Nhanh": originalShippingCost = new BigDecimal("30000"); break;
+                case "Tiết kiệm": originalShippingCost = new BigDecimal("15000"); break;
+                case "Nhận tại cửa hàng": originalShippingCost = BigDecimal.ZERO; break;
+                default: originalShippingCost = BigDecimal.ZERO; break;
+            }
+        }
+
+        // Apply VIP benefits for shipping (server authoritative)
+        boolean mienPhiVanChuyenVip = vipBenefitProcessor.hasFreshipping(khachHang);
+        BigDecimal chiPhiDichVuSauVip = vipBenefitProcessor.calculateShippingCostAfterVipBenefit(khachHang, originalShippingCost);
+        donHang.setMienPhiVanChuyen(mienPhiVanChuyenVip);
+        donHang.setChiPhiDichVu(chiPhiDichVuSauVip);
+
         BigDecimal thanhTienCuoi = tongTienGoc
                 .subtract(giamGiaVoucher)
                 .subtract(giaTriDiem)
-                .add(donHang.getChiPhiDichVu());
+                .add(chiPhiDichVuSauVip);
 
         donHang.setTongTienGoc(tongTienGoc);
         donHang.setThanhTien(thanhTienCuoi);

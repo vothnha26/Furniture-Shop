@@ -1,9 +1,12 @@
 package com.noithat.qlnt.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "BienTheSanPham")
@@ -23,6 +26,9 @@ public class BienTheSanPham {
     @Column(name = "SKU", unique = true, nullable = false)
     private String sku;
 
+    @Column(name = "GiaMua", precision = 18, scale = 2)
+    private BigDecimal giaMua;
+
     @Column(name = "GiaBan", precision = 18, scale = 2, nullable = false)
     private BigDecimal giaBan;
 
@@ -30,15 +36,8 @@ public class BienTheSanPham {
 
     private Integer soLuongTon = 0;
 
-    // Thêm các trường quản lý kho nâng cao
-    @Column(name = "SoLuongDatTruoc")
-    private Integer soLuongDatTruoc = 0;
-
     @Column(name = "MucTonToiThieu")
     private Integer mucTonToiThieu = 5;
-
-    @Column(name = "ViTriKho")
-    private String viTriKho;
 
     @Column(name = "NgayCapNhatKho")
     private LocalDateTime ngayCapNhatKho;
@@ -46,42 +45,26 @@ public class BienTheSanPham {
     @Column(name = "TrangThaiKho")
     private String trangThaiKho = "ACTIVE"; // ACTIVE, LOW_STOCK, OUT_OF_STOCK, DISCONTINUED
 
-    // Business methods for stock management
-    public Integer getSoLuongCoSan() {
-        return soLuongTon - soLuongDatTruoc;
+    // Relationship với thuộc tính (lưu giá trị trực tiếp trong join)
+    @OneToMany(mappedBy = "bienTheSanPham", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties("bienTheSanPham")
+    private List<BienTheThuocTinh> bienTheThuocTinhs = new ArrayList<>();
+
+    // Helper method để lấy danh sách giá trị thuộc tính (giaTri) cho frontend
+    public List<String> getGiaTriThuocTinhs() {
+        if (bienTheThuocTinhs == null) return new java.util.ArrayList<>();
+        return bienTheThuocTinhs.stream()
+                .map(bt -> bt.getGiaTri())
+                .toList();
     }
 
+    // Business methods for stock management
     public boolean isLowStock() {
         return soLuongTon <= mucTonToiThieu;
     }
 
     public boolean isOutOfStock() {
         return soLuongTon <= 0;
-    }
-
-    public boolean canReserve(Integer soLuong) {
-        return getSoLuongCoSan() >= soLuong;
-    }
-
-    // Stock operations
-    public void reserveStock(Integer soLuong) {
-        if (!canReserve(soLuong)) {
-            throw new IllegalArgumentException("Không đủ hàng để đặt trước");
-        }
-        this.soLuongDatTruoc += soLuong;
-        updateStockStatus();
-    }
-
-    public void releaseStock(Integer soLuong) {
-        this.soLuongDatTruoc = Math.max(0, this.soLuongDatTruoc - soLuong);
-        updateStockStatus();
-    }
-
-    public void confirmSale(Integer soLuong) {
-        this.soLuongDatTruoc = Math.max(0, this.soLuongDatTruoc - soLuong);
-        this.soLuongTon = Math.max(0, this.soLuongTon - soLuong);
-        this.ngayCapNhatKho = LocalDateTime.now();
-        updateStockStatus();
     }
 
     public void updateStock(Integer soLuongThayDoi) {

@@ -112,70 +112,18 @@ public class QuanLyTonKhoService {
      * Đặt trước sản phẩm
      */
     public boolean reserveProduct(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
-        try {
-            Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
-            if (optionalBienThe.isEmpty()) {
-                return false;
-            }
-            
-            BienTheSanPham bienThe = optionalBienThe.get();
-            
-            // Kiểm tra đủ hàng để đặt trước
-            if (!bienThe.canReserve(quantity)) {
-                return false;
-            }
-            
-            // Đặt trước
-            bienThe.reserveStock(quantity);
-            bienTheSanPhamRepository.save(bienThe);
-            
-            // Ghi lịch sử
-            LichSuTonKho lichSu = new LichSuTonKho(
-                bienThe, bienThe.getSoLuongTon(), 0, bienThe.getSoLuongTon(),
-                "DAT_TRUOC", maThamChieu, 
-                "Đặt trước " + quantity + " sản phẩm", nguoiThucHien
-            );
-            lichSuTonKhoRepository.save(lichSu);
-            
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        // Reservation feature removed; keep API but not supported
+        logger.warn("reserveProduct called but reservation is not supported. maBienThe={}", maBienThe);
+        return false;
     }
     
     /**
      * Hủy đặt trước
      */
     public boolean releaseReservation(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
-        try {
-            Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
-            if (optionalBienThe.isEmpty()) {
-                return false;
-            }
-            
-            BienTheSanPham bienThe = optionalBienThe.get();
-            
-            // Kiểm tra có đủ số lượng đặt trước để hủy
-            if (bienThe.getSoLuongDatTruoc() < quantity) {
-                return false;
-            }
-            
-            // Hủy đặt trước
-            bienThe.releaseStock(quantity);
-            bienTheSanPhamRepository.save(bienThe);
-            
-            // Ghi lịch sử
-            LichSuTonKho lichSu = new LichSuTonKho(
-                bienThe, bienThe.getSoLuongTon(), 0, bienThe.getSoLuongTon(),
-                "HUY_DAT_TRUOC", maThamChieu, 
-                "Hủy đặt trước " + quantity + " sản phẩm", nguoiThucHien
-            );
-            lichSuTonKhoRepository.save(lichSu);
-            
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        // Release reservation not supported after removal
+        logger.warn("releaseReservation called but reservation is not supported. maBienThe={}", maBienThe);
+        return false;
     }
     
     /**
@@ -183,28 +131,20 @@ public class QuanLyTonKhoService {
      */
     public boolean confirmSale(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
         try {
-            System.out.println("DEBUG: confirmSale called with maBienThe=" + maBienThe + ", quantity=" + quantity);
             Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
             if (optionalBienThe.isEmpty()) {
-                System.out.println("DEBUG: BienTheSanPham not found with id=" + maBienThe);
                 return false;
             }
-            
+
             BienTheSanPham bienThe = optionalBienThe.get();
             Integer soLuongTruoc = bienThe.getSoLuongTon();
-            Integer soLuongDatTruoc = bienThe.getSoLuongDatTruoc() != null ? bienThe.getSoLuongDatTruoc() : 0;
-            
-            System.out.println("DEBUG: soLuongTon=" + soLuongTruoc + ", soLuongDatTruoc=" + soLuongDatTruoc + ", quantity=" + quantity);
-            
-            // Kiểm tra có thể bán không - Sửa lại logic: chỉ cần đủ tồn kho
+
             if (bienThe.getSoLuongTon() < quantity) {
-                System.out.println("DEBUG: Không đủ tồn kho để bán");
                 return false;
             }
-            
-            // Xác nhận bán hàng
-            bienThe.confirmSale(quantity);
-            
+
+            // Reduce stock directly (reservation removed)
+            bienThe.updateStock(-quantity);
             bienTheSanPhamRepository.save(bienThe);
             
             // Ghi lịch sử
@@ -218,8 +158,7 @@ public class QuanLyTonKhoService {
             System.out.println("DEBUG: confirmSale completed successfully");
             return true;
         } catch (Exception e) {
-            System.out.println("DEBUG: confirmSale failed with exception: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("confirmSale failed: {}", e.getMessage());
             return false;
         }
     }
@@ -370,10 +309,7 @@ public class QuanLyTonKhoService {
             stockInfo.put("tenSanPham", bienThe.getSanPham().getTenSanPham());
             stockInfo.put("sku", bienThe.getSku());
             stockInfo.put("soLuongTon", bienThe.getSoLuongTon());
-            stockInfo.put("soLuongDatTruoc", bienThe.getSoLuongDatTruoc());
-            stockInfo.put("soLuongCoSan", bienThe.getSoLuongCoSan());
             stockInfo.put("giaBan", bienThe.getGiaBan());
-            stockInfo.put("viTriKho", bienThe.getViTriKho());
             stockInfo.put("trangThaiKho", bienThe.getTrangThaiKho());
             
             response.put("success", true);

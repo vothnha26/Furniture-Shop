@@ -7,6 +7,7 @@ const FileUpload = ({
   maxSize = 5 * 1024 * 1024, // 5MB
   onUpload,
   onRemove,
+  onToggleMain,
   files = [],
   className = '',
   disabled = false
@@ -156,34 +157,73 @@ const FileUpload = ({
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-700">Files đã tải lên:</h4>
           <div className="space-y-2">
-            {files.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center space-x-3">
-                  {getFileIcon(file)}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.size)}
-                    </p>
+            {files.map((file, index) => {
+              // normalize file representation for display
+              const name = file.name || file.duongDanHinhAnh || (file.file && file.file.name) || `file-${index}`;
+              const size = file.size || (file.file && file.file.size) || 0;
+              const isMain = !!(file.laAnhChinh || file.isMain || file.main || file.isPrimary || file._isMain);
+              
+              // Get image preview URL
+              let imageUrl = null;
+              if (file instanceof File) {
+                imageUrl = URL.createObjectURL(file);
+              } else if (file.duongDanHinhAnh) {
+                // Existing image from server - prepend base URL if needed
+                imageUrl = file.duongDanHinhAnh.startsWith('http') 
+                  ? file.duongDanHinhAnh 
+                  : `http://localhost:8080${file.duongDanHinhAnh}`;
+              }
+              
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center space-x-3">
+                    {/* Show image preview if available */}
+                    {imageUrl ? (
+                      <img 
+                        src={imageUrl} 
+                        alt={name}
+                        className="w-12 h-12 object-cover rounded"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      getFileIcon({ type: (file.type || (file.file && file.file.type) || 'image/*') })
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {size ? formatFileSize(size) : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {onToggleMain ? (
+                      <button
+                        onClick={() => onToggleMain(index)}
+                        className={`p-1 rounded ${isMain ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'}`}
+                        title={isMain ? 'Ảnh chính' : 'Đặt làm ảnh chính'}
+                        type="button"
+                      >
+                        <IoCheckmark className="w-5 h-5" />
+                      </button>
+                    ) : (
+                      <IoCheckmark className={`w-5 h-5 ${isMain ? 'text-green-500' : 'text-gray-300'}`} />
+                    )}
+                    <button
+                      onClick={() => handleRemove(index)}
+                      className="text-red-500 hover:text-red-700"
+                      disabled={disabled}
+                    >
+                      <IoClose className="w-5 h-5" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <IoCheckmark className="w-5 h-5 text-green-500" />
-                  <button
-                    onClick={() => handleRemove(index)}
-                    className="text-red-500 hover:text-red-700"
-                    disabled={disabled}
-                  >
-                    <IoClose className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

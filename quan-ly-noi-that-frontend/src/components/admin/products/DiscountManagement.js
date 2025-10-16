@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  IoAdd, 
-  IoTrashOutline, 
-  IoPencilOutline, 
-  IoSearch, 
-  IoFilterOutline, 
+import {
+  IoAdd,
+  IoTrashOutline,
+  IoPencilOutline,
+  IoSearch,
+  IoFilterOutline,
   IoCalendarOutline,
   IoTimeOutline,
   IoCloseCircle,
@@ -24,57 +24,15 @@ import api from '../../../api';
 const DiscountManagement = () => {
   const [discountPrograms, setDiscountPrograms] = useState([]);
   const [filteredPrograms, setFilteredPrograms] = useState([]);
-  const [productVariants, setProductVariants] = useState([]);
+  const [products, setProducts] = useState([]); // Danh sách sản phẩm
+  const [selectedProducts, setSelectedProducts] = useState([]); // Sản phẩm được chọn
+  const [productVariants, setProductVariants] = useState({}); // Map maSanPham -> variants[]
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingVariants, setIsLoadingVariants] = useState(false);
   const [error, setError] = useState(null);
 
-  // Map discount program from API
-  const mapDiscountFromApi = (discount) => ({
-    maChuongTrinh: discount.maChuongTrinh || discount.id,
-    tenChuongTrinh: discount.tenChuongTrinh || discount.name,
-    moTa: discount.moTa || discount.description,
-    loaiGiamGia: discount.loaiGiamGia || discount.discountType,
-    giaTriGiam: discount.giaTriGiam || discount.discountValue,
-    giaTriGiamToiDa: discount.giaTriGiamToiDa || discount.maxDiscountValue,
-    ngayBatDau: discount.ngayBatDau || discount.startDate,
-    ngayKetThuc: discount.ngayKetThuc || discount.endDate,
-    trangThai: discount.trangThai || discount.status,
-    soLuongSanPhamApDung: discount.soLuongSanPhamApDung || discount.appliedProductCount || 0,
-    tongTienGiam: discount.tongTienGiam || discount.totalDiscountAmount || 0,
-    dieuKienApDung: discount.dieuKienApDung || discount.conditions || []
-  });
+  // (mapping helper removed - we map server responses directly in the fetch)
 
-  const mapDiscountToApi = (discount) => ({
-    tenChuongTrinh: discount.tenChuongTrinh,
-    moTa: discount.moTa,
-    loaiGiamGia: discount.loaiGiamGia,
-    giaTriGiam: discount.giaTriGiam,
-    giaTriGiamToiDa: discount.giaTriGiamToiDa,
-    ngayBatDau: discount.ngayBatDau,
-    ngayKetThuc: discount.ngayKetThuc,
-    trangThai: discount.trangThai,
-    dieuKienApDung: discount.dieuKienApDung
-  });
-
-  // Fetch discount programs
-  useEffect(() => {
-    const fetchDiscountPrograms = async () => {
-      setIsLoading(true);
-      try {
-        const data = await api.get('/api/v1/chuong-trinh-giam-gia');
-        if (Array.isArray(data)) {
-          setDiscountPrograms(data.map(mapDiscountFromApi));
-          setFilteredPrograms(data.map(mapDiscountFromApi));
-        }
-      } catch (err) {
-        console.error('Fetch discount programs error', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchDiscountPrograms();
-  }, []);
   const [showModal, setShowModal] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -83,82 +41,181 @@ const DiscountManagement = () => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [formData, setFormData] = useState({
     tenChuongTrinh: '',
+    moTa: '',
     ngayBatDau: '',
-    ngayKetThuc: ''
+    ngayKetThuc: '',
+    // canonical keys for UI: 'upcoming' | 'active' | 'paused' | 'expired'
+    trangThai: 'upcoming'
   });
   const [variantDiscounts, setVariantDiscounts] = useState([]);
+  const [discountType, setDiscountType] = useState('amount'); // 'amount' or 'percent'
+  const [discountValue, setDiscountValue] = useState(''); // Giá trị giảm (% hoặc số tiền)
+  const [lastPayload, setLastPayload] = useState(null); // debug: last POST/PUT payload
   const [filters, setFilters] = useState({
     searchTerm: '',
     status: 'all',
     dateRange: 'all'
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [activeProduct, setActiveProduct] = useState(null); // product currently showing variants in right column
+  const [selectedProductVariantIds, setSelectedProductVariantIds] = useState([]); // variant ids selected in right column
 
-  // Mock data initialization
+  // Load discount programs and products from backend
   useEffect(() => {
-    const mockVariants = [
-      { id: 1, maBienThe: 'BT001', tenSanPham: 'Ghế Sofa Nordic', thuocTinh: 'Màu đỏ - Chất liệu vải', giaGoc: 5000000 },
-      { id: 2, maBienThe: 'BT002', tenSanPham: 'Bàn Ăn Gỗ Sồi', thuocTinh: 'Kích thước 1.6m - Màu nâu', giaGoc: 8000000 },
-      { id: 3, maBienThe: 'BT003', tenSanPham: 'Tủ Quần Áo', thuocTinh: 'Màu trắng - 4 cánh', giaGoc: 12000000 },
-      { id: 4, maBienThe: 'BT004', tenSanPham: 'Ghế Làm Việc', thuocTinh: 'Màu đen - Có bánh xe', giaGoc: 3500000 },
-      { id: 5, maBienThe: 'BT005', tenSanPham: 'Bàn Làm Việc', thuocTinh: 'Gỗ tự nhiên - 120x60cm', giaGoc: 4500000 },
-      { id: 6, maBienThe: 'BT006', tenSanPham: 'Giường Ngủ', thuocTinh: 'Kích thước 1.8m - Màu walnut', giaGoc: 15000000 }
-    ];
+    let mounted = true;
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch program list with details (includes danhSachBienThe and tongTietKiem)
+        const programs = await api.get('/api/chuongtrinh-giamgia?details=true');
+        console.log("ac:", programs);
+        // programs should be an array of basic ChuongTrinhGiamGia objects
+        const mappedPrograms = Array.isArray(programs)
+          ? programs.map(p => ({
+            id: p.maChuongTrinhGiamGia,
+            maChuongTrinhGiamGia: p.maChuongTrinhGiamGia,
+            tenChuongTrinh: p.tenChuongTrinh,
+            ngayBatDau: p.ngayBatDau,
+            ngayKetThuc: p.ngayKetThuc,
+            status: normalizeStatus(p.trangThai),
+            statusText: p.trangThai || '',
+            // Map server-provided danhSachBienThe into UI-friendly structure
+            bienTheGiamGias: (p.danhSachBienThe || []).map(bt => ({
+              maBienThe: bt.maBienThe,
+              giaSauGiam: bt.giaSauGiam,
+              giaGoc: bt.giaGoc || 0,
+              thuocTinh: bt.skuBienThe || '',
+              sku: bt.skuBienThe || '',
+              tenSanPham: bt.tenSanPham || bt.tenSanPhamGoc || null,
+              phanTramGiam: bt.phanTramGiam || null
+            })),
+            soLuongBienThe: p.soLuongBienThe || (p.danhSachBienThe ? p.danhSachBienThe.length : 0),
+            tongTietKiem: p.tongTietKiem || 0
+          }))
+          : [];
 
-    const mockPrograms = [
-      {
-        id: 1,
-        maChuongTrinhGiamGia: 1,
-        tenChuongTrinh: 'Black Friday 2024',
-        ngayBatDau: '2024-11-20T00:00',
-        ngayKetThuc: '2024-11-30T23:59',
-        status: 'upcoming',
-        bienTheGiamGias: [
-          { maBienThe: 1, giaSauGiam: 4000000, bienTheSanPham: mockVariants[0] },
-          { maBienThe: 2, giaSauGiam: 7200000, bienTheSanPham: mockVariants[1] }
-        ]
-      },
-      {
-        id: 2,
-        maChuongTrinhGiamGia: 2,
-        tenChuongTrinh: 'Khuyến mãi cuối năm',
-        ngayBatDau: '2024-12-01T00:00',
-        ngayKetThuc: '2024-12-31T23:59',
-        status: 'upcoming',
-        bienTheGiamGias: [
-          { maBienThe: 3, giaSauGiam: 10800000, bienTheSanPham: mockVariants[2] },
-          { maBienThe: 4, giaSauGiam: 3150000, bienTheSanPham: mockVariants[3] }
-        ]
-      },
-      {
-        id: 3,
-        maChuongTrinhGiamGia: 3,
-        tenChuongTrinh: 'Flash Sale Tuần',
-        ngayBatDau: '2024-10-07T00:00',
-        ngayKetThuc: '2024-10-13T23:59',
-        status: 'active',
-        bienTheGiamGias: [
-          { maBienThe: 5, giaSauGiam: 3600000, bienTheSanPham: mockVariants[4] }
-        ]
-      },
-      {
-        id: 4,
-        maChuongTrinhGiamGia: 4,
-        tenChuongTrinh: 'Khai trương chi nhánh mới',
-        ngayBatDau: '2024-09-01T00:00',
-        ngayKetThuc: '2024-09-30T23:59',
-        status: 'expired',
-        bienTheGiamGias: [
-          { maBienThe: 6, giaSauGiam: 13500000, bienTheSanPham: mockVariants[5] }
-        ]
+        // Fetch all products
+        let productsList = [];
+        try {
+          const productsResp = await api.get('/api/products');
+          if (Array.isArray(productsResp)) {
+            productsList = productsResp.map(p => ({
+              maSanPham: p.maSanPham,
+              tenSanPham: p.tenSanPham,
+              moTa: p.moTa,
+              hinhAnh: p.hinhAnh
+            }));
+          }
+        } catch (e) {
+          console.error('Failed to fetch products', e);
+        }
+
+        if (!mounted) return;
+        setDiscountPrograms(mappedPrograms);
+        setFilteredPrograms(mappedPrograms);
+        setProducts(productsList);
+      } catch (err) {
+        console.error('Fetch discount programs error', err);
+        setError(err);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-    ];
-
-    setProductVariants(mockVariants);
-    setDiscountPrograms(mockPrograms);
-    setFilteredPrograms(mockPrograms);
+    };
+    fetchData();
+    return () => { mounted = false; };
   }, []);
+
+  // Fetch variants for a specific product
+  // eslint-disable-next-line no-unused-vars
+  const fetchProductVariants = async (maSanPham) => {
+    // Return already loaded variants to callers
+    if (productVariants[maSanPham]) return productVariants[maSanPham]; // Already loaded
+
+    setIsLoadingVariants(true);
+    try {
+      const variants = await api.get(`/api/products/${maSanPham}/variants`);
+      if (Array.isArray(variants)) {
+        const mapped = variants.map(v => ({
+          maBienThe: v.maBienThe,
+          sku: v.sku,
+          giaBan: v.giaBan,
+          soLuongTon: v.soLuongTon,
+          thuocTinh: v.bienTheThuocTinhs?.map(bt => bt.giaTri).filter(Boolean).join(', ') || ''
+        }));
+        setProductVariants(prev => ({
+          ...prev,
+          [maSanPham]: mapped
+        }));
+        return mapped;
+      }
+      return [];
+    } catch (err) {
+      console.error('Failed to fetch variants for product', maSanPham, err);
+      return [];
+    } finally {
+      setIsLoadingVariants(false);
+    }
+  };
+
+  // When activeProduct changes (or variantDiscounts change), ensure variants are loaded
+  // and pre-select any variants that are already present in variantDiscounts.
+  useEffect(() => {
+    let mounted = true;
+    const syncSelectedVariants = async () => {
+      // Determine which products we should show variants for: selectedProducts (if any) else activeProduct
+      const productList = (selectedProducts && selectedProducts.length > 0) ? selectedProducts : (activeProduct ? [activeProduct] : []);
+      if (productList.length === 0) {
+        if (mounted) setSelectedProductVariantIds([]);
+        return;
+      }
+
+      // For multi-select, aggregate variants across products
+      let variants = [];
+      for (const p of productList) {
+        const ma = p.maSanPham;
+        let local = productVariants[ma];
+        if (!local) {
+          setIsLoadingVariants(true);
+          try {
+            const resp = await api.get(`/api/products/${ma}/variants`);
+            if (Array.isArray(resp)) {
+              local = resp.map(v => ({
+                maBienThe: v.maBienThe,
+                sku: v.sku,
+                giaBan: v.giaBan,
+                soLuongTon: v.soLuongTon,
+                thuocTinh: v.bienTheThuocTinhs?.map(bt => bt.giaTri).filter(Boolean).join(', ') || ''
+              }));
+              // store into cache
+              setProductVariants(prev => ({ ...prev, [ma]: local }));
+            } else {
+              local = [];
+            }
+          } catch (err) {
+            console.error('Failed to fetch variants for product (effect)', ma, err);
+            local = [];
+          } finally {
+            setIsLoadingVariants(false);
+          }
+        }
+        if (Array.isArray(local) && local.length > 0) {
+          variants = variants.concat(local);
+        }
+      }
+      if (!mounted) return;
+
+      // Determine which variants (by id) are already in variantDiscounts
+      const existingIds = (variantDiscounts || []).map(vd => vd.maBienThe);
+      const preChecked = variants
+        .filter(v => existingIds.includes(v.maBienThe))
+        .map(v => v.maBienThe);
+
+      if (mounted) setSelectedProductVariantIds(preChecked);
+    };
+
+    syncSelectedVariants();
+    return () => { mounted = false; };
+  }, [activeProduct, variantDiscounts, productVariants, selectedProducts]);
 
   // Filter and search functionality
   useEffect(() => {
@@ -177,25 +234,25 @@ const DiscountManagement = () => {
     if (filters.dateRange !== 'all') {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      
+
       switch (filters.dateRange) {
         case 'this-week':
           const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-          filtered = filtered.filter(program => 
+          filtered = filtered.filter(program =>
             new Date(program.ngayBatDau) >= thisWeek
           );
           break;
         case 'this-month':
           const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          filtered = filtered.filter(program => 
+          filtered = filtered.filter(program =>
             new Date(program.ngayBatDau) >= thisMonth
           );
           break;
         case 'next-month':
           const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
           const monthAfter = new Date(now.getFullYear(), now.getMonth() + 2, 1);
-          filtered = filtered.filter(program => 
-            new Date(program.ngayBatDau) >= nextMonth && 
+          filtered = filtered.filter(program =>
+            new Date(program.ngayBatDau) >= nextMonth &&
             new Date(program.ngayBatDau) < monthAfter
           );
           break;
@@ -208,18 +265,75 @@ const DiscountManagement = () => {
   }, [discountPrograms, filters]);
 
   const showToast = (message, type = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+    // Use global Toast API (default export) which exposes show/showError/showSuccess helpers
+    try {
+      if (type === 'error') Toast.show(message, 'error');
+      else if (type === 'warning') Toast.show(message, 'warning');
+      else if (type === 'info') Toast.show(message, 'info');
+      else Toast.show(message, 'success');
+    } catch (e) {
+      // fallback: no-op
+      // eslint-disable-next-line no-console
+      console.warn('Toast API not available', e);
+    }
   };
 
   const formatDateTime = (dateString) => {
+    // Handle empty or invalid inputs gracefully to avoid RangeError: Invalid time value
+    if (!dateString && dateString !== 0) return '-';
+
+    // Support numeric timestamps (seconds or milliseconds) and ISO strings
+    let dateObj;
+    try {
+      // Accept arrays like [2025,10,16,14,30,0] (Jackson default for LocalDateTime)
+      if (Array.isArray(dateString)) {
+        const [y, m, d, hh = 0, mm = 0, ss = 0] = dateString;
+        dateObj = new Date(y, m - 1, d, hh, mm, ss);
+      } else if (typeof dateString === 'number') {
+        // If looks like seconds (10 digits), convert to ms
+        dateObj = dateString.toString().length === 10 ? new Date(dateString * 1000) : new Date(dateString);
+      } else if (/^\d+$/.test(String(dateString))) {
+        // numeric string
+        const num = Number(dateString);
+        dateObj = String(dateString).length === 10 ? new Date(num * 1000) : new Date(num);
+      } else {
+        dateObj = new Date(dateString);
+      }
+    } catch (e) {
+      return '-';
+    }
+
+    if (isNaN(dateObj.getTime())) return '-';
+
     return new Intl.DateTimeFormat('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(new Date(dateString));
+    }).format(dateObj);
+  };
+
+  // Convert ISO datetime (or timestamp) to datetime-local value 'YYYY-MM-DDTHH:mm'
+  const toDateTimeLocal = (iso) => {
+    if (!iso && iso !== 0) return '';
+    let d;
+    try {
+      if (Array.isArray(iso)) {
+        const [y, m, day, hh = 0, mm = 0] = iso;
+        d = new Date(y, m - 1, day, hh, mm);
+      } else if (typeof iso === 'object' && iso !== null && iso.year) {
+        // object like {year:2025, month:10, day:16, hour:14, minute:30}
+        d = new Date(iso.year, iso.month - 1, iso.day, iso.hour || 0, iso.minute || 0);
+      } else {
+        d = new Date(iso);
+      }
+    } catch (e) {
+      return '';
+    }
+    if (isNaN(d.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const formatCurrency = (amount) => {
@@ -259,9 +373,23 @@ const DiscountManagement = () => {
     }
   };
 
+  // Normalize backend status text (may be Vietnamese or English) into canonical keys
+  // canonical: 'active', 'upcoming', 'expired', 'paused', 'unknown'
+  const normalizeStatus = (raw) => {
+    if (!raw && raw !== 0) return 'unknown';
+    const s = String(raw).trim().toLowerCase();
+    if (!s) return 'unknown';
+    if (s.includes('đang') || s.includes('dang') || s.includes('active')) return 'active';
+    if (s.includes('sắp') || s.includes('sap') || s.includes('upcoming')) return 'upcoming';
+    if (s.includes('kết thúc') || s.includes('ket thuc') || s.includes('da ket') || s.includes('expired')) return 'expired';
+    if (s.includes('tạm') || s.includes('tam') || s.includes('pause') || s.includes('dừng')) return 'paused';
+    // If the backend already sends canonical keys, accept them
+    if (['active', 'upcoming', 'expired', 'paused'].includes(s)) return s;
+    return 'unknown';
+  };
   const calculateTotalDiscount = (program) => {
     return program.bienTheGiamGias?.reduce((total, item) => {
-      const originalPrice = item.bienTheSanPham?.giaGoc || 0;
+      const originalPrice = item.giaGoc || 0;
       const discountedPrice = item.giaSauGiam || 0;
       return total + (originalPrice - discountedPrice);
     }, 0) || 0;
@@ -274,11 +402,18 @@ const DiscountManagement = () => {
   const resetForm = () => {
     setFormData({
       tenChuongTrinh: '',
+      moTa: '',
       ngayBatDau: '',
-      ngayKetThuc: ''
+      ngayKetThuc: '',
+      // default to 'active' for new programs
+      // default to 'upcoming' for new programs
+      trangThai: 'upcoming'
     });
     setVariantDiscounts([]);
+    setSelectedProducts([]);
     setEditingProgram(null);
+    setDiscountType('amount');
+    setDiscountValue('');
   };
 
   const handleAdd = () => {
@@ -286,15 +421,175 @@ const DiscountManagement = () => {
     setShowModal(true);
   };
 
-  const handleEdit = (program) => {
-    setFormData({
-      tenChuongTrinh: program.tenChuongTrinh,
-      ngayBatDau: program.ngayBatDau,
-      ngayKetThuc: program.ngayKetThuc
-    });
-    setVariantDiscounts(program.bienTheGiamGias || []);
-    setEditingProgram(program);
-    setShowModal(true);
+  const handleEdit = async (program) => {
+    try {
+      setIsLoading(true);
+      // Fetch detailed program (includes danhSachBienThe)
+      const detail = await api.get(`/api/chuongtrinh-giamgia/${program.maChuongTrinhGiamGia}/details`);
+
+      // Populate form data including status and format dates for input
+      // Normalize incoming detail.trangThai into canonical UI keys
+      const norm = normalizeStatus(detail.trangThai);
+      setFormData(fd => ({
+        ...fd,
+        tenChuongTrinh: detail.tenChuongTrinh,
+        moTa: detail.moTa || '',
+        ngayBatDau: toDateTimeLocal(detail.ngayBatDau),
+        ngayKetThuc: toDateTimeLocal(detail.ngayKetThuc),
+        // keep one of canonical keys
+        trangThai: ['upcoming', 'active', 'paused', 'expired'].includes(norm) ? norm : 'upcoming'
+      }));
+
+      // Prefer server grouped products (danhSachSanPham) to populate variants for edit UI
+      let variantData = [];
+      if (detail.danhSachSanPham && detail.danhSachSanPham.length > 0) {
+        // flatten groups into variant list but keep product info for clarity
+        variantData = detail.danhSachSanPham.flatMap(sp => (
+          (sp.bienTheGiamGias || []).map(bt => ({
+            maBienThe: bt.maBienThe,
+            maSanPham: sp.maSanPham,
+            tenSanPham: sp.tenSanPham,
+            giaSauGiam: bt.giaSauGiam,
+            giaGoc: bt.giaGoc || 0,
+            thuocTinh: bt.skuBienThe || '',
+            sku: bt.skuBienThe || ''
+          }))
+        ));
+      } else {
+        variantData = (detail.danhSachBienThe || []).map(bt => ({
+          maBienThe: bt.maBienThe,
+          maSanPham: bt.maSanPham,
+          tenSanPham: bt.tenSanPham || null,
+          giaSauGiam: bt.giaSauGiam,
+          giaGoc: bt.giaGoc || 0,
+          thuocTinh: bt.skuBienThe || '',
+          sku: bt.skuBienThe || ''
+        }));
+      }
+      setVariantDiscounts(variantData);
+
+      // Prefill selected products based on variantData (keep product objects if available)
+      const productIds = Array.from(new Set(variantData.map(v => v.maSanPham).filter(Boolean)));
+      const preSelectedProducts = productIds.map(id => {
+        const found = products.find(p => p.maSanPham === id);
+        return found || { maSanPham: id, tenSanPham: variantData.find(v => v.maSanPham === id)?.tenSanPham || '' };
+      });
+      setSelectedProducts(preSelectedProducts);
+
+      // Set active product to first selected product (so right column shows it)
+      const firstActive = preSelectedProducts.length > 0 ? preSelectedProducts[0] : null;
+      setActiveProduct(firstActive);
+
+      // Ensure productVariants cache contains variants for selected products (fetch missing ones)
+      const missing = productIds.filter(id => !productVariants[id]);
+      if (missing.length > 0) {
+        setIsLoadingVariants(true);
+        try {
+          const fetches = missing.map(id => api.get(`/api/products/${id}/variants`).then(r => ({ id, data: r })).catch(e => ({ id, data: [] })));
+          const results = await Promise.all(fetches);
+          const newMap = {};
+          results.forEach(({ id, data }) => {
+            if (Array.isArray(data)) {
+              newMap[id] = data.map(v => ({
+                maBienThe: v.maBienThe,
+                sku: v.sku,
+                giaBan: v.giaBan,
+                soLuongTon: v.soLuongTon,
+                thuocTinh: v.bienTheThuocTinhs?.map(bt => bt.giaTri).filter(Boolean).join(', ') || ''
+              }));
+            } else {
+              newMap[id] = [];
+            }
+          });
+          setProductVariants(prev => ({ ...prev, ...newMap }));
+        } catch (e) {
+          console.error('Failed to prefetch variants for edit', e);
+        } finally {
+          setIsLoadingVariants(false);
+        }
+      }
+
+      // Pre-check variant ids for active product using variantData
+      if (firstActive) {
+        const activeId = firstActive.maSanPham;
+        const preCheckedIds = variantData.filter(v => v.maSanPham === activeId).map(v => v.maBienThe);
+        setSelectedProductVariantIds(preCheckedIds);
+      } else {
+        setSelectedProductVariantIds([]);
+      }
+      // (already populated above)
+
+      // Load discount type/value for editing
+      if (detail.loaiGiamGia === 'PERCENT') {
+        setDiscountType('percent');
+      } else {
+        setDiscountType('amount');
+      }
+      setDiscountValue(detail.giaTriGiam != null ? String(detail.giaTriGiam) : '');
+
+      setEditingProgram(detail);
+      setShowModal(true);
+    } catch (err) {
+      console.error('Failed to load program details for edit', err);
+      showToast('Không thể tải chi tiết chương trình', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Toggle product selection
+  const toggleProduct = async (product) => {
+    const isSelected = selectedProducts.some(p => p.maSanPham === product.maSanPham);
+
+    if (isSelected) {
+      // Remove product and its variants from selection
+      setSelectedProducts(selectedProducts.filter(p => p.maSanPham !== product.maSanPham));
+      setVariantDiscounts(variantDiscounts.filter(vd => {
+        const variants = productVariants[product.maSanPham] || [];
+        return !variants.some(v => v.maBienThe === vd.maBienThe);
+      }));
+      // After removal, recompute which variant ids should be checked (only those already in program and in remaining selected products)
+      const remaining = selectedProducts.filter(p => p.maSanPham !== product.maSanPham);
+      const remainingIds = remaining.flatMap(p => (productVariants[p.maSanPham] || []).map(v => v.maBienThe));
+      const existingProgramIds = (variantDiscounts || []).map(vd => vd.maBienThe);
+      setSelectedProductVariantIds(remainingIds.filter(id => existingProgramIds.includes(id)));
+    } else {
+      // Add product to selection and fetch its variants
+    const newSelected = [...selectedProducts, product];
+    setSelectedProducts(newSelected);
+
+        // Fetch and cache variants for this product but DO NOT auto-add them to variantDiscounts.
+        let variants = productVariants[product.maSanPham];
+        if (!variants) {
+          setIsLoadingVariants(true);
+          try {
+            const variantsData = await api.get(`/api/products/${product.maSanPham}/variants`);
+            if (Array.isArray(variantsData)) {
+              variants = variantsData.map(v => ({
+                maBienThe: v.maBienThe,
+                sku: v.sku,
+                giaBan: v.giaBan,
+                soLuongTon: v.soLuongTon,
+                thuocTinh: v.bienTheThuocTinhs?.map(bt => bt.giaTri).filter(Boolean).join(', ') || ''
+              }));
+              setProductVariants(prev => ({
+                ...prev,
+                [product.maSanPham]: variants
+              }));
+            }
+          } catch (err) {
+            console.error('Failed to fetch variants for product', product.maSanPham, err);
+          } finally {
+            setIsLoadingVariants(false);
+          }
+        }
+
+    // After selecting a product, keep checked ids only for variants already in the program across selected products
+    const visible = newSelected.flatMap(p => (productVariants[p.maSanPham] || []).map(v => v.maBienThe));
+        const existingProgramIds = (variantDiscounts || []).map(vd => vd.maBienThe);
+        const preChecked = visible.filter(id => existingProgramIds.includes(id));
+        setSelectedProductVariantIds(preChecked);
+    }
   };
 
   const handleDelete = (program) => {
@@ -303,11 +598,32 @@ const DiscountManagement = () => {
   };
 
   const handleViewDetails = (program) => {
-    setSelectedProgram(program);
-    setShowVariantModal(true);
+    (async () => {
+      try {
+        setIsLoading(true);
+        const detail = await api.get(`/api/chuongtrinh-giamgia/${program.maChuongTrinhGiamGia}/details`);
+        const mapped = {
+          ...detail,
+          bienTheGiamGias: (detail.danhSachBienThe || []).map(bt => ({
+            maBienThe: bt.maBienThe,
+            giaSauGiam: bt.giaSauGiam,
+            giaGoc: bt.giaGoc || 0,
+            thuocTinh: bt.skuBienThe || '',
+            sku: bt.skuBienThe || ''
+          }))
+        };
+        setSelectedProgram(mapped);
+        setShowVariantModal(true);
+      } catch (err) {
+        console.error('Failed to load program details for view', err);
+        showToast('Không thể tải chi tiết chương trình', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     // Validation
@@ -327,86 +643,234 @@ const DiscountManagement = () => {
     }
 
     if (variantDiscounts.length === 0) {
-      showToast('Vui lòng thêm ít nhất một sản phẩm vào chương trình', 'error');
+      showToast('Vui lòng thêm ít nhất một biến thể vào chương trình', 'error');
       return;
     }
 
-    // Check for duplicate program name
-    const isDuplicate = discountPrograms.some(program => 
-      program.tenChuongTrinh.toLowerCase() === formData.tenChuongTrinh.toLowerCase() &&
-      (!editingProgram || program.id !== editingProgram.id)
-    );
-
-    if (isDuplicate) {
-      showToast('Tên chương trình đã tồn tại', 'error');
-      return;
-    }
-
-    // Determine status based on dates
-    const now = new Date();
-    const startDate = new Date(formData.ngayBatDau);
-    const endDate = new Date(formData.ngayKetThuc);
-    let status = 'upcoming';
-    
-    if (now >= startDate && now <= endDate) {
-      status = 'active';
-    } else if (now > endDate) {
-      status = 'expired';
-    }
-
-    const programData = {
-      id: editingProgram ? editingProgram.id : Date.now(),
-      maChuongTrinhGiamGia: editingProgram ? editingProgram.maChuongTrinhGiamGia : Date.now(),
-      tenChuongTrinh: formData.tenChuongTrinh.trim(),
-      ngayBatDau: formData.ngayBatDau,
-      ngayKetThuc: formData.ngayKetThuc,
-      status: status,
-      bienTheGiamGias: variantDiscounts
+    // Helper: ensure datetime-local value has seconds (Jackson LocalDateTime parser expects seconds often)
+    const normalizeDateTimeLocal = (s) => {
+      if (!s && s !== 0) return s;
+      // if already contains seconds (HH:mm:ss) leave it
+      const parts = String(s).split('T');
+      if (parts.length !== 2) return s;
+      const time = parts[1];
+      if (time.split(':').length === 2) return `${parts[0]}T${time}:00`;
+      return s;
     };
 
-    if (editingProgram) {
-      setDiscountPrograms(discountPrograms.map(program => 
-        program.id === editingProgram.id ? programData : program
-      ));
-      showToast('Cập nhật chương trình giảm giá thành công');
-    } else {
-      setDiscountPrograms([...discountPrograms, programData]);
-      showToast('Thêm chương trình giảm giá thành công');
-    }
+    try {
+      // Validate variant entries before sending
+      for (const vd of variantDiscounts) {
+        if (!vd.maBienThe) {
+          showToast('Một số biến thể thiếu mã biến thể', 'error');
+          return;
+        }
+        const price = Number(vd.giaSauGiam);
+        if (!isFinite(price) || price <= 0) {
+          showToast('Giá sau giảm của biến thể phải là số dương', 'error');
+          return;
+        }
+      }
+      setIsLoading(true);
 
-    setShowModal(false);
-    resetForm();
+      // Prepare request payload matching ChuongTrinhGiamGiaDetailRequest
+      const requestPayload = {
+        tenChuongTrinh: formData.tenChuongTrinh.trim(),
+        moTa: formData.moTa || null,
+        ngayBatDau: normalizeDateTimeLocal(formData.ngayBatDau),
+        ngayKetThuc: normalizeDateTimeLocal(formData.ngayKetThuc),
+        // send canonical string status to backend (server accepts many textual forms)
+        trangThai: formData.trangThai || 'upcoming',
+        loaiGiamGia: discountType === 'percent' ? 'PERCENT' : 'FIXED',
+        // send as number (BigDecimal on server side)
+        giaTriGiam: Number(discountValue) || 0,
+        danhSachBienThe: variantDiscounts.map(vd => ({
+          maBienThe: Number(vd.maBienThe),
+          // ensure numeric value
+          giaSauGiam: Number(vd.giaSauGiam)
+        }))
+      };
+
+      // Save payload for UI inspection
+      setLastPayload(requestPayload);
+
+      let saved;
+      if (editingProgram) {
+        // Validate the editingProgram id before attempting PUT
+        const rawId = editingProgram.maChuongTrinhGiamGia;
+        const idInt = Number(rawId);
+        if (!isFinite(idInt) || !Number.isInteger(idInt) || idInt <= 0) {
+          showToast('ID chương trình không hợp lệ. Vui lòng tải lại chi tiết và thử lại.', 'error');
+          // Keep the payload visible for debugging
+          setLastPayload(requestPayload);
+          return;
+        }
+
+        // Update existing program and capture returned updated resource
+        saved = await api.put(
+          `/api/chuongtrinh-giamgia/${idInt}/with-details`,
+          { body: requestPayload }
+        );
+        showToast('Cập nhật chương trình giảm giá thành công');
+      } else {
+        // Create new program
+        // also log to console for quick dev inspection
+        console.log('Creating program with payload', requestPayload);
+        saved = await api.post('/api/chuongtrinh-giamgia/with-details', { body: requestPayload });
+        showToast('Thêm chương trình giảm giá thành công');
+      }
+
+      // If server returned the saved resource, update local list immediately
+      if (saved && saved.maChuongTrinhGiamGia) {
+        const p = saved;
+        const updatedProgram = {
+          id: p.maChuongTrinhGiamGia,
+          maChuongTrinhGiamGia: p.maChuongTrinhGiamGia,
+          tenChuongTrinh: p.tenChuongTrinh,
+          ngayBatDau: p.ngayBatDau,
+          ngayKetThuc: p.ngayKetThuc,
+          status: normalizeStatus(p.trangThai),
+          statusText: p.trangThai || '',
+          bienTheGiamGias: (p.danhSachBienThe || []).map(bt => ({
+            maBienThe: bt.maBienThe,
+            giaSauGiam: bt.giaSauGiam,
+            giaGoc: bt.giaGoc || 0,
+            thuocTinh: bt.skuBienThe || '',
+            sku: bt.skuBienThe || '',
+            tenSanPham: bt.tenSanPham || bt.tenSanPhamGoc || null,
+            phanTramGiam: bt.phanTramGiam || null
+          })),
+          soLuongBienThe: p.soLuongBienThe || (p.danhSachBienThe ? p.danhSachBienThe.length : 0),
+          tongTietKiem: p.tongTietKiem || 0
+        };
+
+        // Replace or append
+        setDiscountPrograms(prev => {
+          const idx = prev.findIndex(x => x.id === updatedProgram.id);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = updatedProgram;
+            return copy;
+          }
+          return [updatedProgram, ...prev];
+        });
+        setFilteredPrograms(prev => {
+          const idx = prev.findIndex(x => x.id === updatedProgram.id);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = updatedProgram;
+            return copy;
+          }
+          return [updatedProgram, ...prev];
+        });
+      } else {
+        // fallback: refresh the full list from server
+        const programs = await api.get('/api/chuongtrinh-giamgia?details=true');
+        if (Array.isArray(programs)) {
+            const mappedPrograms = programs.map(p => {
+              return {
+                id: p.maChuongTrinhGiamGia,
+                maChuongTrinhGiamGia: p.maChuongTrinhGiamGia,
+                tenChuongTrinh: p.tenChuongTrinh,
+                ngayBatDau: p.ngayBatDau,
+                ngayKetThuc: p.ngayKetThuc,
+                status: normalizeStatus(p.trangThai),
+                statusText: p.trangThai || '',
+                bienTheGiamGias: []
+              };
+            });
+          setDiscountPrograms(mappedPrograms);
+          setFilteredPrograms(mappedPrograms);
+        }
+      }
+
+      setShowModal(false);
+      resetForm();
+    } catch (error) {
+      console.error('Failed to save discount program:', error);
+      showToast(
+        error.response?.data?.message || 'Có lỗi xảy ra khi lưu chương trình giảm giá',
+        'error'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const confirmDelete = () => {
-    setDiscountPrograms(discountPrograms.filter(program => program.id !== deletingProgram.id));
-    setShowConfirmDialog(false);
-    setDeletingProgram(null);
-    showToast('Xóa chương trình giảm giá thành công');
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/api/chuongtrinh-giamgia/${deletingProgram.maChuongTrinhGiamGia}`);
+      setDiscountPrograms(discountPrograms.filter(program => program.id !== deletingProgram.id));
+      showToast('Xóa chương trình giảm giá thành công');
+    } catch (error) {
+      console.error('Failed to delete discount program:', error);
+      showToast('Có lỗi xảy ra khi xóa chương trình giảm giá', 'error');
+    } finally {
+      setShowConfirmDialog(false);
+      setDeletingProgram(null);
+    }
   };
 
   const addVariantDiscount = (variant, discountedPrice) => {
-    const existingIndex = variantDiscounts.findIndex(item => item.maBienThe === variant.id);
-    
+    const existingIndex = variantDiscounts.findIndex(item => item.maBienThe === variant.maBienThe);
+
     if (existingIndex >= 0) {
       const updated = [...variantDiscounts];
       updated[existingIndex] = {
-        maBienThe: variant.id,
+        maBienThe: variant.maBienThe,
         giaSauGiam: discountedPrice,
-        bienTheSanPham: variant
+        thuocTinh: variant.thuocTinh,
+        sku: variant.sku,
+        giaGoc: variant.giaBan
       };
       setVariantDiscounts(updated);
     } else {
       setVariantDiscounts([...variantDiscounts, {
-        maBienThe: variant.id,
+        maBienThe: variant.maBienThe,
         giaSauGiam: discountedPrice,
-        bienTheSanPham: variant
+        thuocTinh: variant.thuocTinh,
+        sku: variant.sku,
+        giaGoc: variant.giaBan
       }]);
     }
   };
 
-  const removeVariantDiscount = (variantId) => {
-    setVariantDiscounts(variantDiscounts.filter(item => item.maBienThe !== variantId));
+  const removeVariantDiscount = (maBienThe) => {
+    setVariantDiscounts(variantDiscounts.filter(item => item.maBienThe !== maBienThe));
+  };
+
+  // Áp dụng giảm giá cho tất cả variants đã chọn
+  const applyDiscountToAll = () => {
+    if (!discountValue || parseFloat(discountValue) <= 0) {
+      showToast('Vui lòng nhập giá trị giảm giá hợp lệ', 'error');
+      return;
+    }
+
+    const updated = variantDiscounts.map(vd => {
+      let newPrice;
+      if (discountType === 'percent') {
+        const percent = parseFloat(discountValue);
+        if (percent < 0 || percent > 100) {
+          showToast('Phần trăm giảm phải từ 0-100%', 'error');
+          return vd;
+        }
+        newPrice = vd.giaGoc * (1 - percent / 100);
+      } else {
+        const amount = parseFloat(discountValue);
+        if (amount >= vd.giaGoc) {
+          showToast('Số tiền giảm không được lớn hơn giá gốc', 'error');
+          return vd;
+        }
+        newPrice = vd.giaGoc - amount;
+      }
+      return {
+        ...vd,
+        giaSauGiam: Math.round(newPrice)
+      };
+    });
+
+    setVariantDiscounts(updated);
+    showToast(`Đã áp dụng giảm ${discountType === 'percent' ? discountValue + '%' : formatCurrency(discountValue)} cho tất cả biến thể`);
   };
 
   const duplicateProgram = (program) => {
@@ -417,7 +881,7 @@ const DiscountManagement = () => {
       tenChuongTrinh: `${program.tenChuongTrinh} (Bản sao)`,
       status: 'upcoming'
     };
-    
+
     setDiscountPrograms([...discountPrograms, newProgram]);
     showToast('Sao chép chương trình thành công');
   };
@@ -427,11 +891,27 @@ const DiscountManagement = () => {
     const active = discountPrograms.filter(p => p.status === 'active').length;
     const upcoming = discountPrograms.filter(p => p.status === 'upcoming').length;
     const expired = discountPrograms.filter(p => p.status === 'expired').length;
-    
+
     return { total, active, upcoming, expired };
   };
 
   const stats = getStats();
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="text-center text-gray-600">Đang tải dữ liệu chương trình giảm giá...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="text-center text-red-600">Lỗi khi tải dữ liệu: {error?.message || String(error)}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -494,7 +974,7 @@ const DiscountManagement = () => {
                 type="text"
                 placeholder="Tìm kiếm chương trình..."
                 value={filters.searchTerm}
-                onChange={(e) => setFilters({...filters, searchTerm: e.target.value})}
+                onChange={(e) => setFilters({ ...filters, searchTerm: e.target.value })}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
               />
             </div>
@@ -525,7 +1005,7 @@ const DiscountManagement = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
                 <select
                   value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Tất cả trạng thái</option>
@@ -540,7 +1020,7 @@ const DiscountManagement = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian</label>
                 <select
                   value={filters.dateRange}
-                  onChange={(e) => setFilters({...filters, dateRange: e.target.value})}
+                  onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Tất cả thời gian</option>
@@ -589,49 +1069,70 @@ const DiscountManagement = () => {
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-bold text-blue-600">
-                    {program.bienTheGiamGias?.length || 0}
+                    {program.bienTheGiamGias && program.bienTheGiamGias.length > 0
+                      ? program.bienTheGiamGias.length
+                      : (program.soLuongBienThe ?? 0)}
                   </div>
                   <div className="text-xs text-gray-600">Sản phẩm</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-green-600">
-                    {formatCurrency(calculateTotalDiscount(program))}
+                    {program.tongTietKiem && Number(program.tongTietKiem) > 0
+                      ? formatCurrency(program.tongTietKiem)
+                      : (program.bienTheGiamGias && program.bienTheGiamGias.length > 0
+                        ? formatCurrency(calculateTotalDiscount(program))
+                        : '-')}
                   </div>
                   <div className="text-xs text-gray-600">Tổng giảm</div>
                 </div>
               </div>
             </div>
 
-            {/* Product Preview */}
-            {program.bienTheGiamGias && program.bienTheGiamGias.length > 0 && (
+            {/* Grouped product/variant preview */}
+            {(program.danhSachSanPham && program.danhSachSanPham.length > 0) ? (
               <div className="p-4">
-                <div className="text-sm font-medium text-gray-700 mb-3">Sản phẩm khuyến mãi:</div>
+                <div className="text-sm font-medium text-gray-700 mb-3">Sản phẩm áp dụng:</div>
+                <div className="space-y-2">
+                  {program.danhSachSanPham.slice(0, 2).map((sp, idx) => (
+                    <div key={sp.maSanPham || idx} className="">
+                      <div className="text-sm font-semibold text-gray-900 truncate">{sp.tenSanPham || `Sản phẩm #${sp.maSanPham}`}</div>
+                      <div className="mt-1">
+                        {sp.bienTheGiamGias && sp.bienTheGiamGias.slice(0,1).map((bt, bi) => (
+                          <div key={bi} className="flex items-center justify-between text-sm py-1">
+                            <div className="flex-1 truncate">
+                              <div className="font-medium text-gray-900 truncate">{bt.sku || bt.thuocTinh || `Biến thể #${bt.maBienThe}`}</div>
+                            </div>
+                            <div className="text-right ml-2">
+                              <div className="font-bold text-red-600">{formatCurrency(bt.giaSauGiam)}</div>
+                              {bt.giaGoc && (<div className="text-xs text-gray-500 line-through">{formatCurrency(bt.giaGoc)}</div>)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  { (program.danhSachSanPham.length > 2) && (
+                    <div className="text-xs text-gray-500 text-center">+{program.danhSachSanPham.length - 2} sản phẩm khác</div>
+                  )}
+                </div>
+              </div>
+            ) : (program.bienTheGiamGias && program.bienTheGiamGias.length > 0) && (
+              <div className="p-4">
+                <div className="text-sm font-medium text-gray-700 mb-3">Biến thể khuyến mãi:</div>
                 <div className="space-y-2">
                   {program.bienTheGiamGias.slice(0, 2).map((item, index) => (
                     <div key={index} className="flex items-center justify-between text-sm">
                       <div className="flex-1 truncate">
-                        <div className="font-medium text-gray-900 truncate">
-                          {item.bienTheSanPham?.tenSanPham}
-                        </div>
-                        <div className="text-xs text-gray-500 truncate">
-                          {item.bienTheSanPham?.thuocTinh}
-                        </div>
+                        <div className="font-medium text-gray-900 truncate">{item.sku || item.thuocTinh || `Biến thể #${item.maBienThe}`}</div>
+                        <div className="text-xs text-gray-500 truncate">{item.tenSanPham ? `${item.tenSanPham} • ` : ''}{item.sku || item.thuocTinh || 'Mặc định'}</div>
                       </div>
                       <div className="text-right ml-2">
-                        <div className="font-bold text-red-600">
-                          {formatCurrency(item.giaSauGiam)}
-                        </div>
-                        <div className="text-xs text-gray-500 line-through">
-                          {formatCurrency(item.bienTheSanPham?.giaGoc)}
-                        </div>
+                        <div className="font-bold text-red-600">{formatCurrency(item.giaSauGiam)}</div>
+                        {item.giaGoc && (<div className="text-xs text-gray-500 line-through">{formatCurrency(item.giaGoc)}</div>)}
                       </div>
                     </div>
                   ))}
-                  {program.bienTheGiamGias.length > 2 && (
-                    <div className="text-xs text-gray-500 text-center">
-                      +{program.bienTheGiamGias.length - 2} sản phẩm khác
-                    </div>
-                  )}
+                  {program.bienTheGiamGias.length > 2 && (<div className="text-xs text-gray-500 text-center">+{program.bienTheGiamGias.length - 2} biến thể khác</div>)}
                 </div>
               </div>
             )}
@@ -718,10 +1219,23 @@ const DiscountManagement = () => {
                 <input
                   type="text"
                   value={formData.tenChuongTrinh}
-                  onChange={(e) => setFormData({...formData, tenChuongTrinh: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, tenChuongTrinh: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập tên chương trình"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mô tả
+                </label>
+                <textarea
+                  value={formData.moTa}
+                  onChange={(e) => setFormData({ ...formData, moTa: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nhập mô tả chương trình (tùy chọn)"
+                  rows="3"
                 />
               </div>
 
@@ -733,7 +1247,7 @@ const DiscountManagement = () => {
                   <input
                     type="datetime-local"
                     value={formData.ngayBatDau}
-                    onChange={(e) => setFormData({...formData, ngayBatDau: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, ngayBatDau: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -746,41 +1260,109 @@ const DiscountManagement = () => {
                   <input
                     type="datetime-local"
                     value={formData.ngayKetThuc}
-                    onChange={(e) => setFormData({...formData, ngayKetThuc: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, ngayKetThuc: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
               </div>
+
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                <select
+                  value={formData.trangThai}
+                  onChange={(e) => setFormData({ ...formData, trangThai: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="upcoming">Sắp diễn ra</option>
+                  <option value="active">Đang hoạt động</option>
+                  <option value="paused">Tạm dừng</option>
+                  <option value="expired">Đã kết thúc</option>
+                </select>
+              </div>
             </div>
+          </div>
+
+          {/* Bulk Discount Application */}
+          <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">Áp dụng giảm giá hàng loạt</h4>
+            <div className="flex gap-3">
+              {/* Discount Type Selection */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('percent')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${discountType === 'percent'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                >
+                  % Phần trăm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountType('amount')}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${discountType === 'amount'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    }`}
+                >
+                  ₫ Số tiền
+                </button>
+              </div>
+
+              {/* Discount Value Input */}
+              <div className="flex-1">
+                <input
+                  type="number"
+                  min="0"
+                  max={discountType === 'percent' ? '100' : undefined}
+                  step={discountType === 'percent' ? '1' : '1000'}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  placeholder={discountType === 'percent' ? 'Nhập % giảm (0-100)' : 'Nhập số tiền giảm'}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Apply Button */}
+              <button
+                type="button"
+                onClick={applyDiscountToAll}
+                disabled={!discountValue || variantDiscounts.length === 0}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
+              >
+                Áp dụng
+              </button>
+            </div>
+            <p className="text-xs text-gray-600 mt-2">
+              {discountType === 'percent'
+                ? 'Giảm giá theo phần trăm sẽ tự động tính giá sau giảm cho tất cả biến thể đã chọn'
+                : 'Giảm cố định số tiền cho tất cả biến thể đã chọn'}
+            </p>
           </div>
 
           {/* Product Selection */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-md font-medium text-gray-900">Sản phẩm áp dụng</h4>
+              <h4 className="text-md font-medium text-gray-900">Sản phẩm và Biến thể áp dụng</h4>
               <span className="text-sm text-gray-600">
-                {variantDiscounts.length} sản phẩm được chọn
+                {variantDiscounts.length} biến thể được chọn
               </span>
             </div>
 
-            {/* Selected Products */}
+            {/* Selected Variants Summary */}
             {variantDiscounts.length > 0 && (
-              <div className="mb-4 space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
+              <div className="mb-4 space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3 bg-blue-50">
                 {variantDiscounts.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <div key={index} className="flex items-center justify-between bg-white p-2 rounded shadow-sm">
                     <div className="flex-1">
-                      <div className="font-medium text-sm">{item.bienTheSanPham?.tenSanPham}</div>
-                      <div className="text-xs text-gray-600">{item.bienTheSanPham?.thuocTinh}</div>
+                      <div className="font-medium text-sm">{item.sku || item.thuocTinh || `Biến thể #${item.maBienThe}`}</div>
+                      <div className="text-xs text-gray-600">{item.tenSanPham ? `${item.tenSanPham} • ${item.thuocTinh || 'Không có thuộc tính'}` : (item.thuocTinh || 'Không có thuộc tính')}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-sm">
-                        <span className="line-through text-gray-500">
-                          {formatCurrency(item.bienTheSanPham?.giaGoc)}
-                        </span>
-                        <span className="ml-2 font-bold text-red-600">
-                          {formatCurrency(item.giaSauGiam)}
-                        </span>
+                      <div className="text-sm font-bold text-red-600">
+                        {formatCurrency(item.giaSauGiam)}
                       </div>
                       <button
                         type="button"
@@ -795,57 +1377,109 @@ const DiscountManagement = () => {
               </div>
             )}
 
-            {/* Add Products */}
-            <div className="space-y-3">
-              {productVariants.map((variant) => {
-                const isSelected = variantDiscounts.some(item => item.maBienThe === variant.id);
-                const selectedItem = variantDiscounts.find(item => item.maBienThe === variant.id);
-                
-                return (
-                  <div key={variant.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-md hover:bg-gray-50">
-                    <div className="flex-1">
-                      <div className="font-medium">{variant.tenSanPham}</div>
-                      <div className="text-sm text-gray-600">{variant.thuocTinh}</div>
-                      <div className="text-sm text-gray-900">Giá gốc: {formatCurrency(variant.giaGoc)}</div>
+            {/* Products and Variants Selection - two column layout */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-96">
+              {/* Left: Product list */}
+              <div className="md:col-span-1 space-y-2 overflow-y-auto border border-gray-200 rounded p-2">
+                <div className="text-sm text-gray-600 mb-2">Danh sách sản phẩm</div>
+                {products.map(product => {
+                  const isSelected = selectedProducts.some(p => p.maSanPham === product.maSanPham);
+                  return (
+                    <div key={product.maSanPham} className={`flex items-center gap-3 p-2 rounded cursor-pointer ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'}`} onClick={() => { toggleProduct(product); setActiveProduct(product); }}>
+                      <input type="checkbox" checked={isSelected} readOnly className="w-4 h-4" />
+                      {product.hinhAnh && <img src={product.hinhAnh} alt={product.tenSanPham} className="w-10 h-10 object-cover rounded" />}
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{product.tenSanPham}</div>
+                        <div className="text-xs text-gray-500">{product.moTa}</div>
+                      </div>
+                      <div className="text-xs text-gray-500">{(productVariants[product.maSanPham] || []).length} biến thể</div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {isSelected ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min="0"
-                            max={variant.giaGoc}
-                            step="1000"
-                            value={selectedItem?.giaSauGiam || ''}
-                            onChange={(e) => addVariantDiscount(variant, parseFloat(e.target.value) || 0)}
-                            className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Giá sau giảm"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeVariantDiscount(variant.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <IoTrashOutline />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => addVariantDiscount(variant, variant.giaGoc * 0.9)}
-                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                        >
-                          <IoAdd />
-                          Thêm
-                        </button>
-                      )}
-                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Right: variants for active product and controls */}
+              <div className="md:col-span-2 border border-gray-200 rounded p-3 bg-white overflow-y-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-medium">
+                    Biến thể của: {selectedProducts && selectedProducts.length > 0 ? selectedProducts.map(p => p.tenSanPham).join(', ') : (activeProduct ? activeProduct.tenSanPham : 'Chọn sản phẩm bên trái')}
                   </div>
-                );
-              })}
+                  <div>
+                    <button type="button" onClick={() => {
+                      // add selected variants from all visible products to variantDiscounts
+                      const visibleProducts = (selectedProducts && selectedProducts.length > 0) ? selectedProducts : (activeProduct ? [activeProduct] : []);
+                      const visibleVariants = visibleProducts.flatMap(p => productVariants[p.maSanPham] || []);
+                      const toAdd = visibleVariants.filter(v => selectedProductVariantIds.includes(v.maBienThe) && !variantDiscounts.some(vd => vd.maBienThe === v.maBienThe))
+                        .map(v => {
+                          const p = visibleProducts.find(pp => (pp.maSanPham === v.maSanPham) || (productVariants[pp.maSanPham] || []).some(x => x.maBienThe === v.maBienThe));
+                          return { maBienThe: v.maBienThe, maSanPham: p ? p.maSanPham : null, tenSanPham: p ? p.tenSanPham : '', sku: v.sku, thuocTinh: v.thuocTinh, giaSauGiam: v.giaSauGiam || v.giaBan || 0, giaGoc: v.giaBan || 0 };
+                        });
+                      if (toAdd.length > 0) setVariantDiscounts(prev => [...prev, ...toAdd]);
+                      setSelectedProductVariantIds([]);
+                    }} className="px-3 py-1 bg-green-600 text-white rounded text-sm">Thêm biến thể đã chọn</button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {((selectedProducts && selectedProducts.length > 0) || activeProduct) ? (
+                    (() => {
+                      const visibleProducts = (selectedProducts && selectedProducts.length > 0) ? selectedProducts : (activeProduct ? [activeProduct] : []);
+                      const variants = visibleProducts.flatMap(p => productVariants[p.maSanPham] || []);
+                      if (isLoadingVariants && variants.length === 0) return <div className="text-center text-gray-500 py-4">Đang tải biến thể...</div>;
+                      if (variants.length === 0) return <div className="text-center text-gray-500 py-4">Sản phẩm chưa có biến thể</div>;
+
+                      return variants.map(variant => {
+                        const inSelected = selectedProductVariantIds.includes(variant.maBienThe);
+                        const includedInProgram = variantDiscounts.some(vd => vd.maBienThe === variant.maBienThe);
+                        return (
+                          <div key={variant.maBienThe} className={`flex items-center justify-between p-2 border rounded ${includedInProgram ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200'}`}>
+                            <div className="flex items-center gap-3">
+                              <input type="checkbox" checked={inSelected} onChange={() => {
+                                setSelectedProductVariantIds(prev => prev.includes(variant.maBienThe) ? prev.filter(x => x !== variant.maBienThe) : [...prev, variant.maBienThe]);
+                              }} />
+                              <div>
+                                <div className="font-medium text-sm">{variant.sku || variant.thuocTinh || `Biến thể #${variant.maBienThe}`}</div>
+                                <div className="text-xs text-gray-500">Mã: {variant.maBienThe}</div>
+                              </div>
+                            </div>
+                            <div className="text-sm font-bold text-red-600">{formatCurrency(variant.giaSauGiam || variant.giaBan || 0)}</div>
+                          </div>
+                        );
+                      });
+                    })()
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">Chọn một sản phẩm bên trái để xem biến thể</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Debug panel: show last payload sent to server */}
+          {lastPayload && (
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-gray-700">Payload gửi (debug)</div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(JSON.stringify(lastPayload, null, 2))}
+                    className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLastPayload(null)}
+                    className="text-sm px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              <pre className="text-xs text-gray-800 overflow-auto max-h-48 p-2 bg-white border rounded">{JSON.stringify(lastPayload, null, 2)}</pre>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <button
@@ -899,39 +1533,59 @@ const DiscountManagement = () => {
               </div>
             </div>
 
-            {/* Products */}
+            {/* Variants (grouped by product) */}
             <div>
-              <h4 className="text-md font-medium text-gray-900 mb-3">
-                Sản phẩm áp dụng ({selectedProgram.bienTheGiamGias?.length || 0})
-              </h4>
-              <div className="space-y-3">
-                {selectedProgram.bienTheGiamGias?.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">{item.bienTheSanPham?.tenSanPham}</div>
-                      <div className="text-sm text-gray-600">{item.bienTheSanPham?.thuocTinh}</div>
-                      <div className="text-sm text-gray-500">{item.bienTheSanPham?.maBienThe}</div>
+              {(() => {
+                // Prefer server grouped products if available
+                const groups = (selectedProgram.danhSachSanPham && selectedProgram.danhSachSanPham.length > 0)
+                  ? selectedProgram.danhSachSanPham
+                  : // fallback: group bienTheGiamGias by product
+                  (selectedProgram.bienTheGiamGias || []).reduce((acc, bt) => {
+                    let g = acc.find(x => x.maSanPham === bt.maSanPham || x.tenSanPham === bt.tenSanPham);
+                    if (!g) {
+                      g = { maSanPham: bt.maSanPham, tenSanPham: bt.tenSanPham || `Sản phẩm #${bt.maSanPham || 'N/A'}`, bienTheGiamGias: [] };
+                      acc.push(g);
+                    }
+                    g.bienTheGiamGias.push(bt);
+                    return acc;
+                  }, []);
+
+                const totalVariants = groups.reduce((s, g) => s + (g.bienTheGiamGias ? g.bienTheGiamGias.length : 0), 0);
+
+                return (
+                  <>
+                    <h4 className="text-md font-medium text-gray-900 mb-3">Biến thể áp dụng ({totalVariants})</h4>
+                    <div className="space-y-3">
+                      {groups.length > 0 ? groups.map((sp, idx) => (
+                        <div key={sp.maSanPham || idx} className="p-4 border border-gray-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium text-gray-900">{sp.tenSanPham || `Sản phẩm #${sp.maSanPham}`}</div>
+                            <div className="text-sm text-gray-500">{sp.bienTheGiamGias ? sp.bienTheGiamGias.length : 0} biến thể</div>
+                          </div>
+                          <div className="space-y-2">
+                            {(sp.bienTheGiamGias || []).map((item, i) => (
+                              <div key={item.maBienThe || i} className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium">{item.sku || item.thuocTinh || `Biến thể #${item.maBienThe}`}</div>
+                                  <div className="text-sm text-gray-600">SKU: {item.sku || item.maBienThe}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold text-red-600">{formatCurrency(item.giaSauGiam)}</div>
+                                  {item.giaGoc && (
+                                    <div className="text-sm text-gray-500 line-through">{formatCurrency(item.giaGoc)}</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="text-center py-8 text-gray-500">Chưa có biến thể nào được thêm vào chương trình</div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 line-through">
-                          {formatCurrency(item.bienTheSanPham?.giaGoc)}
-                        </span>
-                        <span className="font-bold text-red-600">
-                          {formatCurrency(item.giaSauGiam)}
-                        </span>
-                      </div>
-                      <div className="text-sm text-green-600">
-                        -{calculateDiscountPercentage(item.bienTheSanPham?.giaGoc, item.giaSauGiam)}%
-                      </div>
-                    </div>
-                  </div>
-                )) || (
-                  <div className="text-center py-8 text-gray-500">
-                    Chưa có sản phẩm nào được thêm vào chương trình
-                  </div>
-                )}
-              </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Summary */}
@@ -939,14 +1593,10 @@ const DiscountManagement = () => {
               <div className="bg-blue-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-blue-900">Tổng tiết kiệm</div>
-                    <div className="text-sm text-blue-700">
-                      Từ {selectedProgram.bienTheGiamGias.length} sản phẩm
-                    </div>
+                    <div className="font-medium text-blue-900">Tổng tiết kiệm (ước tính)</div>
+                    <div className="text-sm text-blue-700">Từ {selectedProgram.bienTheGiamGias.length} biến thể</div>
                   </div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {formatCurrency(calculateTotalDiscount(selectedProgram))}
-                  </div>
+                  <div className="text-2xl font-bold text-blue-600">{formatCurrency(calculateTotalDiscount(selectedProgram))}</div>
                 </div>
               </div>
             )}
@@ -963,13 +1613,7 @@ const DiscountManagement = () => {
         message={`Bạn có chắc chắn muốn xóa chương trình "${deletingProgram?.tenChuongTrinh}"? Hành động này không thể hoàn tác.`}
       />
 
-      {/* Toast */}
-      <Toast
-        show={toast.show}
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast({ show: false, message: '', type: '' })}
-      />
+      {/* Toast is shown via global Toast API (Toast.show) */}
     </div>
   );
 };

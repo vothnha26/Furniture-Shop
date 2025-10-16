@@ -36,23 +36,20 @@ const CustomerCheckout = ({ cartItems: initialCartItems = [], total: initialTota
   // Create order data for API
   const createOrderData = () => ({
     maKhachHang: customerInfo.customerId || null,
-    thongTinKhachHang: {
-      hoTen: customerInfo.name,
-      soDienThoai: customerInfo.phone,
-      email: customerInfo.email
-    },
-    diaChiGiaoHang: `${shippingInfo.address}, ${shippingInfo.ward}, ${shippingInfo.district}, ${shippingInfo.city}`,
-    phuongThucThanhToan: paymentMethod,
+    maVoucher: selectedVoucher?.id || null,
+    diemThuongSuDung: appliedLoyaltyPoints || 0,
     ghiChu: orderNotes,
+    trangThai: 'Chờ xác nhận',
+    phuongThucThanhToan: paymentMethod,
+    phuongThucGiaoHang: shippingMethod === 'standard' ? 'Tiết kiệm' : (shippingMethod === 'express' ? 'Nhanh' : (shippingMethod === 'same-day' ? 'Nhanh' : 'Tiết kiệm')),
+    diaChiGiaoHang: `${shippingInfo.address}, ${shippingInfo.ward}, ${shippingInfo.district}, ${shippingInfo.city}`,
     chiTietDonHangList: cartItems.map(item => ({
       maBienThe: item.id,
-      soLuong: item.quantity,
-      donGia: item.price
+      soLuong: item.quantity
     })),
-    maVoucherSuDung: selectedVoucher?.id || null,
-    dichVuBoSung: selectedServices.map(service => ({
+    donHangDichVuList: selectedServices.map(service => ({
       maDichVu: service.id,
-      giaTriDichVu: service.price
+      soLuong: 1
     }))
   });
 
@@ -61,21 +58,22 @@ const CustomerCheckout = ({ cartItems: initialCartItems = [], total: initialTota
     setIsLoading(true);
     try {
       const orderData = createOrderData();
-      const response = await api.post('/api/checkout/create-order', orderData);
-      
-      if (response.success) {
+      const response = await api.post('/api/banhang/donhang', orderData);
+
+      // If backend returns DonHangResponse or similar, treat as success
+      if (response && (response.maDonHang || response.id || response !== null)) {
         setStep(4); // Move to confirmation step
         if (onOrderComplete) {
-          onOrderComplete(response.order);
+          onOrderComplete(response);
         }
-        
+
         // Clear cart after successful order
         localStorage.removeItem('cart');
-        
+
         // Show success message
         Toast.success('Đặt hàng thành công!');
       } else {
-        throw new Error(response.message || 'Đặt hàng thất bại');
+        throw new Error('Đặt hàng thất bại');
       }
     } catch (err) {
       console.error('Submit order error', err);
@@ -135,59 +133,8 @@ const CustomerCheckout = ({ cartItems: initialCartItems = [], total: initialTota
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderCode, setOrderCode] = useState('');
 
-  // Mock data initialization
+  // Load saved shipping info (if available)
   useEffect(() => {
-    const mockCartItems = [
-      {
-        id: 1,
-        name: 'Ghế Sofa Nordic',
-        variant: 'Màu đỏ - Chất liệu vải',
-        price: 4500000,
-        originalPrice: 5000000,
-        quantity: 2,
-        image: '/api/placeholder/80/80',
-        inStock: true
-      },
-      {
-        id: 2,
-        name: 'Bàn Ăn Gỗ Sồi',
-        variant: 'Kích thước 1.6m - Màu nâu',
-        price: 8000000,
-        originalPrice: 8000000,
-        quantity: 1,
-        image: '/api/placeholder/80/80',
-        inStock: true
-      }
-    ];
-
-    const mockVouchers = [
-      {
-        id: 1,
-        code: 'NEWUSER50',
-        title: 'Giảm 50K cho khách hàng mới',
-        discount: 50000,
-        type: 'fixed',
-        minOrder: 1000000,
-        maxDiscount: 50000,
-        expiry: '2024-12-31'
-      },
-      {
-        id: 2,
-        code: 'SALE10',
-        title: 'Giảm 10% đơn hàng',
-        discount: 10,
-        type: 'percentage',
-        minOrder: 2000000,
-        maxDiscount: 500000,
-        expiry: '2024-11-30'
-      }
-    ];
-
-    setCartItems(mockCartItems);
-    setAvailableVouchers(mockVouchers);
-    setLoyaltyPoints(125000); // Available loyalty points
-
-    // Pre-fill shipping info from localStorage (if available)
     const savedShippingInfo = localStorage.getItem('customerShippingInfo');
     if (savedShippingInfo) {
       setShippingInfo(JSON.parse(savedShippingInfo));

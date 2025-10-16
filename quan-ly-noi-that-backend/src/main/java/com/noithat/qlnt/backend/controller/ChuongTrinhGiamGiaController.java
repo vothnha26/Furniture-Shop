@@ -3,15 +3,18 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.dto.request.ChuongTrinhGiamGiaRequest;
 import com.noithat.qlnt.backend.dto.request.ChuongTrinhGiamGiaDetailRequest;
 import com.noithat.qlnt.backend.dto.response.ChuongTrinhGiamGiaResponse;
-import com.noithat.qlnt.backend.dto.response.BienTheSanPhamGiaResponse;
 import com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia;
 import com.noithat.qlnt.backend.service.IChuongTrinhGiamGiaService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestParam;
 
-import java.math.BigDecimal;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Controller quản lý Chương trình Giảm giá trực tiếp trên Biến thể Sản phẩm
@@ -28,10 +31,15 @@ public class ChuongTrinhGiamGiaController {
 
     /**
      * Lấy danh sách tất cả chương trình giảm giá (cơ bản)
+     * Trả về DTO tóm tắt để tránh serialize toàn bộ entity graph (gây nesting sâu).
      */
     @GetMapping
-    public ResponseEntity<List<ChuongTrinhGiamGia>> getAll() {
-        return ResponseEntity.ok(service.getAll());
+    public ResponseEntity<List<ChuongTrinhGiamGiaResponse>> getAll(
+            @RequestParam(value = "details", required = false, defaultValue = "false") boolean includeDetails) {
+        if (includeDetails) {
+            return ResponseEntity.ok(service.getAllWithDetails());
+        }
+        return ResponseEntity.ok(service.getAllSummaries());
     }
 
     /**
@@ -51,14 +59,14 @@ public class ChuongTrinhGiamGiaController {
         if (id == null || "null".equals(id) || id.trim().isEmpty()) {
             throw new IllegalArgumentException("ID chương trình giảm giá không được để trống hoặc không hợp lệ");
         }
-        
+
         Integer idInteger;
         try {
             idInteger = Integer.parseInt(id);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("ID chương trình giảm giá phải là số nguyên hợp lệ");
         }
-        
+
         return ResponseEntity.ok(service.getDetailById(idInteger));
     }
 
@@ -70,14 +78,14 @@ public class ChuongTrinhGiamGiaController {
         if (id == null || "null".equals(id) || id.trim().isEmpty()) {
             throw new IllegalArgumentException("ID chương trình giảm giá không được để trống hoặc không hợp lệ");
         }
-        
+
         Integer idInteger;
         try {
             idInteger = Integer.parseInt(id);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("ID chương trình giảm giá phải là số nguyên hợp lệ");
         }
-        
+
         return ResponseEntity.ok(service.getDetailById(idInteger));
     }
 
@@ -103,8 +111,9 @@ public class ChuongTrinhGiamGiaController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<ChuongTrinhGiamGia> update(@PathVariable Integer id,
-                                                    @Valid @RequestBody ChuongTrinhGiamGiaRequest request) {
-        return ResponseEntity.ok(service.update(id, request.getTenChuongTrinh(), request.getNgayBatDau(), request.getNgayKetThuc()));
+            @Valid @RequestBody ChuongTrinhGiamGiaRequest request) {
+        return ResponseEntity
+                .ok(service.update(id, request.getTenChuongTrinh(), request.getNgayBatDau(), request.getNgayKetThuc()));
     }
 
     /**
@@ -126,46 +135,27 @@ public class ChuongTrinhGiamGiaController {
         return ResponseEntity.noContent().build();
     }
 
+    // Simple exception handlers to return clearer JSON error messages during development
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("error", "IllegalArgumentException");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleServerError(Exception ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("error", ex.getClass().getSimpleName());
+        body.put("message", ex.getMessage());
+        // include cause message if available (helpful in local dev)
+        if (ex.getCause() != null) body.put("cause", ex.getCause().toString());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
     // ========== Quản lý giá sau giảm cho từng biến thể ==========
-
-    /**
-     * Thêm hoặc cập nhật giá sau giảm cho một biến thể trong chương trình
-     */
-    @PostMapping("/{maChuongTrinh}/bien-the/{maBienThe}")
-    public ResponseEntity<Void> upsertBienTheGia(@PathVariable Integer maChuongTrinh,
-                                                 @PathVariable Integer maBienThe,
-                                                 @RequestParam BigDecimal giaSauGiam) {
-        service.upsertBienTheGia(maChuongTrinh, maBienThe, giaSauGiam);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
-     * Xóa biến thể khỏi chương trình giảm giá
-     */
-    @DeleteMapping("/{maChuongTrinh}/bien-the/{maBienThe}")
-    public ResponseEntity<Void> removeBienTheGia(@PathVariable Integer maChuongTrinh,
-                                                 @PathVariable Integer maBienThe) {
-        service.removeBienTheGia(maChuongTrinh, maBienThe);
-        return ResponseEntity.noContent().build();
-    }
-
-    // ========== API cho Khách hàng xem giá ==========
-
-    /**
-     * Lấy giá hiển thị hiện tại cho một biến thể (giá thấp nhất)
-     */
-    @GetMapping("/bien-the/{maBienThe}/gia-hien-thi")
-    public ResponseEntity<BigDecimal> getGiaHienThi(@PathVariable Integer maBienThe) {
-        return ResponseEntity.ok(service.getGiaHienThi(maBienThe));
-    }
-
-    /**
-     * Lấy thông tin chi tiết giá của biến thể với các chương trình giảm giá đang áp dụng
-     */
-    @GetMapping("/bien-the/{maBienThe}/gia-chi-tiet")
-    public ResponseEntity<BienTheSanPhamGiaResponse> getBienTheGiaChiTiet(@PathVariable Integer maBienThe) {
-        return ResponseEntity.ok(service.getBienTheGiaChiTiet(maBienThe));
-    }
+    // Product-level discount endpoints đã bị xóa vì hệ thống chuyển sang
+    // variant-level (BienTheGiamGia)
+    // Sử dụng endpoints /with-details để quản lý discount áp dụng cho biến thể
 }
-
-

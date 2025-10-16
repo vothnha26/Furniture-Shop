@@ -1,49 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IoHeart, IoTrash, IoCart, IoStar, IoSearch } from 'react-icons/io5';
+import api from '../../api';
 
 const CustomerFavorites = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [favorites, setFavorites] = useState([
-    {
-      id: 1,
-      name: 'Ghế gỗ cao cấp',
-      price: 2500000,
-      originalPrice: 3000000,
-      image: 'https://via.placeholder.com/300x200?text=Ghế+gỗ',
-      rating: 4.8,
-      reviews: 124,
-      category: 'chairs',
-      inStock: true,
-      isNew: true,
-      addedDate: '2024-01-15'
-    },
-    {
-      id: 2,
-      name: 'Bàn ăn 6 người',
-      price: 4500000,
-      originalPrice: 5000000,
-      image: 'https://via.placeholder.com/300x200?text=Bàn+ăn',
-      rating: 4.6,
-      reviews: 89,
-      category: 'tables',
-      inStock: true,
-      isNew: false,
-      addedDate: '2024-01-10'
-    },
-    {
-      id: 3,
-      name: 'Giường ngủ gỗ',
-      price: 6500000,
-      originalPrice: 7500000,
-      image: 'https://via.placeholder.com/300x200?text=Giường+ngủ',
-      rating: 4.9,
-      reviews: 156,
-      category: 'beds',
-      inStock: false,
-      isNew: false,
-      addedDate: '2024-01-05'
-    }
-  ]);
+  const [favorites, setFavorites] = useState([]);
+
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const res = await api.get('/api/v1/yeu-thich');
+        const data = res?.data || res;
+        // Map API fields if necessary; assume API returns list of products
+        setFavorites(data.map(p => ({
+          id: p.id || p.maSanPham || p.productId,
+          name: p.ten || p.tenSanPham || p.name,
+          price: p.gia || p.giaBan || p.price,
+          originalPrice: p.giaGoc || p.originalPrice,
+          image: p.hinhAnh || p.image,
+          rating: p.danhGia || p.rating || 0,
+          reviews: p.soLuotDanhGia || p.reviews || 0,
+          category: p.danhMuc || p.category,
+          inStock: (p.tonKho || p.soLuongTonKho) > 0,
+          isNew: p.sanPhamMoi || p.isNew || false,
+          addedDate: p.ngayThem || p.addedDate || ''
+        })));
+      } catch (e) {
+        console.debug('Favorites API not available', e);
+      }
+    };
+    loadFavorites();
+  }, []);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -52,13 +39,32 @@ const CustomerFavorites = () => {
     }).format(price);
   };
 
-  const removeFromFavorites = (id) => {
-    setFavorites(favorites.filter(item => item.id !== id));
+  const removeFromFavorites = async (id) => {
+    try {
+      // Optimistic update
+      setFavorites(prev => prev.filter(item => item.id !== id));
+      try {
+        await api.delete(`/api/v1/yeu-thich/${id}`);
+      } catch (e) {
+        console.debug('Remove favorite API not available', e);
+      }
+    } catch (e) {
+      console.error('Error removing favorite', e);
+    }
   };
 
-  const addToCart = (product) => {
-    // Simulate adding to cart
-    alert(`Đã thêm "${product.name}" vào giỏ hàng!`);
+  const addToCart = async (product) => {
+    try {
+      try {
+        await api.post('/api/v1/gio-hang', { san_pham_id: product.id, so_luong: 1 });
+        // optionally show toast / UI feedback
+      } catch (e) {
+        console.debug('Cart API not available', e);
+        alert(`Đã thêm "${product.name}" vào giỏ hàng (local)`);
+      }
+    } catch (e) {
+      console.error('Error adding to cart', e);
+    }
   };
 
   const renderStars = (rating) => {

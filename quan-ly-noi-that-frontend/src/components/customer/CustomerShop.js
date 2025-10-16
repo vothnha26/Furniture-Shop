@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { IoSearch, IoCart, IoHeart, IoStar, IoFilter, IoGrid, IoList, IoEye } from 'react-icons/io5';
+import { useNavigate } from 'react-router-dom';
+import { IoSearch, IoCart, IoHeart, IoStar, IoGrid, IoList, IoEye } from 'react-icons/io5';
 import CustomerProductDetail from './CustomerProductDetail';
 import api from '../../api';
 
@@ -8,44 +9,144 @@ const CustomerShop = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState('grid');
-  const [favorites, setFavorites] = useState([2, 6]); // IDs of favorited products
+  const [favorites, setFavorites] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
-  const [cart, setCart] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [, setCart] = useState([]);
+  const [, setIsLoading] = useState(false);
+  const [, setError] = useState(null);
 
   // Map product data from API for public shop
-  const mapProductFromApi = (product) => ({
-    id: product.maSanPham || product.id,
-    name: product.tenSanPham || product.name,
-    category: product.danhMuc?.tenDanhMuc || product.category,
-    price: product.giaBan || product.price || 0,
-    originalPrice: product.giaGoc || product.originalPrice || 0,
-    discount: product.phanTramGiamGia || 0,
-    rating: product.danhGia || product.rating || 5,
-    reviews: product.soLuongDanhGia || product.reviews || 0,
-    image: product.hinhAnh || product.image || '/default-product.jpg',
-    inStock: product.tonKho > 0,
-    stockCount: product.tonKho || 0,
-    description: product.moTa || product.description || '',
-    variants: product.bienTheList?.map(variant => ({
-      id: variant.maBienThe,
-      name: variant.tenBienThe,
-      price: variant.giaBan,
-      inStock: variant.tonKho > 0
-    })) || []
-  });
+  const mapProductFromApi = (product) => {
+    const rawPrice = product.giaBan ?? product.gia ?? product.price ?? product.gia_ban ?? 0;
+    const rawOriginal = product.giaGoc ?? product.gia_goc ?? product.originalPrice ?? 0;
+    const price = Number(rawPrice) || 0;
+    const originalPrice = Number(rawOriginal) || 0;
+
+    // Extract a usable image value. Backend may return:
+    // - a string url in product.hinhAnh / product.image
+    // - an array of image objects in product.hinhAnhs or product.danh_sach_hinh_anh
+    // - an object with field duongDanHinhAnh
+    let rawImage = '/default-product.jpg';
+    if (product) {
+      if (product.hinhAnhs && Array.isArray(product.hinhAnhs) && product.hinhAnhs.length > 0) {
+        const first = product.hinhAnhs[0];
+        rawImage = first?.duongDanHinhAnh ?? first ?? rawImage;
+      } else if (product.danh_sach_hinh_anh && Array.isArray(product.danh_sach_hinh_anh) && product.danh_sach_hinh_anh.length > 0) {
+        const first = product.danh_sach_hinh_anh[0];
+        rawImage = first?.duongDanHinhAnh ?? first ?? rawImage;
+      } else if (product.hinhAnh) {
+        rawImage = product.hinhAnh;
+      } else if (product.image) {
+        rawImage = product.image;
+      }
+    }
+
+    return {
+      id: product.maSanPham ?? product.id ?? product.productId,
+      name: product.tenSanPham ?? product.ten ?? product.name ?? 'Sản phẩm',
+      category: product.danhMuc?.tenDanhMuc ?? product.category ?? '',
+      price,
+      originalPrice,
+      discount: Number(product.phanTramGiamGia ?? product.giam_gia ?? 0) || 0,
+      rating: Number(product.danhGia ?? product.rating) || 0,
+      reviews: Number(product.soLuongDanhGia ?? product.reviews) || 0,
+      // store the raw image value; the rendering layer will convert it to absolute URL
+      image: rawImage || '/default-product.jpg',
+  // Prefer explicit stockQuantity when available, fall back to older fields
+  inStock: Number(product.stockQuantity ?? product.tonKho ?? product.soLuongTonKho ?? 0) > 0,
+  stockCount: Number(product.stockQuantity ?? product.tonKho ?? product.soLuongTonKho ?? 0) || 0,
+      description: product.moTa ?? product.description ?? '',
+      variants: (product.bienTheList || product.bienThe || []).map(variant => ({
+        id: variant.maBienThe ?? variant.id,
+        name: variant.tenBienThe ?? variant.ten ?? variant.name,
+        price: Number(variant.giaBan ?? variant.gia ?? variant.price) || 0,
+        inStock: Number(variant.tonKho ?? variant.soLuong ?? 0) > 0
+      })),
+      isOnSale: originalPrice > 0 && price < originalPrice
+    };
+  };
+
+  // Convert possibly-relative backend image path to absolute URL using api.buildUrl.
+  const resolveImageUrl = (img) => {
+    if (!img) return api.buildUrl('/default-product.jpg');
+    if (typeof img === 'string') {
+      const s = img.trim();
+      if (s.startsWith('http://') || s.startsWith('https://')) return s;
+      // relative path like /uploads/products/1/abc.png -> build absolute URL to backend
+      return api.buildUrl(s);
+    }
+    // If it's an object with duongDanHinhAnh field
+    if (img.duongDanHinhAnh) return resolveImageUrl(img.duongDanHinhAnh);
+    return api.buildUrl('/default-product.jpg');
+  };
 
   // Fetch public products for shop
   useEffect(() => {
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        const data = await api.get('/api/products');
-        if (Array.isArray(data)) {
-          setProducts(data.map(mapProductFromApi));
-        }
+        // Prefer the shop-specific endpoint which returns variant-aware aggregates
+        const response = await api.get('/api/products/shop');
+        const data = response?.data ?? response;
+
+        // Support paged responses (content/items) or plain arrays
+        let items = [];
+        if (Array.isArray(data)) items = data;
+        else if (Array.isArray(data.content)) items = data.content;
+        else if (Array.isArray(data.items)) items = data.items;
+
+        // Map shop DTO -> UI product shape. Shop DTO may include fields like:
+        // - giaMin/giaMax or priceMin/priceMax
+        // - tongSoLuong or totalStock
+        // - soLuongBienThe / availableVariantCount
+        // - hinhAnhs (array of image DTO or strings)
+        const mapped = items.map(it => {
+          // If the item already looks like a full product (contains price or giaBan), reuse existing mapper
+          if (it && (it.giaBan != null || it.gia != null || it.price != null)) {
+            return mapProductFromApi(it);
+          }
+          // If the shop response already has min/max price, use them to compute display
+          const priceMin = it.giaMin ?? it.priceMin ?? it.minPrice ?? it.giaMinVnd ?? 0;
+          const priceMax = it.giaMax ?? it.priceMax ?? it.maxPrice ?? it.giaMaxVnd ?? 0;
+
+          const displayPrice = (priceMin && priceMax && priceMin !== priceMax)
+            ? { min: Number(priceMin) || 0, max: Number(priceMax) || 0 }
+            : { min: Number(it.giaBan ?? it.price ?? priceMin) || 0, max: Number(it.giaBan ?? it.price ?? priceMax) || 0 };
+
+          // images
+          let imageRaw = '/default-product.jpg';
+          if (Array.isArray(it.hinhAnhs) && it.hinhAnhs.length > 0) {
+            const first = it.hinhAnhs[0];
+            imageRaw = first?.duongDanHinhAnh ?? first ?? imageRaw;
+          } else if (it.hinhAnh) {
+            imageRaw = it.hinhAnh;
+          }
+
+          return {
+            id: it.maSanPham ?? it.id ?? it.productId,
+            name: it.tenSanPham ?? it.ten ?? it.name ?? 'Sản phẩm',
+            category: it.tenDanhMuc ?? it.danhMuc?.tenDanhMuc ?? '',
+            // use min price for singular display; we will render range when min!=max
+            price: displayPrice.min,
+            priceRange: displayPrice,
+            originalPrice: it.giaGoc ?? it.originalPrice ?? 0,
+            // prefer backend-provided discountPercent if available
+            discount: Number(it.discountPercent ?? it.phanTramGiamGia ?? it.giam_gia ?? 0) || 0,
+            rating: Number(it.danhGia ?? it.rating) || 0,
+            reviews: Number(it.soLuongDanhGia ?? it.reviews) || 0,
+            image: imageRaw,
+            // Prefer API's explicit stockQuantity if present
+            inStock: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? it.soLuongTon ?? it.stockCount ?? 0) > 0,
+            stockCount: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? it.soLuongTon ?? it.stockCount ?? 0) || 0,
+            description: it.moTa ?? it.description ?? '',
+            variants: [], // the shop DTO intentionally does not include full variants; keep empty here
+            isOnSale: (it.giaGoc ?? it.originalPrice ?? 0) > 0 && (displayPrice.min < (it.giaGoc ?? it.originalPrice ?? Number.POSITIVE_INFINITY)),
+            discountPercent: it.discountPercent != null ? it.discountPercent : null
+          };
+  });
+
+        setProducts(mapped);
       } catch (err) {
         console.error('Fetch products error', err);
         setError(err);
@@ -60,7 +161,8 @@ const CustomerShop = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await api.get('/api/categories');
+        const response = await api.get('/api/categories');
+        const data = response?.data ?? response;
         if (Array.isArray(data)) {
           const mappedCategories = data.map(cat => ({
             id: cat.maDanhMuc,
@@ -77,93 +179,14 @@ const CustomerShop = () => {
   }, []);
 
   const [categories, setCategories] = useState([
-    { id: 'all', name: 'Tất cả', count: 6 },
-    { id: 'chairs', name: 'Ghế', count: 2 },
-    { id: 'tables', name: 'Bàn', count: 2 },
-    { id: 'beds', name: 'Giường', count: 1 },
-    { id: 'storage', name: 'Tủ', count: 1 }
+    // start empty; will be populated from API
+    { id: 'all', name: 'Tất cả', count: 0 }
   ]);
 
   const [products, setProducts] = useState([
-    {
-      id: 1,
-      name: 'Ghế gỗ cao cấp',
-      price: 2500000,
-      originalPrice: 3000000,
-      image: 'https://via.placeholder.com/300x200?text=Ghế+gỗ',
-      rating: 4.8,
-      reviews: 124,
-      category: 'chairs',
-      inStock: true,
-      isNew: true,
-      isFavorite: false
-    },
-    {
-      id: 2,
-      name: 'Bàn ăn 6 người',
-      price: 4500000,
-      originalPrice: 5000000,
-      image: 'https://via.placeholder.com/300x200?text=Bàn+ăn',
-      rating: 4.6,
-      reviews: 89,
-      category: 'tables',
-      inStock: true,
-      isNew: false,
-      isFavorite: true
-    },
-    {
-      id: 3,
-      name: 'Giường ngủ gỗ',
-      price: 6500000,
-      originalPrice: 7500000,
-      image: 'https://via.placeholder.com/300x200?text=Giường+ngủ',
-      rating: 4.9,
-      reviews: 156,
-      category: 'beds',
-      inStock: false,
-      isNew: false,
-      isFavorite: false
-    },
-    {
-      id: 4,
-      name: 'Tủ quần áo 3 cánh',
-      price: 3200000,
-      originalPrice: 3800000,
-      image: 'https://via.placeholder.com/300x200?text=Tủ+quần+áo',
-      rating: 4.7,
-      reviews: 98,
-      category: 'storage',
-      inStock: true,
-      isNew: true,
-      isFavorite: false
-    },
-    {
-      id: 5,
-      name: 'Ghế sofa 3 chỗ',
-      price: 8500000,
-      originalPrice: 9500000,
-      image: 'https://via.placeholder.com/300x200?text=Sofa+3+chỗ',
-      rating: 4.5,
-      reviews: 76,
-      category: 'chairs',
-      inStock: true,
-      isNew: false,
-      isFavorite: false
-    },
-    {
-      id: 6,
-      name: 'Bàn làm việc gỗ',
-      price: 1800000,
-      originalPrice: 2200000,
-      image: 'https://via.placeholder.com/300x200?text=Bàn+làm+việc',
-      rating: 4.4,
-      reviews: 45,
-      category: 'tables',
-      inStock: true,
-      isNew: true,
-      isFavorite: true
-    }
+    // start empty and rely on API fetch
   ]);
+  const navigate = useNavigate();
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -186,9 +209,17 @@ const CustomerShop = () => {
     );
   };
 
+  // Navigate to product page route
   const handleViewProduct = (product) => {
-    setSelectedProduct(product);
-    setShowProductDetail(true);
+    try {
+      const id = product.id ?? product.maSanPham;
+      // Use SPA navigation instead of full reload
+      navigate(`/shop/products/${id}`);
+    } catch (e) {
+      // fallback to modal if routing fails
+      setSelectedProduct(product);
+      setShowProductDetail(true);
+    }
   };
 
   const handleAddToCart = (product) => {
@@ -307,13 +338,27 @@ const CustomerShop = () => {
               {/* Product Image */}
               <div className="relative">
                 <img
-                  src={product.image}
+                  src={resolveImageUrl(product.image)}
+                  title={resolveImageUrl(product.image)}
                   alt={product.name}
                   className="w-full h-48 object-cover"
+                  loading="lazy"
+                  onError={(e) => { 
+                    // Log failing URL for easier debugging in browser console
+                    // eslint-disable-next-line no-console
+                    console.error('Image load failed for', e.currentTarget.src);
+                    e.currentTarget.onerror = null; 
+                    e.currentTarget.src = api.buildUrl('/logo192.png'); 
+                  }}
                 />
                 {product.isNew && (
                   <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
                     Mới
+                  </span>
+                )}
+                {product.discountPercent != null && product.discountPercent > 0 && (
+                  <span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                    -{product.discountPercent}%
                   </span>
                 )}
                 {!product.inStock && (
@@ -341,12 +386,24 @@ const CustomerShop = () => {
                   <span className="text-sm text-gray-500">({product.reviews})</span>
                 </div>
 
+                {/* Stock */}
+                <div className="mb-2">
+                  {product.stockCount > 0 ? (
+                    <span className="text-sm text-green-600 font-medium">Còn hàng: {product.stockCount}</span>
+                  ) : (
+                    <span className="text-sm text-red-600 font-medium">Hết hàng</span>
+                  )}
+                </div>
+
                 {/* Price */}
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-lg font-bold text-primary">
-                    {formatPrice(product.price)}
+                    {product.priceRange && product.priceRange.min != null && product.priceRange.max != null && product.priceRange.min !== product.priceRange.max
+                      ? `${formatPrice(product.priceRange.min)} - ${formatPrice(product.priceRange.max)}`
+                      : (product.price > 0 ? formatPrice(product.price) : 'Liên hệ')
+                    }
                   </span>
-                  {product.originalPrice > product.price && (
+                  {product.originalPrice > 0 && product.isOnSale && (
                     <span className="text-sm text-gray-500 line-through">
                       {formatPrice(product.originalPrice)}
                     </span>

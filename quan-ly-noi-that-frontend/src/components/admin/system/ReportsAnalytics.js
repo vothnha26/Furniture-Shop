@@ -12,6 +12,7 @@ const ReportsAnalytics = () => {
   const [productSales, setProductSales] = useState([]);
   const [customerStats, setCustomerStats] = useState([]);
   const [inventoryAlerts, setInventoryAlerts] = useState([]);
+  const [procTotals, setProcTotals] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -21,17 +22,101 @@ const ReportsAnalytics = () => {
       setLoading(true);
       setError(null);
       try {
+        // Prefer new stored-proc endpoints, fall back to legacy /api/reports/* if not available
+        const tryEndpoints = async (newPath, oldPath) => {
+          try {
+            const resp = await api.get(newPath);
+            return resp;
+          } catch (e) {
+            try {
+              const resp2 = await api.get(oldPath);
+              return resp2;
+            } catch (e2) {
+              return [];
+            }
+          }
+        };
+
         const [salesRes, productsRes, customersRes, inventoryRes] = await Promise.all([
-          api.get('/api/reports/sales').catch(() => []),
-          api.get('/api/reports/products').catch(() => []),
-          api.get('/api/reports/customers').catch(() => []),
-          api.get('/api/reports/inventory').catch(() => [])
+          tryEndpoints('/api/v1/bao-cao-thong-ke/revenue-summary', '/api/reports/sales'),
+          tryEndpoints('/api/v1/bao-cao-thong-ke/sales-by-product', '/api/reports/products'),
+          tryEndpoints('/api/v1/bao-cao-thong-ke/customer-metrics', '/api/reports/customers'),
+          tryEndpoints('/api/v1/bao-cao-thong-ke/inventory-metrics', '/api/reports/inventory')
         ]);
 
-        setSalesData(Array.isArray(salesRes) ? salesRes : []);
-        setProductSales(Array.isArray(productsRes) ? productsRes : []);
-        setCustomerStats(Array.isArray(customersRes) ? customersRes : []);
-        setInventoryAlerts(Array.isArray(inventoryRes) ? inventoryRes : []);
+        const normalize = (resp) => {
+          if (!resp) return [];
+          // New backend shape: { success: true, data: { rows: [...] } }
+          if (resp.success && resp.data) return Array.isArray(resp.data.rows) ? resp.data.rows : [];
+          // Some endpoints may return { rows: [...] }
+          if (Array.isArray(resp)) return resp;
+          if (resp.rows && Array.isArray(resp.rows)) return resp.rows;
+          // fallback: if object with numeric properties, return array with it
+          return [];
+        };
+
+  // Normalize responses
+  const origNormalizedSales = normalize(salesRes);
+  let normalizedSales = origNormalizedSales;
+        const normalizedProducts = normalize(productsRes);
+        const normalizedCustomers = normalize(customersRes);
+        const normalizedInventory = normalize(inventoryRes);
+
+        // Some stored-proc endpoints return aggregated metrics rather than time-series rows.
+        // Example payload (from stored-proc):
+        // { success: true, data: { rows: [ { DoanhThuCaoNhat: 32700000.00, DoanhThuThapNhat: 32700000.00 } ] } }
+        // Detect that shape and transform into a small array of { date, revenue } so UI charts/widgets work.
+        const isAggregatedRow = (row) => {
+          if (!row || typeof row !== 'object') return false;
+          const keys = Object.keys(row).map(k => k.toLowerCase());
+          return keys.includes('doanhthucaonhat') || keys.includes('doanhthuthapnhat') || keys.includes('maxrevenue') || keys.includes('minrevenue');
+        };
+
+        // If the stored-proc returned an aggregated summary row that includes total spending/orders,
+        // capture those totals so we can display authoritative numbers.
+        if (Array.isArray(origNormalizedSales) && origNormalizedSales.length === 1) {
+          const ro = origNormalizedSales[0];
+          const totalRevFromProc = Number(ro.tong_ch_tieu ?? ro.TongChiTieu ?? ro.Tong_Chi_Tieu ?? ro.TongDoanhThu ?? ro.TongDoanhThu ?? ro.tongDoanhThu ?? ro.TotalRevenue ?? ro.total ?? ro.DoanhThu ?? ro.doanhThu) || null;
+          const totalOrdersFromProc = Number(ro.tong_don_hang ?? ro.TongDonHang ?? ro.Tong_SoDonHang ?? ro.TotalOrders ?? ro.totalOrders ?? ro.orders ?? ro.SoDonHang ?? ro.soDonHang) || null;
+          if (totalRevFromProc || totalOrdersFromProc) {
+            setProcTotals({ totalRevenue: totalRevFromProc || undefined, totalOrders: totalOrdersFromProc || undefined });
+          }
+        }
+
+        if (Array.isArray(normalizedSales) && normalizedSales.length === 1 && isAggregatedRow(normalizedSales[0])) {
+          const r = normalizedSales[0];
+          const cao = r.DoanhThuCaoNhat ?? r.doanhThuCaoNhat ?? r.maxRevenue ?? r.MaxRevenue ?? 0;
+          const thap = r.DoanhThuThapNhat ?? r.doanhThuThapNhat ?? r.minRevenue ?? r.MinRevenue ?? 0;
+          normalizedSales = [
+            { date: 'Cao', revenue: Number(cao) || 0 },
+            { date: 'Thap', revenue: Number(thap) || 0 }
+          ];
+        }
+
+        // Normalize product list if stored-proc returned aggregated product fields
+        let finalProducts = normalizedProducts;
+        const isProductAggregated = (row) => {
+          if (!row || typeof row !== 'object') return false;
+          const keys = Object.keys(row).map(k => k.toLowerCase());
+          // common names returned by stored procs: TenSanPham, ProductName, SoLuongBan, DoanhThu
+          return keys.includes('ten_san_pham') || keys.includes('sku') || keys.includes('tensanpham') || keys.includes('tensp') || keys.includes('masp');
+        };
+
+        if (Array.isArray(normalizedProducts) && normalizedProducts.length > 0 && isProductAggregated(normalizedProducts[0])) {
+          finalProducts = normalizedProducts.map(p => {
+            // Vietnamese snake_case / PascalCase / English variants
+            const name = p.ten_san_pham ?? p.TenSanPham ?? p.tenSanPham ?? p.tensp ?? p.ProductName ?? p.productName ?? p.name ?? p.Ten ?? 'N/A';
+            const sku = p.sku ?? p.MSP ?? p.masp ?? p.MaSP ?? null;
+            const sales = Number(p.TongSoLuongBan ?? p.TongSoLuongBan ?? p.SoLuongBan ?? p.soLuongBan ?? p.soLuong ?? p.Sales ?? p.sales ?? p.quantity ?? p.qty) || 0;
+            const revenue = Number(p.TongDoanhThu ?? p.TongDoanhThu ?? p.DoanhThu ?? p.doanhThu ?? p.Revenue ?? p.revenue ?? p.Total ?? p.tongTien) || 0;
+            return { name, sku, sales, revenue, ...p };
+          });
+        }
+
+        setSalesData(normalizedSales);
+        setProductSales(finalProducts);
+        setCustomerStats(normalizedCustomers);
+        setInventoryAlerts(normalizedInventory);
       } catch (err) {
         console.error('Error fetching reports data:', err);
         setError('Không thể tải dữ liệu báo cáo');
@@ -43,52 +128,16 @@ const ReportsAnalytics = () => {
     fetchReportsData();
   }, []);
 
-  // API Functions
-  const fetchSalesReport = async (period = selectedPeriod) => {
-    try {
-      const response = await api.get(`/api/reports/sales?period=${period}`);
-      setSalesData(Array.isArray(response) ? response : []);
-    } catch (error) {
-      console.error('Error fetching sales report:', error);
-    }
-  };
-
-  const fetchProductReport = async () => {
-    try {
-      const response = await api.get('/api/reports/products');
-      setProductSales(Array.isArray(response) ? response : []);
-    } catch (error) {
-      console.error('Error fetching product report:', error);
-    }
-  };
-
-  const fetchCustomerReport = async () => {
-    try {
-      const response = await api.get('/api/reports/customers');
-      setCustomerStats(Array.isArray(response) ? response : []);
-    } catch (error) {
-      console.error('Error fetching customer report:', error);
-    }
-  };
-
-  const fetchInventoryReport = async () => {
-    try {
-      const response = await api.get('/api/reports/inventory');
-      setInventoryAlerts(Array.isArray(response) ? response : []);
-    } catch (error) {
-      console.error('Error fetching inventory report:', error);
-    }
-  };
-
   const exportReport = async (reportType) => {
     try {
-      const response = await api.get(`/api/reports/export/${reportType}`, {
-        responseType: 'blob'
-      });
-      // Handle file download
-      const url = window.URL.createObjectURL(new Blob([response]));
+      // Use fetch directly to handle binary response
+      const url = api.buildUrl(`/api/reports/export/${reportType}`);
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = downloadUrl;
       link.setAttribute('download', `${reportType}-report.xlsx`);
       document.body.appendChild(link);
       link.click();
@@ -111,9 +160,44 @@ const ReportsAnalytics = () => {
   ];
 
   // Calculate metrics from API data
-  const totalRevenue = salesData.reduce((sum, day) => sum + (day.doanhThu || day.revenue || 0), 0);
-  const totalOrders = salesData.reduce((sum, day) => sum + (day.soDonHang || day.orders || 0), 0);
-  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const computedTotalRevenue = salesData.reduce((sum, day) => sum + (Number(day.doanhThu ?? day.revenue) || 0), 0);
+  // Try to get orders from time-series if available, otherwise fall back to product-level sold counts
+  const totalOrdersFromSeries = salesData.reduce((sum, day) => sum + (Number(day.soDonHang ?? day.orders ?? day.TongSoDonHang ?? day.TongDonHang) || 0), 0);
+  const totalUnitsSold = productSales.reduce((sum, p) => sum + (Number(p.sales ?? p.SoLuongBan ?? p.TongSoLuongBan ?? 0) || 0), 0);
+  const computedTotalOrders = totalOrdersFromSeries || totalUnitsSold || 0;
+
+  // Allow stored-proc authoritative totals to override computed totals
+  const totalRevenue = procTotals?.totalRevenue ?? computedTotalRevenue;
+  const totalOrders = procTotals?.totalOrders ?? computedTotalOrders;
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : null; // null means unavailable
+
+  // Customers: try to aggregate counts from customerStats
+  const totalCustomers = customerStats.reduce((sum, stat) => sum + (Number(stat.soLuong ?? stat.count ?? stat.total ?? stat.tong ?? 0) || 0), 0) || null;
+
+  // Safe formatting helpers to avoid calling toLocaleString on undefined
+  const formatNumber = (n) => {
+    const v = Number(n);
+    if (!isFinite(v) || isNaN(v)) return '0';
+    return v.toLocaleString('vi-VN');
+  };
+
+  const formatCurrency = (n) => `${formatNumber(n)}đ`;
+
+  const safeMax = (arr, accessor = (x) => x) => {
+    if (!Array.isArray(arr) || arr.length === 0) return 0;
+    return Math.max(...arr.map(accessor).map(v => Number(v) || 0));
+  };
+  const safeMin = (arr, accessor = (x) => x) => {
+    if (!Array.isArray(arr) || arr.length === 0) return 0;
+    return Math.min(...arr.map(accessor).map(v => Number(v) || 0));
+  };
+
+  const renderDayLabel = (day) => {
+    if (!day || !day.date) return '–';
+    const d = new Date(day.date);
+    if (Number.isNaN(d.getTime())) return '–';
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -132,9 +216,9 @@ const ReportsAnalytics = () => {
           title: 'Báo cáo Bán hàng',
           description: 'Phân tích doanh thu và xu hướng bán hàng',
           data: [
-            { metric: 'Tổng doanh thu', value: `${totalRevenue.toLocaleString('vi-VN')}đ`, change: '+12.5%' },
+            { metric: 'Tổng doanh thu', value: formatCurrency(totalRevenue), change: '+12.5%' },
             { metric: 'Số đơn hàng', value: totalOrders.toString(), change: '+8.2%' },
-            { metric: 'Giá trị đơn hàng TB', value: `${Math.round(averageOrderValue).toLocaleString('vi-VN')}đ`, change: '-2.1%' },
+            { metric: 'Giá trị đơn hàng TB', value: formatCurrency(Math.round(averageOrderValue)), change: '-2.1%' },
             { metric: 'Tỷ lệ chuyển đổi', value: '3.2%', change: '+0.5%' }
           ]
         };
@@ -168,14 +252,14 @@ const ReportsAnalytics = () => {
         };
       case 'products':
         const topProduct = productSales.length > 0 ? productSales[0] : null;
-        const maxRevenue = productSales.length > 0 ? Math.max(...productSales.map(p => p.doanhThu || p.revenue || 0)) : 0;
-        const maxRevenueProduct = productSales.find(p => (p.doanhThu || p.revenue || 0) === maxRevenue);
+        const maxRevenue = safeMax(productSales, p => p.doanhThu || p.revenue || 0);
+        const maxRevenueProduct = productSales.find(p => (Number(p.doanhThu || p.revenue) || 0) === maxRevenue) || null;
         return {
           title: 'Báo cáo Sản phẩm',
           description: 'Hiệu suất bán hàng theo sản phẩm',
           data: [
             { metric: 'Sản phẩm bán chạy', value: topProduct?.tenSanPham || topProduct?.name || 'N/A', change: `${topProduct?.soLuongBan || topProduct?.sales || 0} đơn` },
-            { metric: 'Doanh thu cao nhất', value: `${maxRevenue.toLocaleString('vi-VN')}đ`, change: maxRevenueProduct?.tenSanPham || maxRevenueProduct?.name || 'N/A' },
+            { metric: 'Doanh thu cao nhất', value: formatCurrency(maxRevenue), change: maxRevenueProduct?.tenSanPham || maxRevenueProduct?.name || 'N/A' },
             { metric: 'Tỷ lệ lợi nhuận TB', value: '35%', change: '+2.1%' },
             { metric: 'Sản phẩm mới', value: '3', change: 'Tháng này' }
           ]
@@ -185,9 +269,9 @@ const ReportsAnalytics = () => {
           title: 'Báo cáo Tài chính',
           description: 'Tình hình tài chính và dòng tiền',
           data: [
-            { metric: 'Doanh thu thuần', value: `${totalRevenue.toLocaleString('vi-VN')}đ`, change: '+12.5%' },
+            { metric: 'Doanh thu thuần', value: formatCurrency(totalRevenue), change: '+12.5%' },
             { metric: 'Chi phí vận hành', value: '450,000,000đ', change: '+8.2%' },
-            { metric: 'Lợi nhuận gộp', value: `${(totalRevenue * 0.757).toLocaleString('vi-VN')}đ`, change: '+15.3%' },
+            { metric: 'Lợi nhuận gộp', value: formatCurrency(totalRevenue * 0.757), change: '+15.3%' },
             { metric: 'Biên lợi nhuận', value: '75.7%', change: '+2.1%' }
           ]
         };
@@ -365,12 +449,9 @@ const ReportsAnalytics = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Tổng doanh thu</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {totalRevenue.toLocaleString('vi-VN')}đ
+                  {formatCurrency(totalRevenue)}
                 </p>
-                <p className="text-sm text-green-600 flex items-center">
-                  <IoTrendingUp className="w-4 h-4 mr-1" />
-                  +12.5% so với tháng trước
-                </p>
+                {/* percentage change unavailable without previous-period data */}
               </div>
             </div>
           </div>
@@ -382,10 +463,7 @@ const ReportsAnalytics = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Tổng đơn hàng</p>
                 <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
-                <p className="text-sm text-green-600 flex items-center">
-                  <IoTrendingUp className="w-4 h-4 mr-1" />
-                  +8.2% so với tháng trước
-                </p>
+                {/* percentage change unavailable without previous-period data */}
               </div>
             </div>
           </div>
@@ -397,12 +475,9 @@ const ReportsAnalytics = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Giá trị đơn hàng TB</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {Math.round(averageOrderValue).toLocaleString('vi-VN')}đ
+                  {averageOrderValue ? formatCurrency(Math.round(averageOrderValue)) : '—'}
                 </p>
-                <p className="text-sm text-red-600 flex items-center">
-                  <IoTrendingDown className="w-4 h-4 mr-1" />
-                  -2.1% so với tháng trước
-                </p>
+                {/* percentage change unavailable without previous-period data */}
               </div>
             </div>
           </div>
@@ -413,11 +488,8 @@ const ReportsAnalytics = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Khách hàng mới</p>
-                <p className="text-2xl font-bold text-gray-900">23</p>
-                <p className="text-sm text-green-600 flex items-center">
-                  <IoTrendingUp className="w-4 h-4 mr-1" />
-                  +15.3% so với tháng trước
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{totalCustomers ?? '—'}</p>
+                {/* percentage change unavailable without previous-period data */}
               </div>
             </div>
           </div>
@@ -438,10 +510,10 @@ const ReportsAnalytics = () => {
                 <div key={index} className="flex flex-col items-center">
                   <div
                     className="bg-blue-500 rounded-t w-8 mb-2"
-                    style={{ height: `${(day.revenue / 35000000) * 200}px` }}
+                    style={{ height: `${((Number(day.revenue) || 0) / 35000000) * 200}px` }}
                   ></div>
                   <div className="text-xs text-gray-500">
-                    {new Date(day.date).getDate()}/{new Date(day.date).getMonth() + 1}
+                    {renderDayLabel(day)}
                   </div>
                 </div>
               ))}
@@ -450,13 +522,13 @@ const ReportsAnalytics = () => {
               <div className="text-center">
                 <p className="text-sm text-gray-600">Doanh thu cao nhất</p>
                 <p className="font-semibold text-gray-900">
-                  {Math.max(...salesData.map(d => d.revenue)).toLocaleString('vi-VN')}đ
+                  {formatCurrency(safeMax(salesData, d => d.revenue))}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-gray-600">Doanh thu thấp nhất</p>
                 <p className="font-semibold text-gray-900">
-                  {Math.min(...salesData.map(d => d.revenue)).toLocaleString('vi-VN')}đ
+                  {formatCurrency(safeMin(salesData, d => d.revenue))}
                 </p>
               </div>
             </div>
@@ -479,7 +551,7 @@ const ReportsAnalytics = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-gray-900">
-                      {product.revenue.toLocaleString('vi-VN')}đ
+                      {formatCurrency(product.revenue)}
                     </p>
                     <p className="text-xs text-gray-500">{product.sales} đơn</p>
                   </div>
@@ -502,10 +574,10 @@ const ReportsAnalytics = () => {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-gray-900">
-                      {stat.revenue.toLocaleString('vi-VN')}đ
+                      {formatCurrency(stat.revenue)}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {Math.round((stat.revenue / totalRevenue) * 100)}% tổng doanh thu
+                      {Math.round(((Number(stat.revenue) || 0) / Math.max(1, Number(totalRevenue || 0))) * 100)}% tổng doanh thu
                     </p>
                   </div>
                 </div>
@@ -571,18 +643,20 @@ const ReportsAnalytics = () => {
                       {product.sales}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {product.revenue.toLocaleString('vi-VN')}đ
+                      {formatCurrency(product.revenue)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                          <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
                           <div 
                             className="bg-blue-500 h-2 rounded-full" 
-                            style={{ width: `${(product.revenue / Math.max(...productSales.map(p => p.revenue))) * 100}%` }}
+                            style={{
+                              width: `${Math.min(100, Math.round(((Number(product.revenue) || 0) / Math.max(1, Number(totalRevenue || 0))) * 100))}%`
+                            }}
                           ></div>
                         </div>
                         <span className="text-sm text-gray-600">
-                          {Math.round((product.revenue / totalRevenue) * 100)}%
+                          {Math.round(((Number(product.revenue) || 0) / Math.max(1, Number(totalRevenue || 0))) * 100)}%
                         </span>
                       </div>
                     </td>
@@ -616,7 +690,7 @@ const ReportsAnalytics = () => {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-semibold">{product.sales} đơn</p>
-                        <p className="text-xs text-gray-500">{product.revenue.toLocaleString('vi-VN')}đ</p>
+                        <p className="text-xs text-gray-500">{formatCurrency(product.revenue)}</p>
                       </div>
                     </div>
                   ))}
@@ -629,10 +703,10 @@ const ReportsAnalytics = () => {
                     <div key={index} className="flex flex-col items-center">
                       <div
                         className="bg-primary rounded-t w-6 mb-2"
-                        style={{ height: `${(day.revenue / 35000000) * 150}px` }}
+                        style={{ height: `${((Number(day.revenue) || 0) / 35000000) * 150}px` }}
                       ></div>
                       <div className="text-xs text-gray-500">
-                        {new Date(day.date).getDate()}/{new Date(day.date).getMonth() + 1}
+                        {renderDayLabel(day)}
                       </div>
                     </div>
                   ))}
@@ -712,9 +786,9 @@ const ReportsAnalytics = () => {
                         <p className="text-sm text-gray-500">{stat.count} khách hàng</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold">{stat.revenue.toLocaleString('vi-VN')}đ</p>
+                        <p className="text-sm font-semibold">{formatCurrency(stat.revenue)}</p>
                         <p className="text-xs text-gray-500">
-                          {Math.round((stat.revenue / totalRevenue) * 100)}% tổng doanh thu
+                          {Math.round(((Number(stat.revenue) || 0) / Math.max(1, Number(totalRevenue || 0))) * 100)}% tổng doanh thu
                         </p>
                       </div>
                     </div>

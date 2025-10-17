@@ -118,4 +118,12 @@ public class KhachHangController {
             .toList();
         return ResponseEntity.ok(result);
     }
+
+    // [Quyền: Admin/Nhân viên] - Tìm khách hàng theo số điện thoại (exact match)
+    @GetMapping("/by-phone/{phone}")
+    public ResponseEntity<KhachHang> getByPhone(@PathVariable("phone") String phone) {
+        KhachHang kh = khachHangService.findBySoDienThoai(phone);
+        if (kh == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(kh);
+    }
 }

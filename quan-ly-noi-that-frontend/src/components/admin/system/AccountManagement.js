@@ -21,7 +21,7 @@ const AccountManagement = () => {
             fullName: account.hoTen || account.fullName,
             email: account.email || account.email,
             phone: account.soDienThoai || account.phone,
-            role: account.vaiTro || account.role,
+            role: String(account.vaiTro || account.role || '').toUpperCase(),
             status: account.trangThai !== false ? 'active' : 'inactive',
             lastLogin: account.lanDangNhapCuoi || account.lastLogin || 'Chưa đăng nhập'
           })));
@@ -68,7 +68,7 @@ const AccountManagement = () => {
     fullName: '',
     email: '',
     phone: '',
-    role: 'Staff',
+    role: 'STAFF',
     password: ''
   });
 
@@ -79,7 +79,7 @@ const AccountManagement = () => {
         hoTen: newAccount.fullName,
         email: newAccount.email,
         soDienThoai: newAccount.phone,
-        vaiTro: newAccount.role,
+        vaiTro: (newAccount.role || 'STAFF').toString().toUpperCase(),
         matKhau: newAccount.password,
         trangThai: true
       };
@@ -106,7 +106,7 @@ const AccountManagement = () => {
         fullName: '',
         email: '',
         phone: '',
-        role: 'Staff',
+        role: 'STAFF',
         password: ''
       });
       setShowAddModal(false);
@@ -123,13 +123,13 @@ const AccountManagement = () => {
       // Refresh data
       const response = await api.get('/api/accounts');
       if (Array.isArray(response)) {
-        setAccounts(response.map(account => ({
+          setAccounts(response.map(account => ({
           id: account.maTaiKhoan || account.id,
           username: account.tenDangNhap || account.username,
           fullName: account.hoTen || account.fullName,
           email: account.email || account.email,
           phone: account.soDienThoai || account.phone,
-          role: account.vaiTro || account.role,
+          role: String(account.vaiTro || account.role || '').toUpperCase(),
           status: account.trangThai !== false ? 'active' : 'inactive',
           lastLogin: account.lanDangNhapCuoi || account.lastLogin || 'Chưa đăng nhập'
         })));
@@ -277,18 +277,16 @@ const AccountManagement = () => {
                       <div className="text-sm text-gray-500">{account.phone}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        account.role === 'Admin' ? 'bg-red-100 text-red-800' :
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${account.role === 'Admin' ? 'bg-red-100 text-red-800' :
                         account.role === 'Manager' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
+                          'bg-blue-100 text-blue-800'
+                        }`}>
                         {account.role}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        account.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${account.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
                         {account.status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
                       </span>
                     </td>
@@ -340,7 +338,7 @@ const AccountManagement = () => {
                   <input
                     type="text"
                     value={newAccount.username}
-                    onChange={(e) => setNewAccount({...newAccount, username: e.target.value})}
+                    onChange={(e) => setNewAccount({ ...newAccount, username: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập tên đăng nhập"
                   />
@@ -352,7 +350,7 @@ const AccountManagement = () => {
                   <input
                     type="text"
                     value={newAccount.fullName}
-                    onChange={(e) => setNewAccount({...newAccount, fullName: e.target.value})}
+                    onChange={(e) => setNewAccount({ ...newAccount, fullName: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập họ và tên"
                   />
@@ -364,7 +362,7 @@ const AccountManagement = () => {
                   <input
                     type="email"
                     value={newAccount.email}
-                    onChange={(e) => setNewAccount({...newAccount, email: e.target.value})}
+                    onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập email"
                   />
@@ -376,7 +374,7 @@ const AccountManagement = () => {
                   <input
                     type="tel"
                     value={newAccount.phone}
-                    onChange={(e) => setNewAccount({...newAccount, phone: e.target.value})}
+                    onChange={(e) => setNewAccount({ ...newAccount, phone: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập số điện thoại"
                   />
@@ -387,12 +385,12 @@ const AccountManagement = () => {
                   </label>
                   <select
                     value={newAccount.role}
-                    onChange={(e) => setNewAccount({...newAccount, role: e.target.value})}
+                    onChange={(e) => setNewAccount({ ...newAccount, role: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="Staff">Nhân viên</option>
-                    <option value="Manager">Quản lý</option>
-                    <option value="Admin">Quản trị viên</option>
+                    <option value="STAFF">Nhân viên</option>
+                    <option value="MANAGER">Quản lý</option>
+                    <option value="ADMIN">Quản trị viên</option>
                   </select>
                 </div>
                 <div>
@@ -402,7 +400,7 @@ const AccountManagement = () => {
                   <input
                     type="password"
                     value={newAccount.password}
-                    onChange={(e) => setNewAccount({...newAccount, password: e.target.value})}
+                    onChange={(e) => setNewAccount({ ...newAccount, password: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập mật khẩu"
                   />
@@ -439,7 +437,7 @@ const AccountManagement = () => {
                   <input
                     type="text"
                     value={editingAccount.username}
-                    onChange={(e) => setEditingAccount({...editingAccount, username: e.target.value})}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, username: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập tên đăng nhập"
                   />
@@ -451,7 +449,7 @@ const AccountManagement = () => {
                   <input
                     type="text"
                     value={editingAccount.fullName}
-                    onChange={(e) => setEditingAccount({...editingAccount, fullName: e.target.value})}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, fullName: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập họ và tên"
                   />
@@ -463,7 +461,7 @@ const AccountManagement = () => {
                   <input
                     type="email"
                     value={editingAccount.email}
-                    onChange={(e) => setEditingAccount({...editingAccount, email: e.target.value})}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, email: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập email"
                   />
@@ -475,7 +473,7 @@ const AccountManagement = () => {
                   <input
                     type="tel"
                     value={editingAccount.phone}
-                    onChange={(e) => setEditingAccount({...editingAccount, phone: e.target.value})}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, phone: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Nhập số điện thoại"
                   />
@@ -486,12 +484,12 @@ const AccountManagement = () => {
                   </label>
                   <select
                     value={editingAccount.role}
-                    onChange={(e) => setEditingAccount({...editingAccount, role: e.target.value})}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, role: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="Staff">Nhân viên</option>
-                    <option value="Manager">Quản lý</option>
-                    <option value="Admin">Quản trị viên</option>
+                    <option value="STAFF">Nhân viên</option>
+                    <option value="MANAGER">Quản lý</option>
+                    <option value="ADMIN">Quản trị viên</option>
                   </select>
                 </div>
                 <div>
@@ -500,7 +498,7 @@ const AccountManagement = () => {
                   </label>
                   <select
                     value={editingAccount.status}
-                    onChange={(e) => setEditingAccount({...editingAccount, status: e.target.value})}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, status: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <option value="active">Hoạt động</option>
@@ -578,4 +576,3 @@ const AccountManagement = () => {
 };
 
 export default AccountManagement;
-

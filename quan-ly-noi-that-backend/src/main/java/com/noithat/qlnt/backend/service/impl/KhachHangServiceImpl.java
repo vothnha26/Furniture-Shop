@@ -104,6 +104,12 @@ public class KhachHangServiceImpl implements IKhachHangService {
     }
 
     @Override
+    public KhachHang findBySoDienThoai(String soDienThoai) {
+        if (soDienThoai == null || soDienThoai.trim().isEmpty()) return null;
+        return khachHangRepository.findBySoDienThoai(soDienThoai.trim()).orElse(null);
+    }
+
+    @Override
     @Transactional
     public KhachHang tichDiemVaCapNhatHang(Integer maKhachHang, Integer diemThayDoi) {
         KhachHang khachHang = getKhachHangProfile(maKhachHang);

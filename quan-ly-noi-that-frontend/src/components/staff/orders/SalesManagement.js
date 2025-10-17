@@ -132,7 +132,8 @@ const SalesManagement = () => {
 
   // API Functions
   const createOrder = async (orderData) => {
-    const response = await api.post('/api/banhang/donhang', orderData);
+    // Use admin-friendly endpoint which accepts a permissive payload from staff UI
+    const response = await api.post('/api/banhang/donhang/admin', orderData);
     return response;
   };
 
@@ -189,11 +190,16 @@ const SalesManagement = () => {
   const [newOrder, setNewOrder] = useState({
     customerName: '',
     customerPhone: '',
-    items: [],
+    address: '',
+    items: [{ name: '', maBienThe: null, quantity: 1, price: 0 }],
     discount: 0,
+    maKhachHang: null,
+    pointsUsed: 0,
     paymentMethod: 'cash',
     notes: ''
   });
+
+  const [foundCustomer, setFoundCustomer] = useState(null); // { maKhachHang, tenKhachHang, soDienThoai, diemTichLuy }
 
   // local toast fallback for admin page
   const showToast = (message, type = 'success') => {
@@ -236,23 +242,30 @@ const SalesManagement = () => {
 
   const handleCreateOrder = async () => {
     try {
-      const orderData = {
-        tenKhachHang: newOrder.customerName,
-        soDienThoai: newOrder.customerPhone,
+      // Basic client-side validation for required receiver fields (backend also validates)
+      if (!newOrder.customerName || !newOrder.customerPhone || !newOrder.address) {
+        alert('Vui lòng điền tên khách hàng, số điện thoại và địa chỉ giao hàng.');
+        return;
+      }
+
+      // Build admin-friendly payload; keep it minimal but include required fields
+      const adminOrder = {
+        maKhachHang: newOrder.maKhachHang || (foundCustomer && foundCustomer.maKhachHang) || null,
+        tenKhachHang: newOrder.customerName || (foundCustomer && foundCustomer.tenKhachHang) || 'Khách lẻ',
+        soDienThoai: newOrder.customerPhone || (foundCustomer && foundCustomer.soDienThoai) || null,
+        diaChiGiaoHang: newOrder.address || (foundCustomer && foundCustomer.diaChi) || null,
         chiTietDonHangList: newOrder.items.map(item => ({
-          tenSanPham: item.name,
-          soLuong: item.quantity,
-          donGia: item.price,
-          maBienThe: item.maBienThe // include variant id when admin selected a specific variant
+          maBienThe: item.maBienThe,
+          soLuong: Number(item.quantity || 1)
         })),
-        giamGia: appliedVoucher?.giamGiaVoucher ?? newOrder.discount,
         maVoucherCode: appliedVoucher?.maVoucherCode || voucherCode || null,
-        phuongThucThanhToan: newOrder.paymentMethod,
+        diemThuongSuDung: Number(newOrder.pointsUsed || 0),
+        phuongThucThanhToan: newOrder.paymentMethod || 'cash',
         ghiChu: newOrder.notes,
-        trangThai: 'Chờ xác nhận'
+        trangThai: 'PENDING'
       };
 
-      await createOrder(orderData);
+      await createOrder(adminOrder);
 
       // Refresh data
       const data = await api.get('/api/banhang/donhang');
@@ -263,6 +276,7 @@ const SalesManagement = () => {
       setNewOrder({
         customerName: '',
         customerPhone: '',
+        address: '',
         items: [],
         discount: 0,
         paymentMethod: 'cash',
@@ -276,21 +290,25 @@ const SalesManagement = () => {
   };
 
   const handleAddItem = () => {
-    setNewOrder({
-      ...newOrder,
-      items: [...newOrder.items, { name: '', maBienThe: null, quantity: 1, price: 0 }]
-    });
+    setNewOrder(prev => ({
+      ...prev,
+      items: [...prev.items, { name: '', maBienThe: null, quantity: 1, price: 0 }]
+    }));
   };
 
   const handleRemoveItem = (index) => {
-    const newItems = newOrder.items.filter((_, i) => i !== index);
-    setNewOrder({ ...newOrder, items: newItems });
+    setNewOrder(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
   };
 
   const handleUpdateItem = (index, field, value) => {
-    const newItems = [...newOrder.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setNewOrder({ ...newOrder, items: newItems });
+    setNewOrder(prev => {
+      const newItems = [...prev.items];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return { ...prev, items: newItems };
+    });
   };
 
   // Voucher functions: apply (server-validated) and clear
@@ -322,6 +340,44 @@ const SalesManagement = () => {
       console.error('Apply voucher error', err);
       alert('Lỗi khi áp dụng voucher');
     }
+  };
+
+  // Customer lookup by phone (used in admin Create Order modal)
+  const fetchCustomerByPhone = async (phone) => {
+    if (!phone) return null;
+    try {
+      // Try common backend path - adapt if your backend differs
+      const res = await api.get(`/api/khach-hang/search?phone=${encodeURIComponent(phone)}`).catch(() => null) || await api.get(`/api/v1/khach-hang/by-phone/${encodeURIComponent(phone)}`).catch(() => null);
+      if (!res) return null;
+      // backend might return array or single object
+      const cust = Array.isArray(res) ? (res[0] || null) : res;
+      if (!cust) return null;
+      const mapped = {
+        maKhachHang: cust.maKhachHang ?? cust.id ?? cust.customerId ?? cust.ma_khach_hang,
+        tenKhachHang: cust.tenKhachHang ?? cust.hoTen ?? cust.name,
+        soDienThoai: cust.soDienThoai ?? cust.phone ?? cust.sdt,
+        // Backend stores loyalty points as `diemThuong` (or diem_thuong). Accept many variants.
+        diemTichLuy: Number(
+          cust.diemThuong ?? cust.diem_tuong ?? cust.diemTichLuy ?? cust.points ?? cust.loyaltyPoints ?? 0
+        )
+      };
+      setFoundCustomer(mapped);
+      // Pre-fill newOrder fields
+      setNewOrder(prev => ({ ...prev, customerName: mapped.tenKhachHang || prev.customerName, customerPhone: mapped.soDienThoai || prev.customerPhone, maKhachHang: mapped.maKhachHang }));
+      return mapped;
+    } catch (err) {
+      console.warn('Customer lookup failed', err);
+      return null;
+    }
+  };
+
+  const applyPoints = (points) => {
+    const p = Number(points || 0);
+    if (!foundCustomer || p <= 0) return;
+    // Clamp to available points
+    const use = Math.min(p, Number(foundCustomer.diemTichLuy || 0));
+    setNewOrder(prev => ({ ...prev, pointsUsed: use }));
+    showToast(`Đã áp dụng ${use} điểm`);
   };
 
   const clearVoucher = () => {
@@ -828,18 +884,21 @@ const SalesManagement = () => {
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Giá</label>
-                            <input
-                              type="number"
-                              value={item.price}
-                              onChange={(e) => handleUpdateItem(index, 'price', parseInt(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                            />
-                            {item._origPrice != null && Number(item._origPrice) > Number(item.price) && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                <span className="line-through">{Number(item._origPrice).toLocaleString('vi-VN')}đ</span>
-                                <span className="ml-2 text-green-700">-{(Number(item._origPrice) - Number(item.price)).toLocaleString('vi-VN')}đ</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="text"
+                                value={(Number(item.price || 0)).toLocaleString('vi-VN') + 'đ'}
+                                disabled
+                                readOnly
+                                className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-right"
+                              />
+                              {item._origPrice != null && Number(item._origPrice) > Number(item.price) ? (
+                                <div className="text-sm text-gray-500">
+                                  <span className="line-through">{Number(item._origPrice).toLocaleString('vi-VN')}đ</span>
+                                  <span className="ml-2 text-green-700">-{(Number(item._origPrice) - Number(item.price)).toLocaleString('vi-VN')}đ</span>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center justify-between mt-2">
@@ -886,12 +945,26 @@ const SalesManagement = () => {
                         <input type="tel" value={newOrder.customerPhone} onChange={(e) => setNewOrder({ ...newOrder, customerPhone: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nhập số điện thoại" />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Phương thức thanh toán</label>
-                        <select value={newOrder.paymentMethod} onChange={(e) => setNewOrder({ ...newOrder, paymentMethod: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
-                          <option value="cash">Tiền mặt</option>
-                          <option value="card">Thẻ</option>
-                          <option value="transfer">Chuyển khoản</option>
-                        </select>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ giao hàng</label>
+                        <input type="text" value={newOrder.address} onChange={(e) => setNewOrder({ ...newOrder, address: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nhập địa chỉ giao hàng" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tìm khách hàng theo SĐT</label>
+                        <div className="flex gap-2">
+                          <input type="tel" value={newOrder.customerPhone} onChange={(e) => setNewOrder({ ...newOrder, customerPhone: e.target.value })} placeholder="Số điện thoại" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" />
+                          <button onClick={() => fetchCustomerByPhone(newOrder.customerPhone)} className="px-3 py-2 bg-primary text-white rounded-lg">Tìm</button>
+                        </div>
+                        {foundCustomer && (
+                          <div className="mt-2 text-sm text-gray-700">
+                            <div><strong>{foundCustomer.tenKhachHang}</strong> — {foundCustomer.soDienThoai}</div>
+                            <div>Điểm tích lũy: <strong>{Number(foundCustomer.diemTichLuy || 0)}</strong></div>
+                            <div className="mt-2 flex gap-2">
+                              <input type="number" min={0} max={foundCustomer.diemTichLuy || 0} value={newOrder.pointsUsed || 0} onChange={(e) => setNewOrder({ ...newOrder, pointsUsed: parseInt(e.target.value) || 0 })} className="px-3 py-2 border border-gray-300 rounded-lg w-28" />
+                              <button onClick={() => applyPoints(newOrder.pointsUsed)} className="px-3 py-2 bg-green-600 text-white rounded-lg">Áp dụng điểm</button>
+                              <button onClick={() => { setNewOrder({ ...newOrder, pointsUsed: 0 }); setFoundCustomer(null); }} className="px-3 py-2 border border-gray-300 rounded-lg">Xóa</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Giảm giá (VNĐ)</label>

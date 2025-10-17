@@ -11,4 +11,6 @@ public interface IKhachHangService {
     void delete(Integer maKhachHang);
     KhachHang getKhachHangProfile(Integer maKhachHang);
     KhachHang tichDiemVaCapNhatHang(Integer maKhachHang, Integer diemThayDoi);
+    // Find customer by phone number
+    KhachHang findBySoDienThoai(String soDienThoai);
 }

@@ -65,36 +65,39 @@ const Dashboard = () => {
     setError(null);
 
     try {
-      // Fetch overview data from multiple possible endpoints
-      const overviewEndpoints = ['/api/admin/overview', '/api/dashboard', '/api/statistics'];
-      let overview = null;
-
-      for (const endpoint of overviewEndpoints) {
-        try {
-          const response = await api.get(endpoint);
-          if (response) {
-            overview = response;
-            break;
-          }
-        } catch (err) {
-          // Continue to next endpoint
-          continue;
+      // Prefer server stored-proc driven endpoints under /api/v1/bao-cao-thong-ke
+      try {
+        const overviewResp = await api.get('/api/v1/bao-cao-thong-ke/overview-metrics');
+        if (overviewResp && overviewResp.success && overviewResp.data) {
+          const rows = overviewResp.data.rows || [];
+          // If stored-proc returns key/value row, try to map first row
+          const first = rows.length ? rows[0] : {};
+          setOverviewData({
+            totalRevenue: first.totalRevenue || first.TotalRevenue || first.doanhThu || overviewResp.data.totalRevenue || '0đ',
+            totalOrders: first.totalOrders || first.orderCount || overviewResp.data.totalOrders || 0,
+            totalCustomers: first.totalCustomers || first.customerCount || overviewResp.data.totalCustomers || 0,
+            totalProducts: first.totalProducts || overviewResp.data.totalProducts || 0
+          });
         }
-      }
 
-      if (overview) {
-        // Map overview data with fallbacks
-        setOverviewData({
-          totalRevenue: overview.totalRevenue || overview.revenue || overview.totalRevenueVnd || overview.total_revenue || overview.summary?.totalRevenue || '0đ',
-          totalOrders: overview.totalOrders || overview.ordersCount || overview.total_orders || overview.summary?.totalOrders || 0,
-          totalCustomers: overview.totalCustomers || overview.customersCount || overview.total_customers || overview.summary?.totalCustomers || 0,
-          totalProducts: overview.totalProducts || overview.productsCount || overview.total_products || overview.summary?.totalProducts || 0
-        });
+        const revenueTrendResp = await api.get('/api/v1/bao-cao-thong-ke/revenue-trend');
+        if (revenueTrendResp && revenueTrendResp.success && revenueTrendResp.data) {
+          setSalesData(revenueTrendResp.data.rows || []);
+        }
 
-        // Set additional data sections
-        setSalesData(overview.sales || overview.salesSummary || null);
-        setInventoryData(overview.inventory || overview.inventorySummary || null);
-        setCustomersData(overview.customers || overview.customersSummary || null);
+        const salesByProductResp = await api.get('/api/v1/bao-cao-thong-ke/sales-by-product');
+        if (salesByProductResp && salesByProductResp.success && salesByProductResp.data) {
+          // map to simple list for UI
+          setInventoryData(salesByProductResp.data.rows || []);
+        }
+
+        const customerMetricsResp = await api.get('/api/v1/bao-cao-thong-ke/customer-metrics');
+        if (customerMetricsResp && customerMetricsResp.success && customerMetricsResp.data) {
+          setCustomersData(customerMetricsResp.data.rows?.[0] || customerMetricsResp.data.rows || null);
+        }
+      } catch (err) {
+        // fallback to legacy endpoints if new ones fail
+        console.warn('Fallback to legacy overview endpoints', err);
       }
 
       // Fetch recent activities

@@ -68,7 +68,7 @@ public class DonHang {
     
     // ----- CÁC MỐI QUAN HỆ -----
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "MaKhachHang", nullable = false)
+    @JoinColumn(name = "MaKhachHang", nullable = true)
     private KhachHang khachHang;
 
     @ManyToOne(fetch = FetchType.LAZY)

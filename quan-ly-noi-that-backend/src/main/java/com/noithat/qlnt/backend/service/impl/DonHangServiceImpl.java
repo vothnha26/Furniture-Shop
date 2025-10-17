@@ -37,13 +37,16 @@ public class DonHangServiceImpl implements IDonHangService {
     @Override
     @Transactional
     public DonHangResponse taoDonHang(DonHangRequest request) {
-        // 1. Xác thực khách hàng
-        KhachHang khachHang = khachHangRepository.findById(request.getMaKhachHang())
-                .orElseThrow(() -> new AppException(404, "Không tìm thấy khách hàng."));
+    // 1. Xác thực khách hàng (cho phép null cho đơn khách lẻ / admin)
+    KhachHang khachHang = null;
+    if (request.getMaKhachHang() != null) {
+        khachHang = khachHangRepository.findById(request.getMaKhachHang())
+            .orElseThrow(() -> new AppException(404, "Không tìm thấy khách hàng."));
+    }
 
         // 2. Tạo đối tượng DonHang và map thông tin
         DonHang donHang = new DonHang();
-        donHang.setKhachHang(khachHang);
+    donHang.setKhachHang(khachHang);
         donHang.setNgayDatHang(LocalDateTime.now());
         donHang.setTrangThaiDonHang(request.getTrangThaiDonHang() != null ? request.getTrangThaiDonHang() : "PENDING");
         donHang.setTrangThaiThanhToan(
@@ -58,7 +61,8 @@ public class DonHangServiceImpl implements IDonHangService {
         // 3. Gọi procedure để tính toán lại toàn bộ giá trị
         CheckoutSummaryRequest summaryRequest = new CheckoutSummaryRequest();
         summaryRequest.setChiTietDonHang(request.getChiTietDonHangList());
-        summaryRequest.setMaKhachHang(request.getMaKhachHang());
+    // Pass through maKhachHang (may be null) so stored-proc can compute correctly
+    summaryRequest.setMaKhachHang(request.getMaKhachHang());
         summaryRequest.setDiemSuDung(request.getDiemThuongSuDung() != null ? request.getDiemThuongSuDung() : 0);
         summaryRequest.setMaVoucherCode(request.getMaVoucherCode());
 
@@ -93,13 +97,35 @@ public class DonHangServiceImpl implements IDonHangService {
             }
         }
 
-        // 6. Trừ điểm thưởng của khách hàng
-        if (request.getDiemThuongSuDung() != null && request.getDiemThuongSuDung() > 0) {
+        // 6. Trừ điểm thưởng của khách hàng (chỉ khi có khách hàng)
+        if (khachHang != null && request.getDiemThuongSuDung() != null && request.getDiemThuongSuDung() > 0) {
             int diemHienCo = khachHang.getDiemThuong() != null ? khachHang.getDiemThuong() : 0;
             if (request.getDiemThuongSuDung() > diemHienCo) {
                 throw new AppException(400, "Số điểm sử dụng vượt quá số điểm hiện có.");
             }
             khachHang.setDiemThuong(diemHienCo - request.getDiemThuongSuDung());
+        }
+
+        // 6b. Cộng điểm thưởng cho khách hàng (nếu có) — thực hiện sau khi trừ điểm đã dùng
+        if (khachHang != null) {
+            Integer diemNhanDuoc = donHang.getDiemThuongNhanDuoc();
+            if (diemNhanDuoc != null && diemNhanDuoc > 0) {
+                int current = khachHang.getDiemThuong() != null ? khachHang.getDiemThuong() : 0;
+                khachHang.setDiemThuong(current + diemNhanDuoc);
+                // Persist the updated customer within the same transaction
+                khachHangRepository.save(khachHang);
+            }
+        }
+
+        // 6c. Cập nhật tổng chi tiêu và tổng đơn hàng của khách hàng (nếu có)
+        if (khachHang != null) {
+            java.math.BigDecimal currentTotal = khachHang.getTongChiTieu() != null ? khachHang.getTongChiTieu() : java.math.BigDecimal.ZERO;
+            java.math.BigDecimal orderAmount = summary.getTongCong() != null ? summary.getTongCong() : java.math.BigDecimal.ZERO;
+            khachHang.setTongChiTieu(currentTotal.add(orderAmount));
+            Integer currentOrders = khachHang.getTongDonHang() != null ? khachHang.getTongDonHang() : 0;
+            khachHang.setTongDonHang(currentOrders + 1);
+            // Persist changes (same transaction)
+            khachHangRepository.save(khachHang);
         }
 
         // 7. Tạo ChiTietDonHang và Trừ kho
@@ -221,6 +247,7 @@ public class DonHangServiceImpl implements IDonHangService {
         response.setDiemThuongSuDung(donHang.getDiemThuongSuDung());
         response.setGiamGiaDiemThuong(donHang.getGiamGiaDiemThuong());
         response.setGiamGiaVip(donHang.getGiamGiaVip());
+    response.setDiemThuongNhanDuoc(donHang.getDiemThuongNhanDuoc());
     // Compute total discount (VIP + Voucher + Điểm) for convenience on frontend
     java.math.BigDecimal vipDisc = donHang.getGiamGiaVip() != null ? donHang.getGiamGiaVip() : java.math.BigDecimal.ZERO;
     java.math.BigDecimal vouDisc = donHang.getGiamGiaVoucher() != null ? donHang.getGiamGiaVoucher() : java.math.BigDecimal.ZERO;

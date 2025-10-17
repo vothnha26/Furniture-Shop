@@ -7,7 +7,7 @@ import java.util.List;
 @Data
 public class DonHangRequest {
 
-    @NotNull(message = "Mã khách hàng không được để trống")
+    // Allow null for guest/admin-created orders; backend will handle missing customer
     private Integer maKhachHang;
 
     @NotEmpty(message = "Danh sách sản phẩm không được để trống")

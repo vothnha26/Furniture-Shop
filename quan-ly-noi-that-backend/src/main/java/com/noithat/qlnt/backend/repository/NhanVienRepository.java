@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface NhanVienRepository extends JpaRepository<NhanVien, Integer> {
     // Các phương thức CRUD cơ bản đã được JpaRepository cung cấp.
+    java.util.Optional<NhanVien> findByTaiKhoan(com.noithat.qlnt.backend.entity.TaiKhoan taiKhoan);
 }

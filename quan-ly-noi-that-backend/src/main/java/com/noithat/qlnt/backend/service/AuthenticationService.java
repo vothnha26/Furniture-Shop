@@ -40,13 +40,13 @@ public class AuthenticationService {
     private final EmailService emailService;
 
     public AuthenticationService(TaiKhoanRepository taiKhoanRepository,
-                                KhachHangRepository khachHangRepository,
-                                VaiTroRepository vaiTroRepository,
-                                HangThanhVienRepository hangThanhVienRepository,
-                                PasswordEncoder passwordEncoder,
-                                JwtService jwtService,
-                                AuthenticationManager authenticationManager,
-                                EmailService emailService) {
+            KhachHangRepository khachHangRepository,
+            VaiTroRepository vaiTroRepository,
+            HangThanhVienRepository hangThanhVienRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            AuthenticationManager authenticationManager,
+            EmailService emailService) {
         this.taiKhoanRepository = taiKhoanRepository;
         this.khachHangRepository = khachHangRepository;
         this.vaiTroRepository = vaiTroRepository;
@@ -67,56 +67,91 @@ public class AuthenticationService {
                 throw new IllegalStateException("Email đã tồn tại.");
             }
 
-            VaiTro userRole = vaiTroRepository.findByTenVaiTro("USER")
-                    .orElseThrow(() -> new IllegalStateException("Vai trò USER không tồn tại."));
+            // Determine role: prefer requested role if provided, otherwise default to USER
+            String requestedRole = request.getVaiTro();
+            VaiTro roleEntity = null;
+            if (requestedRole != null && !requestedRole.isBlank()) {
+                roleEntity = vaiTroRepository.findByTenVaiTro(requestedRole.toUpperCase()).orElse(null);
+            }
+            if (roleEntity == null) {
+                roleEntity = vaiTroRepository.findByTenVaiTro("USER")
+                        .orElseThrow(() -> new IllegalStateException("Vai trò USER không tồn tại."));
+            }
 
             TaiKhoan taiKhoan = new TaiKhoan();
             taiKhoan.setTenDangNhap(request.getTenDangNhap());
             taiKhoan.setEmail(request.getEmail());
             taiKhoan.setMatKhauHash(passwordEncoder.encode(request.getPassword()));
-            taiKhoan.setVaiTro(userRole);
-            taiKhoan.setEnabled(false); // Chưa kích hoạt
+            taiKhoan.setVaiTro(roleEntity);
 
-            String otp = generateOtp();
-            taiKhoan.setOtp(otp);
-            taiKhoan.setOtpGeneratedTime(LocalDateTime.now());
+            boolean isUserRole = "USER".equalsIgnoreCase(roleEntity.getTenVaiTro());
+            if (isUserRole) {
+                taiKhoan.setEnabled(false); // Chưa kích hoạt - requires OTP
+                String otp = generateOtp();
+                taiKhoan.setOtp(otp);
+                taiKhoan.setOtpGeneratedTime(LocalDateTime.now());
+                taiKhoanRepository.save(taiKhoan);
 
-            taiKhoanRepository.save(taiKhoan);
+                // Create KhachHang for USER role
+                KhachHang khachHang = new KhachHang();
+                khachHang.setTaiKhoan(taiKhoan);
+                khachHang.setHoTen(request.getHoTen());
+                khachHang.setEmail(request.getEmail());
+                khachHang.setSoDienThoai(request.getSoDienThoai());
 
-        // Nếu vai trò là USER thì tạo bản ghi KhachHang tương ứng (tự động)
-        if (userRole != null && "USER".equalsIgnoreCase(userRole.getTenVaiTro())) {
-        KhachHang khachHang = new KhachHang();
-        khachHang.setTaiKhoan(taiKhoan);
-        khachHang.setHoTen(request.getHoTen());
-        khachHang.setEmail(request.getEmail());
-        khachHang.setSoDienThoai(request.getSoDienThoai());
+                // Set default membership tier
+                HangThanhVien defaultTier = hangThanhVienRepository.findByTenHang("Ð?ng")
+                        .orElseThrow(() -> new IllegalStateException("Hạng thành viên mặc định không tồn tại."));
+                khachHang.setHangThanhVien(defaultTier);
 
-        // Set default membership tier
-        HangThanhVien defaultTier = hangThanhVienRepository.findByTenHang("Ð?ng")
-            .orElseThrow(() -> new IllegalStateException("Hạng thành viên mặc định không tồn tại."));
-        khachHang.setHangThanhVien(defaultTier);
+                // Set default values
+                khachHang.setDiemThuong(0);
+                khachHang.setTongChiTieu(java.math.BigDecimal.ZERO);
+                khachHang.setTongDonHang(0);
+                khachHang.setNgayThamGia(java.time.LocalDate.now());
 
-        // Set default values
-        khachHang.setDiemThuong(0);
-        khachHang.setTongChiTieu(java.math.BigDecimal.ZERO);
-        khachHang.setTongDonHang(0);
-        khachHang.setNgayThamGia(java.time.LocalDate.now());
+                khachHangRepository.save(khachHang);
 
-        khachHangRepository.save(khachHang);
-        }
-
-            try {
-                emailService.sendOtpEmail(request.getEmail(), otp);
-            } catch (org.springframework.mail.MailException | MessagingException e) {
-                logger.warn("Failed to send OTP email to {}: {}", request.getEmail(), e.getMessage());
-                // Do not expose internal mail errors to client; return a controlled error
-                throw new IllegalStateException("Không thể gửi email xác thực. Vui lòng thử lại sau.");
+                try {
+                    emailService.sendOtpEmail(request.getEmail(), taiKhoan.getOtp());
+                } catch (org.springframework.mail.MailException | MessagingException e) {
+                    logger.warn("Failed to send OTP email to {}: {}", request.getEmail(), e.getMessage());
+                    // Do not expose internal mail errors to client; return a controlled error
+                    throw new IllegalStateException("Không thể gửi email xác thực. Vui lòng thử lại sau.");
+                }
+            } else {
+                // For staff/employee or other roles, enable account immediately and do not send
+                // OTP
+                taiKhoan.setEnabled(true);
+                taiKhoanRepository.save(taiKhoan);
+                // If admin/staff created via register request provided hoTen, create NhanVien
+                try {
+                    if (request.getHoTen() != null && !request.getHoTen().isBlank()) {
+                        com.noithat.qlnt.backend.entity.NhanVien nv = new com.noithat.qlnt.backend.entity.NhanVien();
+                        nv.setTaiKhoan(taiKhoan);
+                        nv.setHoTen(request.getHoTen());
+                        nv.setChucVu(null);
+                        // Persist NhanVien using repository
+                        // Acquire bean via repository field (add import if necessary)
+                        // We don't have NhanVienRepository as a field here, so use a quick save via EntityManager alternative
+                        // To avoid adding new dependencies, attempt to resolve repository from Spring context
+                        try {
+                            var repo = org.springframework.web.context.ContextLoader.getCurrentWebApplicationContext()
+                                    .getBean(com.noithat.qlnt.backend.repository.NhanVienRepository.class);
+                            repo.save(nv);
+                        } catch (Exception ex) {
+                            // Fallback: ignore if saving NhanVien fails here; admin account creation shouldn't fail because of this
+                            logger.warn("Failed to persist NhanVien for account {}: {}", taiKhoan.getTenDangNhap(), ex.getMessage());
+                        }
+                    }
+                } catch (Exception ignored) {}
             }
         } catch (IllegalStateException e) {
             // rethrow known bad-request exceptions
             throw e;
         } catch (Exception e) {
-            logger.error("Unexpected error during registration for {}: {}", request.getTenDangNhap(), e.getMessage(), e);
+            logger.error("Unexpected error during registration for {}: {}", request.getTenDangNhap(), e.getMessage(),
+                    e);
             throw new IllegalStateException("Đăng ký thất bại do lỗi hệ thống. Vui lòng thử lại sau.");
         }
     }

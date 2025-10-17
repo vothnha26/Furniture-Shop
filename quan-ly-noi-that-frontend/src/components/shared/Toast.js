@@ -154,21 +154,19 @@ const ToastInternal = (function () {
   return { getToasts, addToast, removeToast, show, subscribe, unsubscribe };
 })();
 
-// Default export: object with show convenience method for legacy uses (Toast.show(...))
-const ToastAPI = {
-  show: ToastInternal.show,
-  showSuccess: (message, title = 'Thành công') => ToastInternal.show(message, 'success', title),
-  showError: (message, title = 'Lỗi') => ToastInternal.show(message, 'error', title),
-  showWarning: (message, title = 'Cảnh báo') => ToastInternal.show(message, 'warning', title),
-  showInfo: (message, title = 'Thông tin') => ToastInternal.show(message, 'info', title),
-  // allow programmatic control if needed
-  addToast: ToastInternal.addToast,
-  removeToast: ToastInternal.removeToast,
-  useToast: useToast
-};
+// Attach API methods to the Toast component so it can be used both as a
+// rendered component (<Toast ... />) and as a legacy API (Toast.show(...)).
+Toast.show = ToastInternal.show;
+Toast.showSuccess = (message, title = 'Thành công') => ToastInternal.show(message, 'success', title);
+Toast.showError = (message, title = 'Lỗi') => ToastInternal.show(message, 'error', title);
+Toast.showWarning = (message, title = 'Cảnh báo') => ToastInternal.show(message, 'warning', title);
+Toast.showInfo = (message, title = 'Thông tin') => ToastInternal.show(message, 'info', title);
+Toast.addToast = ToastInternal.addToast;
+Toast.removeToast = ToastInternal.removeToast;
+Toast.useToast = useToast;
 
 export { ToastInternal };
-export default ToastAPI;
+export default Toast;
 
 
 

@@ -1,23 +1,76 @@
-import React, { useState } from 'react';
-import { IoPerson, IoMail, IoCall, IoLocation, IoCreate, IoSave, IoClose, IoCheckmarkCircle, IoStar } from 'react-icons/io5';
+import React, { useState, useEffect } from 'react';
+import { IoCreate, IoSave, IoClose, IoCheckmarkCircle, IoStar, IoWarning } from 'react-icons/io5';
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../api';
 
 const CustomerProfile = () => {
+  const { user, updateProfile, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
   const [profile, setProfile] = useState({
-    name: 'Nguyễn Văn A',
-    email: 'nguyenvana@email.com',
-    phone: '0901234567',
-    address: '123 Đường ABC, Quận 1, TP.HCM',
-    dateOfBirth: '1990-01-01',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    dateOfBirth: '',
     gender: 'male',
-    vipLevel: 'gold',
-    joinDate: '2023-01-15',
-    totalOrders: 12,
-    totalSpent: 25000000,
+    vipLevel: 'bronze',
+    joinDate: '',
+    totalOrders: 0,
+    totalSpent: 0,
     avatar: 'https://via.placeholder.com/150'
   });
 
   const [editProfile, setEditProfile] = useState(profile);
+  const [recentOrders, setRecentOrders] = useState([]);
+
+  // Load user data from AuthContext and fetch additional details
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (user) {
+        setLoading(true);
+        try {
+          // Map user data from backend to profile state
+          const userProfile = {
+            name: user.hoTen || user.tenKhachHang || user.name || '',
+            email: user.email || '',
+            phone: user.soDienThoai || user.phone || '',
+            address: user.diaChi || user.address || '',
+            dateOfBirth: user.ngaySinh || user.dateOfBirth || '',
+            gender: user.gioiTinh || user.gender || 'male',
+            vipLevel: user.capDoThanhVien || user.vipLevel || 'bronze',
+            joinDate: user.ngayTaoTaiKhoan || user.createdAt || new Date().toISOString().split('T')[0],
+            totalOrders: user.tongDonHang || user.totalOrders || 0,
+            totalSpent: user.tongChiTieu || user.totalSpent || 0,
+            avatar: user.avatar || user.hinhAnh || 'https://via.placeholder.com/150'
+          };
+          
+          setProfile(userProfile);
+          setEditProfile(userProfile);
+
+          // Fetch recent orders
+          try {
+            const ordersResponse = await api.get('/api/customers/orders?limit=3&sort=desc');
+            const orders = ordersResponse.data?.orders || ordersResponse.data || ordersResponse || [];
+            setRecentOrders(orders.slice(0, 3));
+          } catch (err) {
+            console.error('Failed to fetch recent orders:', err);
+          }
+        } catch (err) {
+          console.error('Failed to load user data:', err);
+          setError('Không thể tải thông tin người dùng');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadUserData();
+  }, [user]);
 
   const vipLevels = [
     { value: 'bronze', label: 'Đồng', color: 'text-orange-600', bg: 'bg-orange-100' },
@@ -40,27 +93,59 @@ const CustomerProfile = () => {
   const handleEdit = () => {
     setEditProfile(profile);
     setIsEditing(true);
+    setError('');
+    setSuccess('');
   };
 
-  const handleSave = () => {
-    setProfile(editProfile);
-    setIsEditing(false);
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Prepare data for backend (map to backend field names)
+      const updateData = {
+        hoTen: editProfile.name,
+        email: editProfile.email,
+        soDienThoai: editProfile.phone,
+        diaChi: editProfile.address,
+        ngaySinh: editProfile.dateOfBirth,
+        gioiTinh: editProfile.gender
+      };
+
+      const result = await updateProfile(updateData);
+      
+      if (result.success) {
+        setProfile(editProfile);
+        setIsEditing(false);
+        setSuccess('Cập nhật thông tin thành công!');
+        
+        // Refresh user data
+        await refreshUser();
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(result.error || 'Cập nhật thất bại');
+      }
+    } catch (err) {
+      console.error('Update error:', err);
+      setError('Có lỗi xảy ra khi cập nhật thông tin');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
     setEditProfile(profile);
     setIsEditing(false);
+    setError('');
+    setSuccess('');
   };
 
   const handleInputChange = (field, value) => {
     setEditProfile(prev => ({ ...prev, [field]: value }));
   };
-
-  const recentOrders = [
-    { id: 'ORD001', date: '2024-01-15', total: 2500000, status: 'delivered' },
-    { id: 'ORD002', date: '2024-01-10', total: 4500000, status: 'shipping' },
-    { id: 'ORD003', date: '2024-01-05', total: 6500000, status: 'processing' }
-  ];
 
   const getStatusColor = (status) => {
     const colors = {
@@ -89,7 +174,29 @@ const CustomerProfile = () => {
           <p className="text-gray-600">Quản lý thông tin tài khoản của bạn</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Success Message */}
+        {success && (
+          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+            <IoCheckmarkCircle className="w-5 h-5" />
+            {success}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+            <IoWarning className="w-5 h-5" />
+            {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Profile Card */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm">
@@ -187,14 +294,25 @@ const CustomerProfile = () => {
                     <div className="flex gap-3">
                       <button
                         onClick={handleSave}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <IoSave className="w-4 h-4" />
-                        Lưu thay đổi
+                        {saving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Đang lưu...
+                          </>
+                        ) : (
+                          <>
+                            <IoSave className="w-4 h-4" />
+                            Lưu thay đổi
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={handleCancel}
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                        disabled={saving}
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <IoClose className="w-4 h-4" />
                         Hủy
@@ -293,24 +411,29 @@ const CustomerProfile = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Đơn hàng gần đây</h3>
               <div className="space-y-3">
-                {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">#{order.id}</p>
-                      <p className="text-sm text-gray-500">{order.date}</p>
+                {recentOrders.length > 0 ? (
+                  recentOrders.map((order) => (
+                    <div key={order.id || order.maDonHang} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-gray-900">#{order.id || order.maDonHang}</p>
+                        <p className="text-sm text-gray-500">{order.date || order.ngayDatHang}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-gray-900">{formatPrice(order.total || order.tongTien)}</p>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status || order.trangThai)}`}>
+                          {getStatusLabel(order.status || order.trangThai)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900">{formatPrice(order.total)}</p>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                        {getStatusLabel(order.status)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 py-4">Chưa có đơn hàng nào</p>
+                )}
               </div>
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

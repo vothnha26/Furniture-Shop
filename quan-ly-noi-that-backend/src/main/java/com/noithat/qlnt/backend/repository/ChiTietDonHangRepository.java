@@ -45,7 +45,7 @@ public interface ChiTietDonHangRepository extends JpaRepository<ChiTietDonHang, 
            "SUM(c.soLuong) as tongSoLuong, " +
            "SUM(c.donGiaThucTe * c.soLuong) as tongDoanhThu " +
            "FROM ChiTietDonHang c " +
-           "WHERE c.donHang.trangThai = 'Hoàn thành' " +
+           "WHERE c.donHang.trangThaiDonHang = 'Hoàn thành' " +
            "GROUP BY c.bienThe.maBienThe, c.bienThe.sanPham.tenSanPham, c.bienThe.sku " +
            "ORDER BY tongSoLuong DESC")
     List<Object[]> findTopSellingProducts();

@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { IoEye, IoEyeOff, IoLockClosed, IoPerson } from 'react-icons/io5';
+import { api } from '../../api';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    username: '',
+    tenDangNhap: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({
@@ -16,14 +20,48 @@ const Login = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate login process
-    setTimeout(() => {
+    setError('');
+
+    console.log('🔐 [Login] Submitting login form...');
+
+    try {
+      const response = await api.post('/api/v1/auth/authenticate', {
+        tenDangNhap: formData.tenDangNhap,
+        password: formData.password
+      });
+
+      console.log('✅ [Login] Authentication successful');
+      console.log('Token received:', response.token ? 'Yes' : 'No');
+
+      // Store token in localStorage
+      localStorage.setItem('authToken', response.token);
+      console.log('💾 [Login] Token saved to localStorage');
+
+      // Fetch and store user info
+      try {
+        console.log('👤 [Login] Fetching user info...');
+        const userResponse = await api.get('/api/customers/me');
+        const userData = userResponse.data || userResponse;
+        
+        console.log('✅ [Login] User info received:', userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        console.log('💾 [Login] User info saved to localStorage');
+      } catch (err) {
+        console.error('❌ [Login] Failed to fetch user info:', err);
+      }
+
+      console.log('🚀 [Login] Redirecting to dashboard...');
+      // Navigate to dashboard or home
+      navigate('/admin/dashboard'); // or wherever you want to redirect after login
+    } catch (err) {
+      console.error('❌ [Login] Authentication failed:', err);
+      setError(err.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+    } finally {
       setIsLoading(false);
-      console.log('Login attempt:', formData);
-    }, 1000);
+    }
   };
 
   return (
@@ -38,16 +76,24 @@ const Login = () => {
             Đăng nhập hệ thống
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            FurniShop Management System
+            Chưa có tài khoản?{' '}
+            <Link to="/register" className="font-medium text-primary hover:text-primary/80">
+              Đăng ký ngay
+            </Link>
           </p>
         </div>
 
         {/* Login Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
           <div className="space-y-4">
             {/* Username Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="tenDangNhap" className="block text-sm font-medium text-gray-700 mb-2">
                 Tên đăng nhập
               </label>
               <div className="relative">
@@ -55,11 +101,11 @@ const Login = () => {
                   <IoPerson className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="username"
-                  name="username"
+                  id="tenDangNhap"
+                  name="tenDangNhap"
                   type="text"
                   required
-                  value={formData.username}
+                  value={formData.tenDangNhap}
                   onChange={handleChange}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Nhập tên đăng nhập"
@@ -115,9 +161,9 @@ const Login = () => {
               </label>
             </div>
             <div className="text-sm">
-              <a href="#" className="font-medium text-primary hover:text-primary/80">
+              <Link to="/forgot-password" className="font-medium text-primary hover:text-primary/80">
                 Quên mật khẩu?
-              </a>
+              </Link>
             </div>
           </div>
 

@@ -26,6 +26,7 @@ public class ThanhToanResponse {
     private Integer diemSuDung;           // Điểm khách hàng dùng
     private String diaChiGiaoHang;        // Địa chỉ nhận hàng
     private String phuongThucGiaoHang;    // Nhanh / Tiết kiệm / Nhận tại cửa hàng
+    private Boolean mienPhiVanChuyen;     // Có được miễn phí vận chuyển (ưu đãi VIP)
 
     // Constructor phụ (cho việc tạo phản hồi đơn giản)
     public ThanhToanResponse(Integer maDonHang, BigDecimal thanhTien, String trangThai, String phuongThucThanhToan) {

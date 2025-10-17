@@ -2,42 +2,69 @@ import React, { useState, useEffect } from 'react';
 import { IoSearch, IoEye, IoRefresh, IoLocation, IoTime, IoCheckmarkCircle, IoClose } from 'react-icons/io5';
 import api from '../../api';
 
-// Mapping functions for Vietnamese API field names
-const mapOrderFromApi = (order) => ({
-  id: order.ma_don_hang,
-  orderDate: order.ngay_dat,
-  status: order.trang_thai,
-  total: order.tong_tien,
-  shippingFee: order.phi_giao_hang,
-  discount: order.giam_gia,
-  finalTotal: order.thanh_tien,
-  customerId: order.khach_hang_id,
-  customerName: order.ten_khach_hang,
-  customerPhone: order.sdt_khach_hang,
-  shippingAddress: order.dia_chi_giao_hang,
-  paymentMethod: order.phuong_thuc_thanh_toan,
-  paymentStatus: order.trang_thai_thanh_toan,
-  trackingNumber: order.ma_van_don,
-  carrier: order.don_vi_van_chuyen,
-  items: (order.chi_tiet_don_hang || []).map(item => ({
-    id: item.san_pham_id,
-    name: item.ten_san_pham,
-    price: item.don_gia,
-    quantity: item.so_luong,
-    total: item.thanh_tien,
-    image: item.hinh_anh,
-    variant: item.bien_the
-  })),
-  notes: order.ghi_chu,
-  estimatedDelivery: order.ngay_giao_hang_du_kien,
-  actualDelivery: order.ngay_giao_hang_thuc_te
-});
+// Mapping functions for API field names (supports camelCase and snake_case)
+const mapOrderFromApi = (order) => {
+  if (!order || typeof order !== 'object') return null;
+
+  const id = order.maDonHang ?? order.ma_don_hang ?? order.id ?? order.maDonHang;
+  const orderDate = order.ngayDatHang ?? order.ngay_dat ?? order.orderDate ?? order.ngayDatHang;
+  const status = order.trangThai ?? order.trang_thai ?? order.status;
+  const total = order.tongTienGoc ?? order.tong_tien ?? order.total ?? order.thanhTien ?? order.thanh_tien;
+  const shippingFee = order.chiPhiDichVu ?? order.chi_phi_dich_vu ?? order.phi_giao_hang ?? order.phiGiaoHang;
+  const discount = order.giamGiaVoucher ?? order.giam_gia ?? order.discount;
+  const finalTotal = order.thanhTien ?? order.thanh_tien ?? order.finalTotal ?? total;
+  const customerId = order.khachHang?.maKhachHang ?? order.khach_hang_id ?? order.customerId ?? null;
+  const customerName = order.tenKhachHang ?? order.ten_khach_hang ?? order.customerName ?? null;
+  const customerPhone = order.sdtKhachHang ?? order.sdt_khach_hang ?? order.customerPhone ?? null;
+  const shippingAddress = order.diaChiGiaoHang ?? order.dia_chi_giao_hang ?? order.shippingAddress ?? null;
+  const paymentMethod = order.phuongThucThanhToan ?? order.phuong_thuc_thanh_toan ?? order.paymentMethod ?? null;
+  const paymentStatus = order.trangThaiThanhToan ?? order.trang_thai_thanh_toan ?? order.paymentStatus ?? null;
+  const trackingNumber = order.maVanDon ?? order.ma_van_don ?? order.trackingNumber ?? null;
+  const carrier = order.donViVanChuyen ?? order.don_vi_van_chuyen ?? order.carrier ?? null;
+
+  const rawItems = order.chiTietDonHangList ?? order.chi_tiet_don_hang ?? order.items ?? [];
+  const items = Array.isArray(rawItems) ? rawItems.map((item) => ({
+    id: item.maBienThe ?? item.san_pham_id ?? item.id ?? item.maBienThe ?? item.bienTheId,
+    name: item.tenSanPham ?? item.ten_san_pham ?? item.name ?? item.tenSanPham ?? 'N/A',
+    price: item.donGia ?? item.don_gia ?? item.price ?? item.donGia ?? 0,
+    quantity: item.soLuong ?? item.so_luong ?? item.quantity ?? item.soLuong ?? 0,
+    total: item.thanhTien ?? item.thanh_tien ?? item.total ?? 0,
+    image: item.hinhAnh ?? item.hinh_anh ?? item.image ?? null,
+    variant: item.bienThe ?? item.bien_the ?? item.variant ?? null
+  })) : [];
+
+  const notes = order.ghiChu ?? order.ghi_chu ?? order.notes ?? null;
+  const estimatedDelivery = order.ngayGiaoHangDuKien ?? order.ngay_giao_hang_du_kien ?? order.estimatedDelivery ?? null;
+  const actualDelivery = order.ngayGiaoHangThucTe ?? order.ngay_giao_hang_thuc_te ?? order.actualDelivery ?? null;
+
+  return {
+    id,
+    orderDate,
+    status,
+    total,
+    shippingFee,
+    discount,
+    finalTotal,
+    customerId,
+    customerName,
+    customerPhone,
+    shippingAddress,
+    paymentMethod,
+    paymentStatus,
+    trackingNumber,
+    carrier,
+    items,
+    notes,
+    estimatedDelivery,
+    actualDelivery
+  };
+};
 
 const CustomerOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [showOrderDetail, setShowOrderDetail] = useState(false);
@@ -49,9 +76,12 @@ const CustomerOrders = () => {
   const fetchCustomerOrders = async () => {
     setLoading(true);
     try {
-      const customerId = localStorage.getItem('customerId'); // Assuming customer ID is stored
+      const customerId = 1; // Assuming customer ID is stored
       const response = await api.get(`/api/v1/khach-hang/${customerId}/don-hang`);
-      setOrders(response.data.map(mapOrderFromApi));
+      // api.get returns parsed body directly. But some endpoints may wrap in { data: ... }
+      const raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
+      const list = Array.isArray(raw) ? raw : (raw?.data ?? raw?.orders ?? []);
+      setOrders((Array.isArray(list) ? list : []).map(mapOrderFromApi));
     } catch (error) {
       setError('Không thể tải đơn hàng');
       console.error('Error fetching customer orders:', error);
@@ -61,10 +91,16 @@ const CustomerOrders = () => {
   };
 
   const getOrderDetail = async (orderId) => {
+    // Try to find in cached orders first
+    const cached = orders.find(o => String(o.id) === String(orderId));
+    if (cached) return cached;
+
     try {
       const response = await api.get(`/api/banhang/donhang/${orderId}`);
-      return mapOrderFromApi(response.data);
+      const raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
+      return mapOrderFromApi(raw);
     } catch (error) {
+      console.error('Error fetching order detail', error);
       throw new Error('Không thể tải chi tiết đơn hàng');
     }
   };
@@ -92,29 +128,29 @@ const CustomerOrders = () => {
   }, []);
 
   const statusConfig = {
-    processing: { 
-      color: 'text-blue-600', 
-      bg: 'bg-blue-100', 
-      icon: IoTime, 
-      label: 'Đang xử lý' 
+    processing: {
+      color: 'text-blue-600',
+      bg: 'bg-blue-100',
+      icon: IoTime,
+      label: 'Đang xử lý'
     },
-    shipping: { 
-      color: 'text-yellow-600', 
-      bg: 'bg-yellow-100', 
-      icon: IoLocation, 
-      label: 'Đang giao hàng' 
+    shipping: {
+      color: 'text-yellow-600',
+      bg: 'bg-yellow-100',
+      icon: IoLocation,
+      label: 'Đang giao hàng'
     },
-    delivered: { 
-      color: 'text-green-600', 
-      bg: 'bg-green-100', 
-      icon: IoCheckmarkCircle, 
-      label: 'Đã giao hàng' 
+    delivered: {
+      color: 'text-green-600',
+      bg: 'bg-green-100',
+      icon: IoCheckmarkCircle,
+      label: 'Đã giao hàng'
     },
-    cancelled: { 
-      color: 'text-red-600', 
-      bg: 'bg-red-100', 
-      icon: IoClose, 
-      label: 'Đã hủy' 
+    cancelled: {
+      color: 'text-red-600',
+      bg: 'bg-red-100',
+      icon: IoClose,
+      label: 'Đã hủy'
     }
   };
 
@@ -157,8 +193,10 @@ const CustomerOrders = () => {
   };
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const idStr = order.id !== undefined && order.id !== null ? String(order.id) : '';
+    const lowerSearch = searchTerm.toLowerCase();
+    const matchesSearch = idStr.toLowerCase().includes(lowerSearch) ||
+      (Array.isArray(order.items) && order.items.some(item => (item.name || '').toLowerCase().includes(lowerSearch)));
     const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
@@ -222,6 +260,16 @@ const CustomerOrders = () => {
           </div>
         </div>
 
+        {/* Loading / Error */}
+        {loading && (
+          <div className="mb-4 text-center text-gray-600">Đang tải đơn hàng...</div>
+        )}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+
         {/* Orders List */}
         <div className="space-y-6">
           {filteredOrders.map((order) => {
@@ -230,7 +278,7 @@ const CustomerOrders = () => {
             const steps = getStatusSteps(order.status);
 
             return (
-              <div key={order.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div key={order.id ?? JSON.stringify(order)} className="bg-white rounded-lg shadow-sm overflow-hidden">
                 {/* Order Header */}
                 <div className="p-6 border-b border-gray-200">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -257,7 +305,7 @@ const CustomerOrders = () => {
                 <div className="p-6">
                   <div className="space-y-4">
                     {order.items.map((item, index) => (
-                      <div key={index} className="flex items-center gap-4">
+                      <div key={item.id ?? index} className="flex items-center gap-4">
                         <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
                           <span className="text-gray-400">📦</span>
                         </div>
@@ -278,24 +326,21 @@ const CustomerOrders = () => {
                   <div className="flex items-center justify-between">
                     {steps.map((step, index) => (
                       <div key={step.id} className="flex items-center">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                          step.completed ? 'bg-primary text-white' : 'bg-gray-300 text-gray-600'
-                        }`}>
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step.completed ? 'bg-primary text-white' : 'bg-gray-300 text-gray-600'
+                          }`}>
                           {step.completed ? (
                             <IoCheckmarkCircle className="w-4 h-4" />
                           ) : (
                             <span className="text-sm font-medium">{index + 1}</span>
                           )}
                         </div>
-                        <span className={`ml-2 text-sm ${
-                          step.completed ? 'text-gray-900' : 'text-gray-500'
-                        }`}>
+                        <span className={`ml-2 text-sm ${step.completed ? 'text-gray-900' : 'text-gray-500'
+                          }`}>
                           {step.label}
                         </span>
                         {index < steps.length - 1 && (
-                          <div className={`w-16 h-0.5 mx-4 ${
-                            step.completed ? 'bg-primary' : 'bg-gray-300'
-                          }`} />
+                          <div className={`w-16 h-0.5 mx-4 ${step.completed ? 'bg-primary' : 'bg-gray-300'
+                            }`} />
                         )}
                       </div>
                     ))}
@@ -338,7 +383,7 @@ const CustomerOrders = () => {
                 {/* Actions */}
                 <div className="p-6 border-t border-gray-200 bg-gray-50">
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <button 
+                    <button
                       onClick={() => handleViewDetail(order)}
                       className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                     >
@@ -346,7 +391,7 @@ const CustomerOrders = () => {
                       Xem chi tiết
                     </button>
                     {order.trackingNumber && (
-                      <button 
+                      <button
                         onClick={() => handleTrackOrder(order)}
                         className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                       >

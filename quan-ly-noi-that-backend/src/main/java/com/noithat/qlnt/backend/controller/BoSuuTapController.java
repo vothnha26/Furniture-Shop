@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.noithat.qlnt.backend.dto.common.BoSuuTapDto;
+import com.noithat.qlnt.backend.dto.response.BoSuuTapResponse;
+import com.noithat.qlnt.backend.dto.response.CollectionsSummary;
 import com.noithat.qlnt.backend.entity.BoSuuTap;
 import com.noithat.qlnt.backend.entity.SanPham;
 import com.noithat.qlnt.backend.service.IBoSuuTapService;
@@ -26,14 +28,38 @@ public class BoSuuTapController {
     @Autowired
     private IBoSuuTapService boSuuTapService;
 
+    @Autowired
+    private com.noithat.qlnt.backend.repository.BoSuuTapRepository boSuuTapRepository;
+
+    @Autowired
+    private com.noithat.qlnt.backend.repository.SanPhamRepository sanPhamRepository;
+
     @GetMapping
-    public ResponseEntity<List<BoSuuTap>> getAll() {
-        return ResponseEntity.ok(boSuuTapService.getAll());
+    public ResponseEntity<List<BoSuuTapResponse>> getAll() {
+        var list = boSuuTapService.getAll();
+        var resp = list.stream().map(bst -> {
+            long count = sanPhamRepository.countByBoSuuTap_MaBoSuuTap(bst.getMaBoSuuTap());
+            return BoSuuTapResponse.builder()
+                    .maBoSuuTap(bst.getMaBoSuuTap())
+                    .tenBoSuuTap(bst.getTenBoSuuTap())
+                    .moTa(bst.getMoTa())
+                    .soLuongSanPham(count)
+                    .build();
+        }).toList();
+        return ResponseEntity.ok(resp);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BoSuuTap> getById(@PathVariable Integer id) {
-        return ResponseEntity.ok(boSuuTapService.getById(id));
+    public ResponseEntity<BoSuuTapResponse> getById(@PathVariable Integer id) {
+        var bst = boSuuTapService.getById(id);
+        long count = sanPhamRepository.countByBoSuuTap_MaBoSuuTap(bst.getMaBoSuuTap());
+        var resp = BoSuuTapResponse.builder()
+                .maBoSuuTap(bst.getMaBoSuuTap())
+                .tenBoSuuTap(bst.getTenBoSuuTap())
+                .moTa(bst.getMoTa())
+                .soLuongSanPham(count)
+                .build();
+        return ResponseEntity.ok(resp);
     }
 
     @PostMapping
@@ -50,6 +76,31 @@ public class BoSuuTapController {
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         boSuuTapService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<CollectionsSummary> getSummary() {
+        long totalCollections = boSuuTapRepository.count();
+        long totalProducts = sanPhamRepository.count();
+
+        // Count empty collections
+        long empty = boSuuTapRepository.findAll().stream()
+                .filter(bst -> sanPhamRepository.countByBoSuuTap_MaBoSuuTap(bst.getMaBoSuuTap()) == 0)
+                .count();
+
+        long avg = 0;
+        if (totalCollections > 0) {
+            avg = Math.round((double) totalProducts / (double) totalCollections);
+        }
+
+        var summary = CollectionsSummary.builder()
+                .totalCollections(totalCollections)
+                .totalProducts(totalProducts)
+                .averagePerCollection(avg)
+                .emptyCollections(empty)
+                .build();
+
+        return ResponseEntity.ok(summary);
     }
 
     @GetMapping("/{collectionId}/products")

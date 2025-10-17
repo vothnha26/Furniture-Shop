@@ -6,19 +6,31 @@ import lombok.Getter;
 import lombok.Setter;
 import java.util.List;
 
-@Getter @Setter
+@Getter
+@Setter
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ThongTinGiaoHangRequest {
+
+    // ----- THÔNG TIN ĐƠN HÀNG CỐT LÕI -----
     private Integer maKhachHang;
-    private Integer maPhuongThucGiaoHang;
-    private String diaChiGiaoHang;
     private String phuongThucThanhToan;
-    private String ghiChu;
-    private Integer maVoucher;
-    private Integer diemThuongSuDung;
-    private String phuongThucGiaoHang;
-    // Người nhận (client sometimes sends tenNguoiNhan)
-    @JsonAlias({"tenNguoiNhan", "ten_nguoi_nhan"})
-    private String tenNguoiNhan;
     private List<ThanhToanRequest> chiTietDonHangList;
+
+    // ----- THÔNG TIN NGƯỜI NHẬN -----
+    @JsonAlias({ "tenNguoiNhan", "ten_nguoi_nhan" })
+    private String tenNguoiNhan;
+    private String soDienThoaiNhan; // << THÊM MỚI
+    private String diaChiGiaoHang;
+    private String ghiChu;
+
+    // ----- THÔNG TIN VẬN CHUYỂN & KHUYẾN MÃI -----
+
+    // >> BỎ: private Integer maPhuongThucGiaoHang;
+    private String phuongThucGiaoHang; // Giữ lại trường String để nhận "Giao hàng nhanh", "Tiêu chuẩn"...
+
+    // >> BỎ: private Integer maVoucherCode;
+    // >> SỬA TÊN VÀ KIỂU DỮ LIỆU: thành String cho đúng
+    private String maVoucherCode;
+
+    private Integer diemThuongSuDung;
 }

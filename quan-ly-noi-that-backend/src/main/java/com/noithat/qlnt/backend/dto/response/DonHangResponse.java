@@ -22,6 +22,7 @@ public class DonHangResponse {
     private Boolean mienPhiVanChuyen; // Có miễn phí vận chuyển từ VIP không
     private BigDecimal chiPhiDichVu; // Tổng chi phí dịch vụ (vận chuyển, lắp đặt...)
     private BigDecimal thanhTien;
+    private BigDecimal tongGiamGia; // Tổng giảm giá (VIP + Voucher + Điểm)
     private String trangThai;
     private String voucherCode;
     private List<ChiTietDonHangResponse> chiTietDonHangList;

@@ -3,6 +3,7 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.dto.request.KhachHangCreationRequest;
 import com.noithat.qlnt.backend.entity.KhachHang;
 import com.noithat.qlnt.backend.service.IKhachHangService;
+import com.noithat.qlnt.backend.service.IDonHangService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -15,9 +16,11 @@ import jakarta.validation.Valid;
 public class KhachHangController {
 
     private final IKhachHangService khachHangService;
+    private final IDonHangService donHangService;
 
-    public KhachHangController(IKhachHangService khachHangService) {
+    public KhachHangController(IKhachHangService khachHangService, IDonHangService donHangService) {
         this.khachHangService = khachHangService;
+        this.donHangService = donHangService;
     }
 
     // [Quyền: Admin/Nhân viên] - Danh sách khách hàng
@@ -50,6 +53,15 @@ public class KhachHangController {
     public ResponseEntity<KhachHang> getKhachHangProfile(@PathVariable Integer maKhachHang) {
         KhachHang khachHang = khachHangService.getKhachHangProfile(maKhachHang);
         return ResponseEntity.ok(khachHang);
+    }
+
+    // [Quyền: Khách hàng (Auth), Nhân viên/Admin] - Lấy danh sách đơn hàng của khách hàng
+    @GetMapping("/{maKhachHang}/don-hang")
+    public ResponseEntity<java.util.List<com.noithat.qlnt.backend.dto.response.DonHangResponse>> getDonHangByKhachHang(
+            @PathVariable Integer maKhachHang) {
+    java.util.List<com.noithat.qlnt.backend.dto.response.DonHangResponse> ds =
+        donHangService.getDonHangByKhachHang(maKhachHang);
+        return ResponseEntity.ok(ds);
     }
 
     // [Quyền: Admin/Nhân viên] - Dùng để tích điểm sau khi đơn hàng hoàn tất

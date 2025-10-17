@@ -47,6 +47,10 @@ public interface IDanhMucService {
     List<DanhMuc> getAll();
     
     /**
+     * Lấy một danh mục theo id
+     */
+    DanhMuc getById(Integer id);
+    /**
      * Xóa danh mục
      */
     void deleteDanhMuc(Integer id);

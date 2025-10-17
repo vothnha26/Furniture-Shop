@@ -102,115 +102,35 @@ const InventoryManagement = () => {
     };
   };
 
-  // Fetch inventory data
+  // Fetch inventory data on mount (use refresh helper)
   useEffect(() => {
-    const fetchInventory = async () => {
+    (async () => {
       setIsLoading(true);
       try {
-        const data = await api.get('/api/v1/quan-ly-ton-kho/tong-quan');
-        if (Array.isArray(data)) {
-          setInventory(data.map(mapInventoryFromApi));
-        } else if (data && data.variants) {
-          // Handle if API returns variants list
-          setInventory(data.variants.map(mapInventoryFromApi));
-        }
+        await refreshInventoryFromServer();
+        setError(null);
       } catch (err) {
         console.error('Fetch inventory error', err);
-        setError(err);
+        setError('Không thể tải dữ liệu tồn kho');
       } finally {
         setIsLoading(false);
       }
-    };
-    fetchInventory();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [inventory, setInventory] = useState([
-    {
-      maBienThe: 1,
-      sanPham: {
-        maSanPham: 'SP001',
-        tenSanPham: 'Ghế gỗ cao cấp',
-        danhMuc: 'Ghế'
-      },
-      sku: 'GHE-GO-001-NAU-L',
-      giaBan: 2500000,
-      soLuongTon: 15,
-      tonKhoToiThieu: 5,
-      tonKhoToiDa: 50,
-      giaTriTongKho: 37500000,
-      ngayCapNhat: '2024-01-15',
-      trangThai: 'binh_thuong',
-      thuocTinh: [
-        { tenThuocTinh: 'Màu sắc', giaTri: 'Nâu đậm' },
-        { tenThuocTinh: 'Kích thước', giaTri: 'Large' },
-        { tenThuocTinh: 'Chất liệu', giaTri: 'Gỗ tự nhiên' }
-      ]
-    },
-    {
-      maBienThe: 2,
-      sanPham: {
-        maSanPham: 'SP001',
-        tenSanPham: 'Ghế gỗ cao cấp',
-        danhMuc: 'Ghế'
-      },
-      sku: 'GHE-GO-001-XAM-M',
-      giaBan: 2500000,
-      soLuongTon: 8,
-      tonKhoToiThieu: 5,
-      tonKhoToiDa: 50,
-      giaTriTongKho: 20000000,
-      ngayCapNhat: '2024-01-15',
-      trangThai: 'binh_thuong',
-      thuocTinh: [
-        { tenThuocTinh: 'Màu sắc', giaTri: 'Xám nhạt' },
-        { tenThuocTinh: 'Kích thước', giaTri: 'Medium' },
-        { tenThuocTinh: 'Chất liệu', giaTri: 'Gỗ tự nhiên' }
-      ]
-    },
-    {
-      maBienThe: 3,
-      sanPham: {
-        maSanPham: 'SP002',
-        tenSanPham: 'Bàn ăn 6 người',
-        danhMuc: 'Bàn'
-      },
-      sku: 'BAN-AN-002-GO-XL',
-      giaBan: 4500000,
-      soLuongTon: 3,
-      tonKhoToiThieu: 3,
-      tonKhoToiDa: 20,
-      giaTriTongKho: 13500000,
-      ngayCapNhat: '2024-01-14',
-      trangThai: 'thap',
-      thuocTinh: [
-        { tenThuocTinh: 'Chất liệu', giaTri: 'Gỗ sồi' },
-        { tenThuocTinh: 'Kích thước', giaTri: 'XL - 180x90cm' },
-        { tenThuocTinh: 'Màu sắc', giaTri: 'Nâu tự nhiên' }
-      ]
-    },
-    {
-      maBienThe: 4,
-      sanPham: {
-        maSanPham: 'SP003',
-        tenSanPham: 'Tủ quần áo 3 cánh',
-        danhMuc: 'Tủ'
-      },
-      sku: 'TU-QA-003-TRANG-XL',
-      giaBan: 3200000,
-      soLuongTon: 0,
-      tonKhoToiThieu: 2,
-      tonKhoToiDa: 15,
-      giaTriTongKho: 0,
-      ngayCapNhat: '2024-01-13',
-      trangThai: 'het_hang',
-      thuocTinh: [
-        { tenThuocTinh: 'Màu sắc', giaTri: 'Trắng' },
-        { tenThuocTinh: 'Kích thước', giaTri: 'XL - 200x60x220cm' },
-        { tenThuocTinh: 'Số cánh', giaTri: '3 cánh' }
-      ]
+  const refreshInventoryFromServer = async () => {
+    try {
+      const variantsResp = await api.get('/api/bien-the-san-pham', { params: { size: 1000 } });
+      const variantsList = Array.isArray(variantsResp) ? variantsResp : (variantsResp?.content || variantsResp?.variants || []);
+      setInventory(variantsList.map(mapInventoryFromApi));
+    } catch (err) {
+      console.error('Refresh inventory error', err);
     }
-  ]);
+  };
+
+  // inventory will be populated from backend on mount
+  const [inventory, setInventory] = useState([]);
 
   const [transactions, setTransactions] = useState([
     {
@@ -255,55 +175,128 @@ const InventoryManagement = () => {
   };
 
   const handleImport = () => {
-    const product = inventory.find(p => p.id === parseInt(newTransaction.productId));
-    if (product) {
-      const updatedInventory = inventory.map(item => 
-        item.id === product.id 
-          ? { ...item, currentStock: item.currentStock + parseInt(newTransaction.quantity) }
-          : item
-      );
-      setInventory(updatedInventory);
-      
-      const transaction = {
-        id: transactions.length + 1,
-        productName: product.productName,
-        type: 'import',
-        quantity: parseInt(newTransaction.quantity),
-        unitPrice: parseInt(newTransaction.unitPrice),
-        totalValue: parseInt(newTransaction.quantity) * parseInt(newTransaction.unitPrice),
-        date: new Date().toISOString().split('T')[0],
-        note: newTransaction.note
-      };
-      setTransactions([transaction, ...transactions]);
-    }
-    setNewTransaction({ productId: '', quantity: '', unitPrice: '', note: '' });
-    setShowImportModal(false);
+    // Call backend API to import stock
+    (async () => {
+      const maBienThe = parseInt(newTransaction.productId);
+      const soLuong = parseInt(newTransaction.quantity);
+      const nguoiNhap = importForm.nguoiNhap || localStorage.getItem('username') || 'admin';
+      const lyDo = importForm.lyDo || newTransaction.note || '';
+      if (!maBienThe || !soLuong) {
+        alert('Vui lòng chọn sản phẩm và số lượng');
+        return;
+      }
+      try {
+        setIsLoading(true);
+        const payload = { maBienThe, soLuong, nguoiNhap, lyDo };
+        const resp = await api.post('/api/v1/quan-ly-ton-kho/nhap-kho', { body: payload });
+        if (resp && resp.success) {
+          // Refresh inventory from server
+          const variantsResp = await api.get('/api/bien-the-san-pham', { params: { size: 1000 } });
+          const variantsList = Array.isArray(variantsResp) ? variantsResp : (variantsResp?.content || variantsResp?.variants || []);
+          setInventory(variantsList.map(mapInventoryFromApi));
+          const transaction = {
+            id: transactions.length + 1,
+            productName: inventory.find(i => i.maBienThe === maBienThe)?.sanPham?.tenSanPham || String(maBienThe),
+            type: 'import',
+            quantity: soLuong,
+            unitPrice: parseInt(newTransaction.unitPrice) || 0,
+            totalValue: soLuong * (parseInt(newTransaction.unitPrice) || 0),
+            date: new Date().toISOString().split('T')[0],
+            note: lyDo
+          };
+          setTransactions([transaction, ...transactions]);
+        } else {
+          alert(resp?.message || 'Nhập kho thất bại');
+        }
+      } catch (err) {
+        console.error('Import API error', err);
+        alert('Lỗi khi gọi API nhập kho');
+      } finally {
+        setIsLoading(false);
+        setNewTransaction({ productId: '', quantity: '', unitPrice: '', note: '' });
+        setShowImportModal(false);
+      }
+    })();
   };
 
   const handleExport = () => {
-    const product = inventory.find(p => p.id === parseInt(newTransaction.productId));
-    if (product && product.currentStock >= parseInt(newTransaction.quantity)) {
-      const updatedInventory = inventory.map(item => 
-        item.id === product.id 
-          ? { ...item, currentStock: item.currentStock - parseInt(newTransaction.quantity) }
-          : item
-      );
-      setInventory(updatedInventory);
-      
-      const transaction = {
-        id: transactions.length + 1,
-        productName: product.productName,
-        type: 'export',
-        quantity: parseInt(newTransaction.quantity),
-        unitPrice: parseInt(newTransaction.unitPrice),
-        totalValue: parseInt(newTransaction.quantity) * parseInt(newTransaction.unitPrice),
-        date: new Date().toISOString().split('T')[0],
-        note: newTransaction.note
-      };
-      setTransactions([transaction, ...transactions]);
-    }
-    setNewTransaction({ productId: '', quantity: '', unitPrice: '', note: '' });
-    setShowExportModal(false);
+    // Call backend API to export stock
+    (async () => {
+      const maBienThe = parseInt(newTransaction.productId);
+      const soLuong = parseInt(newTransaction.quantity);
+      const nguoiXuat = exportForm.nguoiXuat || localStorage.getItem('username') || 'admin';
+      const lyDo = exportForm.lyDo || newTransaction.note || '';
+      const maThamChieu = exportForm.maThamChieu || '';
+      if (!maBienThe || !soLuong) {
+        alert('Vui lòng chọn sản phẩm và số lượng');
+        return;
+      }
+      try {
+        setIsLoading(true);
+        const payload = { maBienThe, soLuong, nguoiXuat, lyDo, maThamChieu };
+        const resp = await api.post('/api/v1/quan-ly-ton-kho/xuat-kho', { body: payload });
+        if (resp && resp.success) {
+          // refresh inventory
+          const variantsResp = await api.get('/api/bien-the-san-pham', { params: { size: 1000 } });
+          const variantsList = Array.isArray(variantsResp) ? variantsResp : (variantsResp?.content || variantsResp?.variants || []);
+          setInventory(variantsList.map(mapInventoryFromApi));
+          const transaction = {
+            id: transactions.length + 1,
+            productName: inventory.find(i => i.maBienThe === maBienThe)?.sanPham?.tenSanPham || String(maBienThe),
+            type: 'export',
+            quantity: soLuong,
+            unitPrice: parseInt(newTransaction.unitPrice) || 0,
+            totalValue: soLuong * (parseInt(newTransaction.unitPrice) || 0),
+            date: new Date().toISOString().split('T')[0],
+            note: lyDo
+          };
+          setTransactions([transaction, ...transactions]);
+        } else {
+          alert(resp?.message || 'Xuất kho thất bại');
+        }
+      } catch (err) {
+        console.error('Export API error', err);
+        alert('Lỗi khi gọi API xuất kho');
+      } finally {
+        setIsLoading(false);
+        setNewTransaction({ productId: '', quantity: '', unitPrice: '', note: '' });
+        setShowExportModal(false);
+      }
+    })();
+  };
+
+  // Adjust stock (dieu chinh)
+  const handleAdjust = () => {
+    (async () => {
+      const maBienThe = parseInt(newTransaction.productId);
+      const soLuongMoi = parseInt(newTransaction.quantity);
+      const nguoiDieuChinh = localStorage.getItem('username') || 'admin';
+      const lyDo = newTransaction.note || '';
+
+      if (!maBienThe || isNaN(soLuongMoi)) {
+        alert('Vui lòng chọn sản phẩm và nhập số lượng mới');
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const payload = { maBienThe, soLuongMoi, nguoiDieuChinh, lyDo };
+        const resp = await api.post('/api/v1/quan-ly-ton-kho/dieu-chinh', { body: payload });
+        if (resp && resp.success) {
+          await refreshInventoryFromServer();
+          alert('Điều chỉnh tồn kho thành công');
+        } else {
+          alert(resp?.message || 'Điều chỉnh thất bại');
+        }
+      } catch (err) {
+        console.error('Adjust API error', err);
+        alert('Lỗi khi gọi API điều chỉnh');
+      } finally {
+        setIsLoading(false);
+        setNewTransaction({ productId: '', quantity: '', unitPrice: '', note: '' });
+        setShowAdjustModal(false);
+      }
+    })();
   };
 
   // Variant Management Functions
@@ -546,6 +539,13 @@ const InventoryManagement = () => {
                 <IoRefresh className="w-5 h-5" />
                 Điều chỉnh
               </button>
+              <button
+                onClick={refreshInventoryFromServer}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <IoRefresh className="w-5 h-5" />
+                Cập nhật tồn kho
+              </button>
             </div>
           </div>
         </div>
@@ -729,8 +729,8 @@ const InventoryManagement = () => {
                   >
                     <option value="">Chọn sản phẩm</option>
                     {inventory.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.productName}
+                      <option key={product.maBienThe} value={product.maBienThe}>
+                        {product.sanPham?.tenSanPham || product.sanPham || `VT-${product.maBienThe}`}
                       </option>
                     ))}
                   </select>
@@ -807,8 +807,8 @@ const InventoryManagement = () => {
                   >
                     <option value="">Chọn sản phẩm</option>
                     {inventory.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.productName} (Tồn: {product.currentStock})
+                      <option key={product.maBienThe} value={product.maBienThe}>
+                        {product.sanPham?.tenSanPham || product.sanPham || `VT-${product.maBienThe}`} (Tồn: {product.soLuongTon ?? 0})
                       </option>
                     ))}
                   </select>

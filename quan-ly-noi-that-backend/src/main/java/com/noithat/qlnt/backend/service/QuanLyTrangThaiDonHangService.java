@@ -45,7 +45,7 @@ public class QuanLyTrangThaiDonHangService {
             }
             
             DonHang donHang = optionalDonHang.get();
-            String trangThaiCu = donHang.getTrangThai();
+            String trangThaiCu = donHang.getTrangThaiDonHang();
             
             // Kiểm tra có thể chuyển trạng thái không
             if (!canTransition(trangThaiCu, trangThaiMoi)) {
@@ -61,7 +61,7 @@ public class QuanLyTrangThaiDonHangService {
             }
             
             // Cập nhật trạng thái đơn hàng
-            donHang.setTrangThai(trangThaiMoi);
+            donHang.setTrangThaiDonHang(trangThaiMoi);
             donHangRepository.save(donHang);
             
             // Ghi lịch sử thay đổi
@@ -232,7 +232,7 @@ public class QuanLyTrangThaiDonHangService {
     private boolean processOrderCancellation(DonHang donHang, String nguoiThayDoi) {
         try {
             // Hủy đặt trước nếu đơn hàng đã được xác nhận
-            if (!CHO_XAC_NHAN.equals(donHang.getTrangThai())) {
+            if (!CHO_XAC_NHAN.equals(donHang.getTrangThaiDonHang())) {
                 rollbackReservations(donHang, nguoiThayDoi);
             }
             
@@ -275,21 +275,21 @@ public class QuanLyTrangThaiDonHangService {
      * Lấy danh sách đơn hàng theo trạng thái
      */
     public List<DonHang> getOrdersByStatus(String trangThai) {
-        return donHangRepository.findByTrangThai(trangThai);
+        return donHangRepository.findByTrangThaiDonHang(trangThai);
     }
     
     /**
      * Lấy danh sách đơn hàng cần xử lý
      */
     public List<DonHang> getPendingOrders() {
-        return donHangRepository.findByTrangThaiIn(List.of(CHO_XAC_NHAN, XAC_NHAN, DANG_CHUAN_BI));
+        return donHangRepository.findByTrangThaiDonHangIn(List.of(CHO_XAC_NHAN, XAC_NHAN, DANG_CHUAN_BI));
     }
     
     /**
      * Lấy danh sách đơn hàng đang giao
      */
     public List<DonHang> getShippingOrders() {
-        return donHangRepository.findByTrangThai(DANG_GIAO);
+        return donHangRepository.findByTrangThaiDonHang(DANG_GIAO);
     }
     
     /**
@@ -301,7 +301,7 @@ public class QuanLyTrangThaiDonHangService {
             return false;
         }
         
-        return canTransition(optionalDonHang.get().getTrangThai(), trangThaiMoi);
+        return canTransition(optionalDonHang.get().getTrangThaiDonHang(), trangThaiMoi);
     }
     
     /**
@@ -311,7 +311,8 @@ public class QuanLyTrangThaiDonHangService {
         // Lấy đơn hàng đã được xác nhận nhưng chưa chuẩn bị quá 1 ngày
         // hoặc đang chuẩn bị quá 2 ngày
         // hoặc đang giao quá 3 ngày
-        return donHangRepository.findOrdersNeedingAttention();
+        // Fallback to repository query by multiple statuses
+        return donHangRepository.findByTrangThaiDonHangIn(List.of(XAC_NHAN, DANG_CHUAN_BI, DANG_GIAO));
     }
     
     /**
@@ -320,12 +321,12 @@ public class QuanLyTrangThaiDonHangService {
     public Map<String, Long> countOrdersByStatus() {
         Map<String, Long> statusCounts = new HashMap<>();
         
-        statusCounts.put("CHO_XAC_NHAN", (long) donHangRepository.findByTrangThai(CHO_XAC_NHAN).size());
-        statusCounts.put("XAC_NHAN", (long) donHangRepository.findByTrangThai(XAC_NHAN).size());
-        statusCounts.put("DANG_CHUAN_BI", (long) donHangRepository.findByTrangThai(DANG_CHUAN_BI).size());
-        statusCounts.put("DANG_GIAO", (long) donHangRepository.findByTrangThai(DANG_GIAO).size());
-        statusCounts.put("HOAN_THANH", (long) donHangRepository.findByTrangThai(HOAN_THANH).size());
-        statusCounts.put("HUY_BO", (long) donHangRepository.findByTrangThai(HUY_BO).size());
+    statusCounts.put("CHO_XAC_NHAN", (long) donHangRepository.findByTrangThaiDonHang(CHO_XAC_NHAN).size());
+    statusCounts.put("XAC_NHAN", (long) donHangRepository.findByTrangThaiDonHang(XAC_NHAN).size());
+    statusCounts.put("DANG_CHUAN_BI", (long) donHangRepository.findByTrangThaiDonHang(DANG_CHUAN_BI).size());
+    statusCounts.put("DANG_GIAO", (long) donHangRepository.findByTrangThaiDonHang(DANG_GIAO).size());
+    statusCounts.put("HOAN_THANH", (long) donHangRepository.findByTrangThaiDonHang(HOAN_THANH).size());
+    statusCounts.put("HUY_BO", (long) donHangRepository.findByTrangThaiDonHang(HUY_BO).size());
         
         return statusCounts;
     }

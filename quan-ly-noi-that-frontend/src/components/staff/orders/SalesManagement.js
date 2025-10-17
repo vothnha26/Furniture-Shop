@@ -1,32 +1,107 @@
-import React, { useState, useEffect } from 'react';
-import { IoAdd, IoSearch, IoCreate, IoTrash, IoEye, IoCart, IoReceipt, IoPerson, IoTime, IoCheckmark, IoClose } from 'react-icons/io5';
+import React, { useState, useEffect, useCallback } from 'react';
+import { IoAdd, IoSearch, IoTrash, IoEye, IoCart, IoReceipt, IoTime, IoCheckmark } from 'react-icons/io5';
 import api from '../../../api';
 
 const SalesManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Map sales data from API
-  const mapSalesFromApi = (sale) => ({
-    id: sale.maBanHang || sale.id,
-    orderNumber: sale.maDonHang || sale.orderNumber,
-    customerName: sale.khachHang?.hoTen || sale.customerName || '',
-    customerPhone: sale.khachHang?.soDienThoai || sale.customerPhone || '',
-    items: sale.chiTietDonHangList?.map(item => ({
-      name: item.bienTheSanPham?.sanPham?.tenSanPham || item.name,
-      quantity: item.soLuong || item.quantity,
-      price: item.donGia || item.price
-    })) || [],
-    subtotal: sale.tongTien || sale.subtotal || 0,
-    discount: sale.giamGia || sale.discount || 0,
-    total: sale.tongTienSauGiam || sale.total || 0,
-    status: sale.trangThai || sale.status || 'pending',
-    paymentMethod: sale.phuongThucThanhToan || sale.paymentMethod || 'cash',
-    createdAt: sale.ngayTao || sale.createdAt || '',
-    notes: sale.ghiChu || sale.notes || ''
-  });
+  // Map sales data from API (compute items first so subtotal/total can fall back to items sum)
+  const mapSalesFromApi = useCallback((sale) => {
+    const items = (sale.chiTietDonHangList || []).map(item => ({
+      name: item.bienTheSanPham?.sanPham?.tenSanPham ?? item.sanPham?.tenSanPham ?? item.tenSanPham ?? item.ten ?? item.name ?? item.bienTheSanPham?.ten ?? '',
+      quantity: Number(item.soLuong ?? item.quantity ?? item.so_luong ?? 0),
+      price: Number(item.donGia ?? item.price ?? item.giaBan ?? item.unitPrice ?? 0)
+    }));
+
+    const itemsSum = items.reduce((acc, it) => acc + (Number(it.quantity || 0) * Number(it.price || 0)), 0);
+
+    const reportedSubtotal = Number(sale.tongTien ?? sale.subtotal ?? 0);
+    const subtotal = (reportedSubtotal && !Number.isNaN(reportedSubtotal) && reportedSubtotal > 0) ? reportedSubtotal : itemsSum;
+
+  // Prefer backend-provided totals when available
+  const backendTongGiamGia = sale.tongGiamGia ?? sale.tong_giam_gia ?? sale.tongGiamgia ?? sale.totalDiscount ?? null;
+
+  // compute discount as sum of voucher + points + vip discounts when backend total not provided
+  const voucherDiscount = Number(sale.giam_gia_voucher ?? sale.giamGiaVoucher ?? sale.tienGiamVoucher ?? 0);
+  const pointsDiscount = Number(sale.giam_gia_diem_thuong ?? sale.giamGiaDiemThuong ?? sale.tienGiamTuDiem ?? 0);
+  const vipDiscount = Number(sale.giam_gia_vip ?? sale.giamGiaVip ?? 0);
+  const rawDiscount = Number(sale.giamGia ?? sale.discount ?? 0);
+  const computedDiscount = (rawDiscount && rawDiscount > 0) ? rawDiscount : (voucherDiscount + pointsDiscount + vipDiscount);
+  const discount = (backendTongGiamGia !== null && backendTongGiamGia !== undefined) ? Number(backendTongGiamGia) : computedDiscount;
+
+  const diemThuongNhanDuoc = Number(sale.diemThuongNhanDuoc ?? sale.diem_thuong_nhan_duoc ?? sale.diemThuongNhan ?? sale.diemVipThuong ?? 0);
+
+    const reportedTotal = Number(sale.tongTienSauGiam ?? sale.total ?? sale.tongCong ?? sale.tongTien ?? 0);
+    const total = (reportedTotal && !Number.isNaN(reportedTotal) && reportedTotal > 0) ? reportedTotal : Math.max(0, itemsSum - discount);
+
+    return {
+      // Normalize identifier: backend may return maDonHang, maBanHang or id
+      id: sale.maDonHang ?? sale.maBanHang ?? sale.id,
+      orderNumber: sale.maDonHang ?? sale.orderNumber ?? String(sale.id ?? ''),
+      customerName: (
+        sale.khachHang?.hoTen ??
+        sale.khachHang?.tenKhachHang ??
+        sale.khachHang?.ten ??
+        sale.tenKhachHang ??
+        sale.hoTen ??
+        (typeof sale.khachHang === 'string' ? sale.khachHang : undefined) ??
+        sale.customerName ??
+        ''
+      ),
+      customerPhone: sale.khachHang?.soDienThoai ?? sale.customerPhone ?? '',
+      items,
+      subtotal,
+  discount,
+      total,
+  // expose backend discount breakdown if available
+  giamGiaVoucher: voucherDiscount,
+  giamGiaDiemThuong: pointsDiscount,
+  giamGiaVip: vipDiscount,
+  diemThuongNhanDuoc,
+  tongGiamGia: (backendTongGiamGia !== null && backendTongGiamGia !== undefined) ? Number(backendTongGiamGia) : undefined,
+      status: normalizeStatus(sale.trangThai ?? sale.status),
+      paymentMethod: normalizePaymentMethod(sale.phuongThucThanhToan ?? sale.paymentMethod),
+      // try multiple fields for creation time (may be in various shapes)
+      createdAt: (sale.ngayTao ?? sale.createdAt ?? sale.ngayTaoGio ?? sale.thoiGianTao ?? sale.created_at ?? sale.createdDate) ?? '',
+      notes: sale.ghiChu ?? sale.notes ?? ''
+    };
+  }, []);
+
+  // Normalizers
+  const normalizeStatus = (raw) => {
+    if (raw === null || raw === undefined) return 'pending';
+    const s = String(raw).trim().toLowerCase();
+    if (!s) return 'pending';
+    // map common variants and backend constants
+    if (['pending', 'cho xac nhan', 'chờ xác nhận', 'chờ xử lý', 'cho xu ly', 'cho-xac-nhan', 'cho_xac_nhan', 'cho_xu_ly'].includes(s)) return 'pending';
+    if (['processing', 'dang xu ly', 'đang xử lý', 'dang-xu-ly', 'xac_nhan', 'xac-nhan', 'xacnhan', 'xac nhan', 'xác nhận', 'xacnhan', 'xác nhận'].includes(s)) return 'processing';
+    if (['preparing', 'dang_chuan_bi', 'dang chuan bi', 'đang chuẩn bị', 'dang-chuan-bi', 'dang chuan bi'].includes(s)) return 'processing';
+    if (['shipping', 'dang giao', 'đang giao', 'dang-giao', 'dang_giao', 'dang giao'].includes(s) || s === 'dang_giao' || s === 'dang giao') return 'shipping';
+    if (['completed', 'hoan thanh', 'hoàn thành', 'completed', 'hoan_thanh', 'hoan-thanh', 'hoant hanh'].includes(s)) return 'completed';
+    if (['cancelled', 'huy', 'hủy', 'da huy', 'đã hủy', 'huy_bo', 'huy-bo', 'huybo'].includes(s)) return 'cancelled';
+    // backend constant names
+    if (s === 'cho_xac_nhan' || s === 'xac_nhan' || s === 'dang_chuan_bi' || s === 'dang_giao' || s === 'hoan_thanh' || s === 'huy_bo') {
+      if (s === 'dang_giao') return 'shipping';
+      if (s === 'hoan_thanh') return 'completed';
+      if (s === 'huy_bo') return 'cancelled';
+      if (s === 'cho_xac_nhan') return 'pending';
+      return 'processing';
+    }
+    return 'pending';
+  };
+
+  const normalizePaymentMethod = (raw) => {
+    if (!raw && raw !== '') return 'cash';
+    const p = String(raw).trim().toLowerCase();
+    if (['card', 'thẻ', 'the', 'card_payment'].includes(p)) return 'card';
+    // treat many server variants as cash by default
+    return 'cash';
+  };
 
   // Fetch sales/orders and products
+  // mapSalesFromApi is stable for this mount-only fetch; intentionally exclude it from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -97,6 +172,7 @@ const SalesManagement = () => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'processing': return 'bg-blue-100 text-blue-800';
+      case 'shipping': return 'bg-purple-100 text-purple-800';
       case 'completed': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -107,10 +183,18 @@ const SalesManagement = () => {
     switch (status) {
       case 'pending': return 'Chờ xử lý';
       case 'processing': return 'Đang xử lý';
+      case 'shipping': return 'Đang giao';
       case 'completed': return 'Hoàn thành';
       case 'cancelled': return 'Đã hủy';
       default: return 'Không xác định';
     }
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '';
+    const d = (value instanceof Date) ? value : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleString('vi-VN');
   };
 
   const handleCreateOrder = async () => {
@@ -210,12 +294,79 @@ const SalesManagement = () => {
       }
     }
   };
+  const callStatusEndpoint = async (orderId, action, payload = {}) => {
+    switch (action) {
+      case 'confirm':
+        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/confirm`, payload);
+      case 'prepare':
+        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/prepare`, payload);
+      case 'ship':
+        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/ship`, payload);
+      case 'complete':
+        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/complete`, payload);
+      case 'cancel':
+        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/cancel`, payload);
+      default:
+        return api.put(`/api/v1/quan-ly-trang-thai-don-hang/cap-nhat-trang-thai/${orderId}`, payload);
+    }
+  };
+
+  const handleChangeStatus = async (orderId, newStatus) => {
+    if (!orderId || !newStatus) {
+      console.warn('handleChangeStatus called with invalid args', { orderId, newStatus });
+      return;
+    }
+
+    // Optimistic UI: update the order status locally first so the select reflects the change immediately
+    const prevOrders = [...orders];
+    const updated = prevOrders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
+    setOrders(updated);
+
+    try {
+      console.log('Updating status for order', orderId, '->', newStatus);
+      const payload = { nguoiThayDoi: 'admin', ghiChu: '' };
+
+      if (newStatus === 'pending') {
+        await callStatusEndpoint(orderId, 'confirm', payload);
+      } else if (newStatus === 'processing') {
+        await callStatusEndpoint(orderId, 'prepare', payload);
+      } else if (newStatus === 'shipping') {
+        await callStatusEndpoint(orderId, 'ship', payload);
+      } else if (newStatus === 'completed') {
+        await callStatusEndpoint(orderId, 'complete', payload);
+      } else if (newStatus === 'cancelled') {
+        await callStatusEndpoint(orderId, 'cancel', payload);
+      } else {
+        await callStatusEndpoint(orderId, 'generic', { trangThaiMoi: newStatus, nguoiCapNhat: 'admin' });
+      }
+
+      // Refresh orders list from server to get canonical status
+      const ordersData = await api.get('/api/banhang/donhang');
+      if (Array.isArray(ordersData)) {
+        setOrders(ordersData.map(mapSalesFromApi));
+      }
+    } catch (err) {
+      console.error('Update status error', err);
+      setError(err);
+      // revert optimistic update
+      setOrders(prevOrders);
+      alert('Cập nhật trạng thái thất bại');
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customerPhone.includes(searchTerm);
-    const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus;
+    const q = String(searchTerm || '').toLowerCase();
+    const orderNumber = String(order?.orderNumber ?? '').toLowerCase();
+    const customerName = String(order?.customerName ?? '').toLowerCase();
+    const customerPhone = String(order?.customerPhone ?? '');
+
+    const matchesSearch = (
+      orderNumber.includes(q) ||
+      customerName.includes(q) ||
+      customerPhone.includes(searchTerm)
+    );
+
+    const matchesStatus = selectedStatus === 'all' || order?.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -300,17 +451,18 @@ const SalesManagement = () => {
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent w-full sm:w-64"
                 />
               </div>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="pending">Chờ xử lý</option>
-                <option value="processing">Đang xử lý</option>
-                <option value="completed">Hoàn thành</option>
-                <option value="cancelled">Đã hủy</option>
-              </select>
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="pending">Chờ xử lý</option>
+                    <option value="processing">Đang xử lý</option>
+                    <option value="shipping">Đang giao</option>
+                    <option value="completed">Hoàn thành</option>
+                    <option value="cancelled">Đã hủy</option>
+                  </select>
             </div>
 
             {/* Create Order Button */}
@@ -323,6 +475,16 @@ const SalesManagement = () => {
             </button>
           </div>
         </div>
+
+        {/* Loading / Error */}
+        {isLoading && (
+          <div className="mb-4 text-center text-gray-600">Đang tải dữ liệu đơn hàng...</div>
+        )}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded">
+            {String(error)}
+          </div>
+        )}
 
         {/* Orders Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -354,8 +516,8 @@ const SalesManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
+                {filteredOrders.map((order, _idx) => (
+                  <tr key={`${order.id ?? order.orderNumber ?? 'order'}-${_idx}`} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
                         {order.orderNumber}
@@ -370,23 +532,45 @@ const SalesManagement = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {order.items.length} sản phẩm
+                        {Number(order.items?.length || 0)} sản phẩm
                       </div>
                       <div className="text-sm text-gray-500">
-                        {order.items.slice(0, 2).map(item => item.name).join(', ')}
-                        {order.items.length > 2 && '...'}
+                        {(order.items || [])
+                          .map(i => String(i?.name || '').trim())
+                          .filter(n => n.length > 0)
+                          .slice(0, 2)
+                          .join(', ')}
+                        {(order.items || []).length > 2 && '...'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.total.toLocaleString('vi-VN')}đ
+                      <div>
+                        <div>{Number(order.total || 0).toLocaleString('vi-VN')}đ</div>
+                        {(order.tongGiamGia || order.tongGiamGia === 0) && (
+                          <div className="text-xs text-gray-500">Giảm: {Number(order.tongGiamGia).toLocaleString('vi-VN')}đ</div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                        {getStatusText(order.status)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                          {getStatusText(order.status)}
+                        </span>
+                        <select
+                          value={order.status ?? 'pending'}
+                          onChange={(e) => handleChangeStatus(order.id, e.target.value)}
+                          className="ml-2 px-2 py-1 border border-gray-200 rounded text-sm"
+                        >
+                          <option value="pending">Chờ xử lý</option>
+                          <option value="processing">Đang xử lý</option>
+                          <option value="shipping">Đang giao</option>
+                          <option value="completed">Hoàn thành</option>
+                          <option value="cancelled">Đã hủy</option>
+                        </select>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {order.createdAt}
+                      {formatDate(order.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
@@ -630,28 +814,55 @@ const SalesManagement = () => {
                   <div>
                     <h4 className="font-semibold text-gray-900">Sản phẩm</h4>
                     <div className="space-y-2">
-                      {selectedOrder.items.map((item, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span>{item.name} x{item.quantity}</span>
-                          <span>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
-                        </div>
-                      ))}
+                      {((selectedOrder.items || [])
+                        .map(i => ({
+                          name: String(i?.name || '').trim(),
+                          quantity: Number(i?.quantity || 0),
+                          price: Number(i?.price || 0)
+                        })))
+                        .map((item, index) => (
+                          <div key={`${item.name || 'item'}-${index}`} className="flex justify-between text-sm">
+                            <span>{item.name} x{item.quantity}</span>
+                            <span>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
+                          </div>
+                        ))}
                     </div>
                   </div>
                   <div className="border-t pt-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Tạm tính:</span>
-                      <span>{selectedOrder.subtotal.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Giảm giá:</span>
-                      <span>{selectedOrder.discount.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-lg border-t pt-2">
-                      <span>Tổng cộng:</span>
-                      <span>{selectedOrder.total.toLocaleString('vi-VN')}đ</span>
-                    </div>
+                    {(() => {
+                      const items = (selectedOrder.items || []).map(i => ({
+                        quantity: Number(i?.quantity || 0),
+                        price: Number(i?.price || 0)
+                      }));
+                      const itemsSum = items.reduce((acc, it) => acc + it.quantity * it.price, 0);
+                      const subtotalVal = (Number(selectedOrder.subtotal) && Number(selectedOrder.subtotal) > 0) ? Number(selectedOrder.subtotal) : itemsSum;
+                      const discountVal = Number(selectedOrder.discount || 0);
+                      const totalVal = (Number(selectedOrder.total) && Number(selectedOrder.total) > 0) ? Number(selectedOrder.total) : Math.max(0, itemsSum - discountVal);
+
+                      return (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span>Tạm tính:</span>
+                            <span>{subtotalVal.toLocaleString('vi-VN')}đ</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Giảm giá:</span>
+                            <span>{(selectedOrder.tongGiamGia ?? discountVal).toLocaleString('vi-VN')}đ</span>
+                          </div>
+                          <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                            <span>Tổng cộng:</span>
+                            <span>{totalVal.toLocaleString('vi-VN')}đ</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
+                  {selectedOrder.diemThuongNhanDuoc !== undefined && (
+                    <div className="mt-2">
+                      <h4 className="font-semibold text-gray-900">Điểm thưởng nhận được</h4>
+                      <p className="text-gray-600">{selectedOrder.diemThuongNhanDuoc} điểm</p>
+                    </div>
+                  )}
                   <div>
                     <h4 className="font-semibold text-gray-900">Trạng thái</h4>
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedOrder.status)}`}>
@@ -694,7 +905,17 @@ const SalesManagement = () => {
                   <p className="text-gray-600">Khách hàng: {selectedOrder.customerName}</p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Tổng tiền: {selectedOrder.total.toLocaleString('vi-VN')}đ</h4>
+                  <h4 className="font-semibold text-gray-900">Tổng tiền: {(selectedOrder.total || 0).toLocaleString('vi-VN')}đ</h4>
+                  {(selectedOrder.tongGiamGia || selectedOrder.giamGiaVoucher || selectedOrder.giamGiaDiemThuong || selectedOrder.giamGiaVip) && (
+                    <div className="text-sm text-gray-600 mt-2">
+                      <div>Giảm voucher: {Number(selectedOrder.giamGiaVoucher || 0).toLocaleString('vi-VN')}đ</div>
+                      <div>Giảm điểm: {Number(selectedOrder.giamGiaDiemThuong || 0).toLocaleString('vi-VN')}đ</div>
+                      <div>Giảm VIP: {Number(selectedOrder.giamGiaVip || 0).toLocaleString('vi-VN')}đ</div>
+                      {selectedOrder.tongGiamGia !== undefined && (
+                        <div className="font-semibold">Tổng giảm: {Number(selectedOrder.tongGiamGia).toLocaleString('vi-VN')}đ</div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900">Phương thức thanh toán</h4>

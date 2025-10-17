@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { IoMenuOutline, IoCloseOutline, IoCartOutline } from 'react-icons/io5';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../contexts/CartContext';
 import { navigation } from '../../data';
 import NavMobile from './NavMobile';
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
-  const { getCartCount } = useCart();
+  // CartContext removed in this build; show 0 items by default
+  const getCartCount = () => 0;
 
   return (
     <header className='bg-white shadow-lg relative'>

@@ -33,7 +33,7 @@ public class VipBenefitProcessor {
         if (khachHang == null || khachHang.getHangThanhVien() == null) {
             return 0;
         }
-        // Sum bonus points from all BONUS_POINTS benefits (params.percent)
+        // Sum bonus points from all BONUS_POINTS benefits. Support fixed "points" param or percent-based rules.
         List<VipBenefit> benefits = getVipBenefits(khachHang.getHangThanhVien());
         int totalPoints = 0;
         for (VipBenefit vb : benefits) {
@@ -41,8 +41,16 @@ public class VipBenefitProcessor {
             if (vb.getBenefitType() == null) continue;
             if (vb.getBenefitType().equalsIgnoreCase("BONUS_POINTS") || vb.getBenefitType().equalsIgnoreCase("TICH_DIEM")) {
                 try {
+                    // fixed points value e.g. {"points":100}
+                    var fixedOpt = extractPointsFromParams(vb.getParams());
+                    if (fixedOpt.isPresent()) {
+                        totalPoints += fixedOpt.get();
+                        continue;
+                    }
+
+                    // fallback: percent based bonus (percent of order converted to points)
                     BigDecimal percent = extractPercentFromParams(vb.getParams()).orElse(null);
-                    if (percent != null) {
+                    if (percent != null && thanhTien != null) {
                         BigDecimal bonusPoints = thanhTien.multiply(percent)
                                 .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
                                 .divide(BigDecimal.valueOf(1000), 0, RoundingMode.HALF_UP);
@@ -182,6 +190,22 @@ public class VipBenefitProcessor {
             }
         } catch (Exception e) {
             // ignore
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Integer> extractPointsFromParams(String params) {
+        if (params == null || params.isBlank()) return Optional.empty();
+        try {
+            JsonNode node = objectMapper.readTree(params);
+            if (node.has("points")) {
+                return Optional.of(node.get("points").asInt());
+            }
+            if (node.has("point")) {
+                return Optional.of(node.get("point").asInt());
+            }
+        } catch (Exception e) {
+            // ignore malformed
         }
         return Optional.empty();
     }

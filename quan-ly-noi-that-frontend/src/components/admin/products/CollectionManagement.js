@@ -60,6 +60,13 @@ const CollectionManagement = () => {
     moTa: ''
   });
 
+  // Manage products modal state
+  const [showManageProductsModal, setShowManageProductsModal] = useState(false);
+  const [managingCollection, setManagingCollection] = useState(null);
+  const [managingProducts, setManagingProducts] = useState([]);
+  const [availableProducts, setAvailableProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+
   // Filter collections based on search term
   const filteredCollections = collections.filter(collection =>
     collection.tenBoSuuTap.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -148,6 +155,69 @@ const CollectionManagement = () => {
         setDeleteId(null);
       }
     })();
+  };
+
+  // --- Manage products helpers ---
+  const openManageProducts = async (collection) => {
+    setManagingCollection(collection);
+    setShowManageProductsModal(true);
+    await loadProductsForCollection(collection.maBoSuuTap);
+  };
+
+  const loadProductsForCollection = async (collectionId) => {
+    setProductsLoading(true);
+    try {
+      // products in collection
+      const inCollection = await api.get(`/api/collections/${collectionId}/products`);
+      const mappedIn = Array.isArray(inCollection) ? inCollection : [];
+      setManagingProducts(mappedIn.map(p => ({ maSanPham: p.maSanPham || p.id, tenSanPham: p.tenSanPham || p.name })));
+
+      // available products (all products) - backend GET /api/products
+      const all = await api.get('/api/products');
+      const allList = Array.isArray(all) ? all : (all?.content || []);
+      // filter out products already in collection
+      const inIds = new Set(mappedIn.map(p => p.maSanPham || p.id));
+      const available = allList.filter(p => !inIds.has(p.maSanPham ?? p.id)).map(p => ({ maSanPham: p.maSanPham || p.id, tenSanPham: p.tenSanPham || p.name }));
+      setAvailableProducts(available);
+    } catch (err) {
+      console.error('Load products for collection error', err);
+      showToast('Không thể tải danh sách sản phẩm', 'error');
+      setManagingProducts([]);
+      setAvailableProducts([]);
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const addProductToCollection = async (collectionId, productId) => {
+    try {
+      setProductsLoading(true);
+      await api.post(`/api/collections/${collectionId}/products/${productId}`);
+      showToast('Đã thêm sản phẩm vào bộ sưu tập');
+      // refresh lists and collections
+      await loadProductsForCollection(collectionId);
+      await fetchCollections();
+    } catch (err) {
+      console.error('Add product to collection error', err);
+      showToast('Thêm sản phẩm thất bại', 'error');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const removeProductFromCollection = async (collectionId, productId) => {
+    try {
+      setProductsLoading(true);
+      await api.del(`/api/collections/${collectionId}/products/${productId}`);
+      showToast('Đã xóa sản phẩm khỏi bộ sưu tập');
+      await loadProductsForCollection(collectionId);
+      await fetchCollections();
+    } catch (err) {
+      console.error('Remove product from collection error', err);
+      showToast('Xóa sản phẩm thất bại', 'error');
+    } finally {
+      setProductsLoading(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -250,6 +320,13 @@ const CollectionManagement = () => {
                       Chỉnh sửa
                     </button>
                     <button
+                      onClick={() => openManageProducts(collection)}
+                      className="flex-1 bg-green-50 hover:bg-green-100 text-green-600 px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <IoAdd className="text-sm" />
+                      Quản lý sản phẩm
+                    </button>
+                    <button
                       onClick={() => handleDelete(collection.maBoSuuTap)}
                       className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg transition-colors flex items-center justify-center"
                     >
@@ -342,6 +419,76 @@ const CollectionManagement = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Manage Products Modal */}
+      <Modal
+        isOpen={showManageProductsModal}
+        onClose={() => { setShowManageProductsModal(false); setManagingCollection(null); setManagingProducts([]); setAvailableProducts([]); }}
+        title={managingCollection ? `Quản lý sản phẩm - ${managingCollection.tenBoSuuTap}` : 'Quản lý sản phẩm'}
+      >
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <h4 className="font-semibold mb-2">Sản phẩm trong bộ sưu tập</h4>
+              <div className="max-h-64 overflow-auto border rounded p-2">
+                {productsLoading ? (
+                  <div className="text-sm text-gray-500">Đang tải...</div>
+                ) : managingProducts.length === 0 ? (
+                  <div className="text-sm text-gray-500">Chưa có sản phẩm nào</div>
+                ) : (
+                  managingProducts.map(p => (
+                    <div key={p.maSanPham} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                      <div className="text-sm">{p.tenSanPham}</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={async () => { await removeProductFromCollection(managingCollection.maBoSuuTap, p.maSanPham); }}
+                          className="text-red-600 bg-red-50 px-2 py-1 rounded hover:bg-red-100 text-sm"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <h4 className="font-semibold mb-2">Sản phẩm khả dụng</h4>
+              <div className="max-h-64 overflow-auto border rounded p-2">
+                {productsLoading ? (
+                  <div className="text-sm text-gray-500">Đang tải...</div>
+                ) : availableProducts.length === 0 ? (
+                  <div className="text-sm text-gray-500">Không có sản phẩm khả dụng</div>
+                ) : (
+                  availableProducts.map(p => (
+                    <div key={p.maSanPham} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                      <div className="text-sm">{p.tenSanPham}</div>
+                      <div>
+                        <button
+                          onClick={async () => { await addProductToCollection(managingCollection.maBoSuuTap, p.maSanPham); }}
+                          className="text-green-600 bg-green-50 px-2 py-1 rounded hover:bg-green-100 text-sm"
+                        >
+                          Thêm
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              onClick={() => { setShowManageProductsModal(false); setManagingCollection(null); setManagingProducts([]); setAvailableProducts([]); }}
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Confirm Delete Dialog */}

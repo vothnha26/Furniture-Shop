@@ -1,52 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import { IoAdd, IoSearch, IoCreate, IoTrash, IoSave, IoClose, IoGrid, IoHome, IoLeaf } from 'react-icons/io5';
-import { FaChair, FaCouch, FaBed, FaTable, FaBookOpen } from 'react-icons/fa';
+import React, { useState, useEffect, useCallback } from 'react';
+import { IoAdd, IoSearch, IoCreate, IoTrash, IoSave, IoClose } from 'react-icons/io5';
 import Modal from '../../shared/Modal';
 import ConfirmDialog from '../../shared/ConfirmDialog';
 import Toast from '../../shared/Toast';
 import api from '../../../api';
 
 const CategoryManagement = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  // loading / error states are handled locally where needed
 
-  // Map category data from API
+  // Map category data from API to local shape: { maDanhMuc, tenDanhMuc, moTa, soLuongSanPham, parentId, children }
   const mapCategoryFromApi = (category) => ({
-    maDanhMuc: category.maDanhMuc || category.id,
-    tenDanhMuc: category.tenDanhMuc || category.name,
-    soLuongSanPham: category.soLuongSanPham || category.productCount || 0,
-    icon: category.icon || 'folder',
-    moTa: category.moTa || category.description || '',
-    trangThai: category.trangThai || category.active || true
-  });
-
-  const mapCategoryToApi = (category) => ({
-    tenDanhMuc: category.tenDanhMuc,
-    moTa: category.moTa,
-    icon: category.icon,
-    trangThai: category.trangThai
+    // be defensive: category may be null or incomplete when API returns unexpected data
+    maDanhMuc: category?.maDanhMuc ?? category?.id ?? null,
+    tenDanhMuc: category?.tenDanhMuc ?? category?.name ?? '',
+    moTa: category?.moTa ?? category?.description ?? '',
+    soLuongSanPham: category?.soLuongSanPham ?? category?.productCount ?? 0,
+    // API now returns explicit parentId. Prefer it, fall back to nested parent object if present.
+    parentId: (category?.parentId ?? (category?.parent && (category.parent.maDanhMuc || category.parent.id)) ) || null,
+    children: []
   });
 
   // Fetch categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      setIsLoading(true);
-      try {
-        const data = await api.get('/api/danhmuc');
-        if (Array.isArray(data)) {
-          setCategories(data.map(mapCategoryFromApi));
-        }
-      } catch (err) {
-        console.error('Fetch categories error', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
+  // Load categories (flat + tree)
+  const loadCategories = useCallback(async () => {
+    try {
+      const data = await api.get('/api/categories');
+      if (Array.isArray(data)) {
+  const flatAll = data.map(mapCategoryFromApi);
+  // remove invalid entries (no id)
+  const flat = flatAll.filter(i => i && (i.maDanhMuc !== null && i.maDanhMuc !== undefined));
+
+  // build tree
+  const byId = new Map();
+  flat.forEach(item => byId.set(item.maDanhMuc, { ...item, children: [] }));
+        const roots = [];
+        byId.forEach(item => {
+          if (item.parentId) {
+            const parent = byId.get(item.parentId);
+            if (parent) parent.children.push(item);
+            else roots.push(item);
+          } else {
+            roots.push(item);
+          }
+        });
+
+  setCategoriesFlat(flat);
+  setCategoriesTree(roots);
+  setCategories(flat);
       }
-    };
-    fetchCategories();
+    } catch (err) {
+      console.error('Fetch categories error', err);
+      showToast('Không thể tải danh sách danh mục', 'error');
+    }
   }, []);
 
+  useEffect(() => { loadCategories(); }, [loadCategories]);
+
   const [categories, setCategories] = useState([]);
+  // hierarchical and flat representations
+  const [categoriesTree, setCategoriesTree] = useState([]);
+  const [categoriesFlat, setCategoriesFlat] = useState([]);
+  const [expandedIds, setExpandedIds] = useState(new Set());
 
   const [showModal, setShowModal] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -57,19 +71,11 @@ const CategoryManagement = () => {
 
   const [formData, setFormData] = useState({
     tenDanhMuc: '',
-    icon: 'grid'
+    moTa: '',
+    parentId: null
   });
 
-  const iconOptions = [
-    { value: 'grid', label: 'Lưới', component: IoGrid },
-    { value: 'chair', label: 'Ghế', component: FaChair },
-    { value: 'table', label: 'Bàn', component: FaTable },
-    { value: 'sofa', label: 'Sofa', component: FaCouch },
-    { value: 'bed', label: 'Giường', component: FaBed },
-    { value: 'cabinet', label: 'Tủ', component: IoHome },
-    { value: 'bookshelf', label: 'Kệ sách', component: FaBookOpen },
-    { value: 'plant', label: 'Cây cảnh', component: IoLeaf }
-  ];
+  // Categories are name + description only
 
   // Filter categories based on search term
   const filteredCategories = categories.filter(category =>
@@ -80,70 +86,105 @@ const CategoryManagement = () => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
   };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.tenDanhMuc.trim()) {
       showToast('Vui lòng nhập tên danh mục', 'error');
       return;
     }
 
-    // Check if category name already exists
-    const exists = categories.some(category => 
+    // Prevent duplicates client-side
+    const exists = categories.some(category =>
       category.tenDanhMuc.toLowerCase() === formData.tenDanhMuc.toLowerCase() &&
       category.maDanhMuc !== editingCategory?.maDanhMuc
     );
-
     if (exists) {
       showToast('Tên danh mục đã tồn tại', 'error');
       return;
     }
 
-    if (editingCategory) {
-      // Update existing category
-      setCategories(categories.map(category =>
-        category.maDanhMuc === editingCategory.maDanhMuc
-          ? { 
-              ...category, 
-              tenDanhMuc: formData.tenDanhMuc,
-              icon: formData.icon
+    try {
+      if (editingCategory) {
+        if (!editingCategory.maDanhMuc) {
+          showToast('Không xác định được danh mục để cập nhật', 'error');
+          return;
+        }
+        // Update via API
+        const payload = { tenDanhMuc: formData.tenDanhMuc, moTa: formData.moTa };
+        const updated = await api.put(`/api/categories/${editingCategory.maDanhMuc}`, payload);
+        const mapped = mapCategoryFromApi(updated || { ...editingCategory, ...payload });
+  setCategories(categories.map(c => c.maDanhMuc === mapped.maDanhMuc ? mapped : c));
+        // handle parent linking/unlinking
+        if (formData.parentId) {
+          await api.post(`/api/categories/${mapped.maDanhMuc}/parents/${formData.parentId}`);
+        } else {
+          // if parent removed, unlink all existing parents
+          try {
+            const existingParents = await api.get(`/api/categories/${mapped.maDanhMuc}/parents`);
+            if (Array.isArray(existingParents)) {
+              for (const p of existingParents) {
+                await api.del(`/api/categories/${mapped.maDanhMuc}/parents/${p.id ?? p.maDanhMuc}`);
+              }
             }
-          : category
-      ));
-      showToast('Cập nhật danh mục thành công');
-    } else {
-      // Add new category
-      const newCategory = {
-        maDanhMuc: Math.max(...categories.map(c => c.maDanhMuc), 0) + 1,
-        tenDanhMuc: formData.tenDanhMuc,
-        icon: formData.icon,
-        soLuongSanPham: 0
-      };
-      setCategories([...categories, newCategory]);
-      showToast('Thêm danh mục thành công');
+          } catch (err) {
+            // ignore unlink errors
+          }
+        }
+        showToast('Cập nhật danh mục thành công');
+        await loadCategories();
+      } else {
+        // Create via API
+        const payload = { tenDanhMuc: formData.tenDanhMuc, moTa: formData.moTa };
+        const created = await api.post('/api/categories', { body: payload });
+        const childId = created?.maDanhMuc ?? created?.id;
+        // if a parent was selected, link it AFTER the category has been persisted
+        if (formData.parentId && childId) {
+          await api.post(`/api/categories/${childId}/parents/${formData.parentId}`);
+        }
+        // reload to get accurate tree state
+        await loadCategories();
+        showToast('Thêm danh mục thành công');
+      }
+      closeModal();
+    } catch (err) {
+      console.error('Save category error', err);
+      showToast(err.data?.message || 'Lỗi khi lưu danh mục', 'error');
     }
-
-    closeModal();
   };
 
   const openModal = (category = null) => {
     setEditingCategory(category);
     setFormData({
       tenDanhMuc: category ? category.tenDanhMuc : '',
-      icon: category ? category.icon : 'grid'
+      moTa: category ? category.moTa : '',
+      parentId: null
     });
     setShowModal(true);
+    // if editing, fetch current parents and set first parent as selected
+    if (category) {
+      (async () => {
+        try {
+          const parents = await api.get(`/api/categories/${category.maDanhMuc}/parents`);
+          if (Array.isArray(parents) && parents.length > 0) {
+            const first = parents[0];
+            setFormData(fd => ({ ...fd, parentId: first.maDanhMuc ?? first.id }));
+          }
+        } catch (err) {
+          // ignore
+        }
+      })();
+    }
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingCategory(null);
-    setFormData({ tenDanhMuc: '', icon: 'grid' });
+    setFormData({ tenDanhMuc: '', moTa: '', parentId: null });
   };
 
   const handleDelete = (id) => {
-    const category = categories.find(c => c.maDanhMuc === id);
+    const category = categories.find(c => c && c.maDanhMuc === id);
     if (category && category.soLuongSanPham > 0) {
       showToast('Không thể xóa danh mục có sản phẩm. Vui lòng di chuyển sản phẩm trước khi xóa.', 'error');
       return;
@@ -152,24 +193,38 @@ const CategoryManagement = () => {
     setShowConfirmDialog(true);
   };
 
-  const confirmDelete = () => {
-    setCategories(categories.filter(category => category.maDanhMuc !== deleteId));
-    setShowConfirmDialog(false);
-    setDeleteId(null);
-    showToast('Xóa danh mục thành công');
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await api.del(`/api/categories/${deleteId}`);
+      await loadCategories();
+      showToast('Xóa danh mục thành công');
+    } catch (err) {
+      console.error('Delete category error', err);
+      showToast(err.data?.message || 'Lỗi khi xóa danh mục', 'error');
+    } finally {
+      setShowConfirmDialog(false);
+      setDeleteId(null);
+    }
   };
 
-  const getCategoryIcon = (iconName, className = "text-2xl") => {
-    const icon = iconOptions.find(opt => opt.value === iconName);
-    if (!icon) return <IoGrid className={className} />;
-    const IconComponent = icon.component;
-    return <IconComponent className={className} />;
+  // Render a simple initial avatar for category
+  const renderCategoryAvatar = (name, className = 'w-10 h-10 rounded-full flex items-center justify-center text-white') => {
+    const initial = name ? name.charAt(0).toUpperCase() : '?';
+    // choose deterministic color based on char code
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-yellow-500', 'bg-red-500', 'bg-cyan-500'];
+    const color = colors[(initial.charCodeAt(0) || 0) % colors.length];
+    return (
+      <div className={`${className} ${color}`}>
+        {initial}
+      </div>
+    );
   };
 
   const getCategoryColor = (index) => {
     const colors = [
       'bg-blue-500 text-white',
-      'bg-green-500 text-white', 
+      'bg-green-500 text-white',
       'bg-purple-500 text-white',
       'bg-pink-500 text-white',
       'bg-indigo-500 text-white',
@@ -178,6 +233,14 @@ const CategoryManagement = () => {
       'bg-cyan-500 text-white'
     ];
     return colors[index % colors.length];
+  };
+
+  // Compute total products for a node (own + all descendants). Use recursion for safety.
+  const getTotalProducts = (node) => {
+    if (!node) return 0;
+    const own = Number(node.soLuongSanPham || 0);
+    const children = (node.children || []).reduce((sum, ch) => sum + getTotalProducts(ch), 0);
+    return own + children;
   };
 
   return (
@@ -190,7 +253,7 @@ const CategoryManagement = () => {
               <h1 className="text-2xl font-bold text-gray-900">Quản lý Danh mục</h1>
               <p className="text-gray-600 mt-1">Phân loại sản phẩm theo các danh mục để dễ quản lý và tìm kiếm</p>
             </div>
-            
+
             <button
               onClick={() => openModal()}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
@@ -219,71 +282,106 @@ const CategoryManagement = () => {
           </div>
         </div>
 
-        {/* Categories Grid */}
-        {filteredCategories.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <IoSearch className="text-4xl text-gray-400 mb-4 mx-auto" />
-            <p className="text-gray-500">Không tìm thấy danh mục nào</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCategories.map((category, index) => (
-              <div key={category.maDanhMuc} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                {/* Category Header */}
-                <div className={`p-6 ${getCategoryColor(index)}`}>
-                  <div className="flex items-center justify-between">
+        {/* Categories: show tree when no search, otherwise show filtered grid */}
+        {searchTerm.trim() ? (
+          filteredCategories.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <IoSearch className="text-4xl text-gray-400 mb-4 mx-auto" />
+              <p className="text-gray-500">Không tìm thấy danh mục nào</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredCategories.filter(Boolean).map((category, index) => (
+                <div key={category.maDanhMuc ?? category.id ?? index} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                  <div className={`p-6 ${getCategoryColor(index)}`}>
                     <div className="flex items-center gap-3">
-                      {getCategoryIcon(category.icon)}
+                      {renderCategoryAvatar(category.tenDanhMuc)}
                       <div>
                         <h3 className="font-semibold text-lg">{category.tenDanhMuc}</h3>
-                        <p className="text-white/80 text-sm">#{category.maDanhMuc}</p>
+                        <p className="text-white/80 text-sm">#{category.maDanhMuc ?? category.id}</p>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Category Content */}
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">{category.soLuongSanPham}</div>
-                      <div className="text-sm text-gray-500">Sản phẩm</div>
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-900">{category.soLuongSanPham}</div>
+                        <div className="text-sm text-gray-500">Sản phẩm</div>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${category.soLuongSanPham === 0 ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600'}`}>
+                        {category.soLuongSanPham === 0 ? 'Trống' : 'Có sản phẩm'}
+                      </div>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      category.soLuongSanPham === 0 
-                        ? 'bg-gray-100 text-gray-600' 
-                        : 'bg-green-100 text-green-600'
-                    }`}>
-                      {category.soLuongSanPham === 0 ? 'Trống' : 'Có sản phẩm'}
+                    <div className="flex gap-2">
+                      <button onClick={() => openModal(category)} className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"><IoCreate className="text-sm" />Chỉnh sửa</button>
+                      <button onClick={() => handleDelete(category.maDanhMuc)} className={`px-3 py-2 rounded-lg transition-colors flex items-center justify-center ${category.soLuongSanPham > 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-red-50 hover:bg-red-100 text-red-600'}`} disabled={category.soLuongSanPham > 0}><IoTrash className="text-sm" /></button>
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => openModal(category)}
-                      className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
-                    >
-                      <IoCreate className="text-sm" />
-                      Chỉnh sửa
-                    </button>
-                    <button
-                      onClick={() => handleDelete(category.maDanhMuc)}
-                      className={`px-3 py-2 rounded-lg transition-colors flex items-center justify-center ${
-                        category.soLuongSanPham > 0
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-red-50 hover:bg-red-100 text-red-600'
-                      }`}
-                      disabled={category.soLuongSanPham > 0}
-                      title={category.soLuongSanPham > 0 ? 'Không thể xóa danh mục có sản phẩm' : 'Xóa danh mục'}
-                    >
-                      <IoTrash className="text-sm" />
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
+        ) : (
+          categoriesTree.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+              <IoSearch className="text-4xl text-gray-400 mb-4 mx-auto" />
+              <p className="text-gray-500">Không tìm thấy danh mục nào</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {categoriesTree.filter(Boolean).map((parent, pIndex) => (
+                <div key={parent.maDanhMuc ?? parent.id ?? pIndex} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                  <div className={`p-6 flex items-center justify-between ${getCategoryColor(pIndex)}`}>
+                    <div className="flex items-center gap-3">
+                      {renderCategoryAvatar(parent.tenDanhMuc)}
+                      <div>
+                        <h3 className="font-semibold text-lg">{parent.tenDanhMuc}</h3>
+                        <p className="text-white/80 text-sm">#{parent.maDanhMuc ?? parent.id}</p>
+                        {parent.moTa && <p className="text-white/80 text-sm mt-1">{parent.moTa}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-center mr-4">
+                        <div className="text-2xl font-bold text-white">{getTotalProducts(parent)}</div>
+                          <div className="text-sm text-white/90">Tổng sản phẩm (gồm con)</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => openModal(parent)} className="bg-white/20 text-white px-3 py-2 rounded-lg">Chỉnh sửa</button>
+                        <button onClick={() => { setExpandedIds(prev => { const next = new Set(prev); if (next.has(parent.maDanhMuc)) next.delete(parent.maDanhMuc); else next.add(parent.maDanhMuc); return next; }); }} className="bg-white/10 text-white px-3 py-2 rounded-lg">{expandedIds.has(parent.maDanhMuc) ? 'Thu gọn' : 'Mở rộng'}</button>
+                        <button onClick={() => handleDelete(parent.maDanhMuc ?? parent.id)} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg">Xóa</button>
+                      </div>
+                    </div>
+                  </div>
+                  {expandedIds.has(parent.maDanhMuc) && (
+                    <div className="p-6 border-t">
+                      {parent.children.length === 0 ? (
+                        <p className="text-gray-500">Chưa có danh mục con</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {(parent.children || []).filter(Boolean).map(child => (
+                            <div key={child.maDanhMuc ?? child.id} className="p-4 bg-gray-50 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-medium">{child.tenDanhMuc}</h4>
+                                  {child.moTa && <p className="text-sm text-gray-600">{child.moTa}</p>}
+                                  <p className="text-xs text-gray-400">#{child.maDanhMuc ?? child.id}</p>
+                                  <p className="text-sm text-gray-500 mt-2">Sản phẩm: {child.soLuongSanPham ?? 0}</p>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                  <button onClick={() => openModal(child)} className="text-sm text-blue-600">Chỉnh sửa</button>
+                                  <button onClick={() => handleDelete(child.maDanhMuc ?? child.id)} className="text-sm text-red-600">Xóa</button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
         )}
 
         {/* Summary Stats */}
@@ -335,29 +433,37 @@ const CategoryManagement = () => {
           </div>
 
           <div>
-            <label htmlFor="icon" className="block text-sm font-medium text-gray-700 mb-1">
-              Biểu tượng
+            <label htmlFor="moTa" className="block text-sm font-medium text-gray-700 mb-1">
+              Mô tả
             </label>
-            <div className="grid grid-cols-4 gap-3">
-              {iconOptions.map((option) => {
-                const IconComponent = option.component;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, icon: option.value })}
-                    className={`p-3 rounded-lg border-2 transition-colors flex flex-col items-center gap-1 ${
-                      formData.icon === option.value
-                        ? 'border-blue-500 bg-blue-50 text-blue-600'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                    }`}
-                  >
-                    <IconComponent className="text-lg" />
-                    <span className="text-xs">{option.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <textarea
+              id="moTa"
+              value={formData.moTa}
+              onChange={(e) => setFormData({ ...formData, moTa: e.target.value })}
+              placeholder="Mô tả ngắn cho danh mục"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows={3}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="parentId" className="block text-sm font-medium text-gray-700 mb-1">
+              Danh mục cha (tùy chọn)
+            </label>
+            <select
+              id="parentId"
+              value={formData.parentId ?? ''}
+              onChange={(e) => setFormData({ ...formData, parentId: e.target.value ? Number(e.target.value) : null })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">-- Không chọn --</option>
+              {categoriesFlat
+                .filter(Boolean)
+                .filter(c => c.maDanhMuc !== editingCategory?.maDanhMuc)
+                .map(c => (
+                  <option key={c.maDanhMuc ?? c.id} value={c.maDanhMuc ?? c.id}>{c.tenDanhMuc}</option>
+                ))}
+            </select>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

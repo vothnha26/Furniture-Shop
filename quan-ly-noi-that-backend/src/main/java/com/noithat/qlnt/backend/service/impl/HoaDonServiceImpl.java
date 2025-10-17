@@ -41,23 +41,23 @@ public class HoaDonServiceImpl implements HoaDonService {
         response.setDaThanhToan(tongHoaDon); // Tạm thời giả sử tất cả đã thanh toán
         response.setChoThanhToan(0L);
         response.setTongDoanhThu(tongDoanhThu);
-        
+
         return response;
     }
 
     @Override
     public List<HoaDonResponse> getAllHoaDon(String search) {
         List<HoaDon> hoaDonList;
-        
+
         if (search != null && !search.trim().isEmpty()) {
             hoaDonList = hoaDonRepository.findAll().stream()
-                    .filter(hd -> hd.getSoHoaDon() != null && 
-                                  hd.getSoHoaDon().toLowerCase().contains(search.toLowerCase()))
+                    .filter(hd -> hd.getSoHoaDon() != null &&
+                            hd.getSoHoaDon().toLowerCase().contains(search.toLowerCase()))
                     .collect(Collectors.toList());
         } else {
             hoaDonList = hoaDonRepository.findAll();
         }
-        
+
         return hoaDonList.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -67,7 +67,7 @@ public class HoaDonServiceImpl implements HoaDonService {
     public HoaDonChiTietResponse getHoaDonById(Integer id) {
         HoaDon hoaDon = hoaDonRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hóa đơn với ID: " + id));
-        
+
         return mapToChiTietResponse(hoaDon);
     }
 
@@ -82,14 +82,28 @@ public class HoaDonServiceImpl implements HoaDonService {
             throw new RuntimeException("Đơn hàng này đã có hóa đơn");
         }
 
-        NhanVien nhanVien = nhanVienRepository.findById(request.getMaNhanVienXuat())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên với ID: " + request.getMaNhanVienXuat()));
-
         HoaDon hoaDon = new HoaDon();
         hoaDon.setDonHang(donHang);
         hoaDon.setSoHoaDon(generateSoHoaDon());
         hoaDon.setNgayXuat(LocalDateTime.now());
-        hoaDon.setNhanVienXuat(nhanVien);
+        if (request.getMaNhanVienXuat() != null) {
+            NhanVien nhanVien = nhanVienRepository.findById(request.getMaNhanVienXuat())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Không tìm thấy nhân viên với ID: " + request.getMaNhanVienXuat()));
+            hoaDon.setNhanVienXuat(nhanVien);
+        } else {
+            // If caller didn't provide an employee, try to pick an existing one from DB
+            // to avoid inserting NULL into a column that is NOT NULL in the database
+            // schema.
+            List<NhanVien> all = nhanVienRepository.findAll();
+            if (!all.isEmpty()) {
+                hoaDon.setNhanVienXuat(all.get(0));
+            } else {
+                // No employee exists in DB — skip creating invoice to avoid DB constraint
+                // error.
+                return null;
+            }
+        }
         hoaDon.setTongTienThanhToan(donHang.getThanhTien());
 
         HoaDon savedHoaDon = hoaDonRepository.save(hoaDon);
@@ -105,7 +119,8 @@ public class HoaDonServiceImpl implements HoaDonService {
         // Cập nhật nhân viên xuất hóa đơn
         if (request.getMaNhanVienXuat() != null) {
             NhanVien nhanVien = nhanVienRepository.findById(request.getMaNhanVienXuat())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy nhân viên với ID: " + request.getMaNhanVienXuat()));
+                    .orElseThrow(() -> new RuntimeException(
+                            "Không tìm thấy nhân viên với ID: " + request.getMaNhanVienXuat()));
             hoaDon.setNhanVienXuat(nhanVien);
         }
 
@@ -136,18 +151,18 @@ public class HoaDonServiceImpl implements HoaDonService {
         response.setNgayXuat(hoaDon.getNgayXuat());
         response.setTongTien(hoaDon.getTongTienThanhToan());
         response.setTrangThaiThanhToan("Đã thanh toán"); // Tạm thời mặc định
-        
+
         if (hoaDon.getDonHang() != null) {
             response.setMaDonHang(String.valueOf(hoaDon.getDonHang().getMaDonHang()));
             if (hoaDon.getDonHang().getKhachHang() != null) {
                 response.setTenKhachHang(hoaDon.getDonHang().getKhachHang().getHoTen());
             }
         }
-        
+
         if (hoaDon.getNhanVienXuat() != null) {
             response.setNhanVienXuat(hoaDon.getNhanVienXuat().getHoTen());
         }
-        
+
         return response;
     }
 
@@ -157,20 +172,20 @@ public class HoaDonServiceImpl implements HoaDonService {
         response.setNgayXuat(hoaDon.getNgayXuat());
         response.setTongTienThanhToan(hoaDon.getTongTienThanhToan());
         response.setTrangThaiThanhToan("Đã thanh toán"); // Tạm thời mặc định
-        
+
         if (hoaDon.getDonHang() != null) {
             response.setMaDonHang(String.valueOf(hoaDon.getDonHang().getMaDonHang()));
             response.setNgayDat(hoaDon.getDonHang().getNgayDatHang());
-            
+
             if (hoaDon.getDonHang().getKhachHang() != null) {
                 response.setTenKhachHang(hoaDon.getDonHang().getKhachHang().getHoTen());
             }
         }
-        
+
         if (hoaDon.getNhanVienXuat() != null) {
             response.setNhanVienXuat(hoaDon.getNhanVienXuat().getHoTen());
         }
-        
+
         return response;
     }
 

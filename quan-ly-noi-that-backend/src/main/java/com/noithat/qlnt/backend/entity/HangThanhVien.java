@@ -1,5 +1,8 @@
 package com.noithat.qlnt.backend.entity;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,4 +34,7 @@ public class HangThanhVien {
 
     @Column(name = "Icon")
     private String icon; // Tên icon cho frontend
+
+    @OneToMany(mappedBy = "hangThanhVien", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<VipBenefit> vipBenefits = new ArrayList<>();
 }

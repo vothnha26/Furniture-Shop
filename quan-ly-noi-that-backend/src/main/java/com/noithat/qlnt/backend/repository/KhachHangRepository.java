@@ -26,6 +26,9 @@ public interface KhachHangRepository extends JpaRepository<KhachHang, Integer> {
     
     Optional<KhachHang> findBySoDienThoai(String soDienThoai);
     
+    // Tìm KhachHang theo tên đăng nhập của tài khoản liên kết
+    Optional<KhachHang> findByTaiKhoan_TenDangNhap(String tenDangNhap);
+    
     // Search functionality
     @Query("SELECT k FROM KhachHang k WHERE k.hoTen LIKE %:keyword% OR k.email LIKE %:keyword% OR k.soDienThoai LIKE %:keyword%")
     Page<KhachHang> findByKeyword(@Param("keyword") String keyword, Pageable pageable);

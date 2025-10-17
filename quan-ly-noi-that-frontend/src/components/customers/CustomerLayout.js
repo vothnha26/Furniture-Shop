@@ -10,7 +10,7 @@ import CustomerFavorites from './CustomerFavorites';
 import CustomerNotifications from './CustomerNotifications';
 import CustomerChat from './CustomerChat';
 
-const CustomerLayout = () => {
+const CustomerLayout = ({ children }) => {
   const [currentView, setCurrentView] = useState('shop');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cartCount] = useState(3); // Simulate cart count
@@ -33,6 +33,8 @@ const CustomerLayout = () => {
   const renderCurrentView = () => {
     // If a nested route element is present, render it instead of the internal tab view
     if (outlet) return outlet;
+    // If a direct child was passed (e.g. <CustomerLayout><CustomerCheckout/></CustomerLayout>), render it
+    if (children) return children;
     const view = views.find(v => v.id === currentView);
     if (view) {
       const Component = view.component;

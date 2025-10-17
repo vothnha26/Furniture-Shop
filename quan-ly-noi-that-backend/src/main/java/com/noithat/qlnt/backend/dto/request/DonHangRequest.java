@@ -6,26 +6,38 @@ import java.util.List;
 
 @Data
 public class DonHangRequest {
+
     @NotNull(message = "Mã khách hàng không được để trống")
     private Integer maKhachHang;
 
-    private Integer maVoucher; // Mã ID voucher (nếu có) - deprecated, dùng maCodeVoucher
-    private String maCodeVoucher; // Mã code voucher dạng chuỗi (vd: SALE100K)
-    
-    @Min(value = 0, message = "Điểm thưởng sử dụng phải >= 0")
-    private Integer diemThuongSuDung = 0; // Số điểm thưởng khách hàng muốn sử dụng
-    
-    private String ghiChu;
+    @NotEmpty(message = "Danh sách sản phẩm không được để trống")
+    private List<ThanhToanRequest> chiTietDonHangList; // Tận dụng lại DTO này để nhận giỏ hàng
 
-    @NotBlank(message = "Trạng thái đơn hàng không được để trống")
-    private String trangThai;
-
+    // ----- THÔNG TIN THANH TOÁN -----
     @NotBlank(message = "Phương thức thanh toán không được để trống")
     private String phuongThucThanhToan;
 
-    @NotEmpty(message = "Danh sách sản phẩm không được để trống")
-    private List<ChiTietDonHangRequest> chiTietDonHangList;
+    private String maVoucherCode; // Mã code voucher dạng chuỗi (vd: SALE100K)
+    
+    @Min(value = 0, message = "Điểm thưởng sử dụng phải là số không âm")
+    private Integer diemThuongSuDung = 0;
+    
+    @Min(value = 0, message = "Điểm thưởng nhận được phải là số không âm")
+    private Integer diemThuongNhanDuoc = 0;
 
-    // Danh sách dịch vụ (vận chuyển, lắp đặt, bảo hành...) - có thể null
-    private List<DonHangDichVuRequest> donHangDichVuList;
+    // ----- THÔNG TIN NGƯỜI NHẬN -----
+    @NotBlank(message = "Tên người nhận không được để trống")
+    private String tenNguoiNhan;
+
+    @NotBlank(message = "Số điện thoại người nhận không được để trống")
+    private String soDienThoaiNhan;
+
+    @NotBlank(message = "Địa chỉ giao hàng không được để trống")
+    private String diaChiGiaoHang;
+
+    private String ghiChu;
+
+    // ----- TRẠNG THÁI (Tùy chọn, backend có thể tự set giá trị mặc định) -----
+    private String trangThaiDonHang;
+    private String trangThaiThanhToan;
 }

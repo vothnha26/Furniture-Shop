@@ -2,7 +2,6 @@ package com.noithat.qlnt.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "ThongTinGiaoHang")
@@ -16,15 +15,13 @@ public class ThongTinGiaoHang {
     @JoinColumn(name = "MaDonHang", nullable = false, unique = true)
     private DonHang donHang;
 
+    // ----- THÔNG TIN VẬN HÀNH (Được admin cập nhật sau) -----
     @Column(name = "DonViVanChuyen")
-    private String donViVanChuyen;
+    private String donViVanChuyen; // Ví dụ: "Giao Hàng Tiết Kiệm"
 
     @Column(name = "MaVanDon")
-    private String maVanDon;
-
-    @Column(name = "PhiVanChuyen", precision = 18, scale = 2)
-    private BigDecimal phiVanChuyen = BigDecimal.ZERO;
+    private String maVanDon; // Mã để theo dõi đơn hàng
 
     @Column(name = "TrangThaiGiaoHang")
-    private String trangThaiGiaoHang;
+    private String trangThaiGiaoHang; // Ví dụ: "Đang lấy hàng", "Đang giao hàng"
 }

@@ -29,16 +29,34 @@ public class DataSeeder {
             SanPhamRepository sanPhamRepository,
             BienTheSanPhamRepository bienTheSanPhamRepository,
             ThuocTinhRepository thuocTinhRepository,
-            BienTheThuocTinhRepository bienTheThuocTinhRepository
+            BienTheThuocTinhRepository bienTheThuocTinhRepository,
+            VaiTroRepository vaiTroRepository
     ) {
         return args -> {
             // Skip if data already exists
-            if (nhaCungCapRepository.count() > 0) {
+            if (vaiTroRepository.count() > 0) {
                 System.out.println("=== Data already seeded, skipping... ===");
                 return;
             }
 
             System.out.println("=== Starting Data Seeding ===");
+
+            // 0. Seed Vai Trò (Roles)
+            System.out.println("Seeding Vai Trò...");
+            VaiTro adminRole = new VaiTro();
+            adminRole.setTenVaiTro("ADMIN");
+
+            VaiTro managerRole = new VaiTro();
+            managerRole.setTenVaiTro("MANAGER");
+
+            VaiTro staffRole = new VaiTro();
+            staffRole.setTenVaiTro("STAFF");
+
+            VaiTro userRole = new VaiTro();
+            userRole.setTenVaiTro("USER");
+
+            List<VaiTro> roles = vaiTroRepository.saveAll(Arrays.asList(adminRole, managerRole, staffRole, userRole));
+            System.out.println("✓ Created " + roles.size() + " roles");
 
             // 1. Seed Nhà Cung Cấp (Suppliers)
             System.out.println("Seeding Nhà Cung Cấp...");

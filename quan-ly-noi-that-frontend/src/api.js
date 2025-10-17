@@ -63,11 +63,21 @@ async function request(method, path, { body, query, headers } = {}) {
   return data;
 }
 
+function normalizeOpts(bodyOrOpts) {
+  // If caller passed an options object with keys like body/query/headers, use it.
+  if (!bodyOrOpts) return {};
+  if (typeof bodyOrOpts === 'object' && ('body' in bodyOrOpts || 'query' in bodyOrOpts || 'headers' in bodyOrOpts)) {
+    return bodyOrOpts;
+  }
+  // Otherwise treat the argument as the request body directly
+  return { body: bodyOrOpts };
+}
+
 export const api = {
   get: (path, opts) => request('GET', path, opts),
-  post: (path, opts) => request('POST', path, opts),
-  put: (path, opts) => request('PUT', path, opts),
-  patch: (path, opts) => request('PATCH', path, opts),
+  post: (path, bodyOrOpts) => request('POST', path, normalizeOpts(bodyOrOpts)),
+  put: (path, bodyOrOpts) => request('PUT', path, normalizeOpts(bodyOrOpts)),
+  patch: (path, bodyOrOpts) => request('PATCH', path, normalizeOpts(bodyOrOpts)),
   del: (path, opts) => request('DELETE', path, opts),
   buildUrl
 };

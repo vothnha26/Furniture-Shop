@@ -20,4 +20,10 @@ public interface SanPhamRepository extends JpaRepository<SanPham, Integer> {
     
     // Tìm sản phẩm theo danh mục
     List<SanPham> findByDanhMuc_MaDanhMuc(Integer maDanhMuc);
+
+    // Đếm số lượng sản phẩm trong một danh mục (không tính đệ quy)
+    long countByDanhMuc_MaDanhMuc(Integer maDanhMuc);
+
+    // Đếm số lượng sản phẩm trong một bộ sưu tập
+    long countByBoSuuTap_MaBoSuuTap(Integer maBoSuuTap);
 }

@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { CartProvider } from './contexts/CartContext';
 
 // Import admin components
 import AccountManagement from './components/admin/system/AccountManagement';
@@ -23,18 +22,22 @@ import Settings from './components/admin/system/Settings';
 import VIPManagement from './components/admin/customers/VIPManagement';
 import VoucherManagement from './components/admin/products/VoucherManagement';
 
-// Import customer components
-import CustomerFavorites from './components/customer/CustomerFavorites';
-import CustomerNotifications from './components/customer/CustomerNotifications';
-import CustomerOrders from './components/customer/CustomerOrders';
-import CustomerOrderTracking from './components/customer/CustomerOrderTracking';
-import CustomerProfile from './components/customer/CustomerProfile';
-import CustomerLayout from './components/customer/CustomerLayout';
-import CustomerCart from './components/customer/CustomerCart';
-import CustomerCheckout from './components/customer/CustomerCheckout';
-import CustomerProductDetail from './components/customer/CustomerProductDetail';
-import CustomerShop from './components/customer/CustomerShop';
-import CustomerShopPage from './components/customer/CustomerShopPage';
+// Import customer components (folder is `customers`)
+import CustomerFavorites from './components/customers/CustomerFavorites';
+import CustomerNotifications from './components/customers/CustomerNotifications';
+import CustomerOrders from './components/customers/CustomerOrders';
+import CustomerOrderTracking from './components/customers/CustomerOrderTracking';
+import CustomerProfile from './components/customers/CustomerProfile';
+import CustomerOrderConfirmation from './components/customers/CustomerOrderConfirmation';
+import CustomerAddresses from './components/customers/CustomerAddresses';
+import CustomerVouchers from './components/customers/CustomerVouchers';
+import CustomerLoyalty from './components/customers/CustomerLoyalty';
+import CustomerLayout from './components/customers/CustomerLayout';
+import CustomerCart from './components/customers/CustomerCart';
+import CustomerCheckout from './components/customers/CustomerCheckout';
+import CustomerProductDetail from './components/customers/CustomerProductDetail';
+import CustomerShop from './components/customers/CustomerShop';
+import CustomerShopPage from './components/customers/CustomerShopPage';
 
 // Import staff components
 import InventoryAlerts from './components/staff/inventory/InventoryAlerts';
@@ -47,6 +50,9 @@ import PaymentTransactionManagement from './components/staff/orders/PaymentTrans
 
 // Import shared components
 import Login from './components/shared/Login';
+import Register from './components/shared/Register';
+import OtpVerification from './components/shared/OtpVerification';
+import ForgotPassword from './components/shared/ForgotPassword';
 import PendingTasks from './components/shared/PendingTasks';
 import MainDashboard from './components/shared/MainDashboard';
 import Header from './components/shared/Header';
@@ -61,6 +67,8 @@ import Newsletter from './components/shared/Newsletter';
 import Footer from './components/shared/Footer';
 
 import MembershipTierManagement from './components/admin/products/MembershipTierManagement';
+import { CartProvider } from './contexts/CartContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Import styles
 import './slider.css';
@@ -145,8 +153,9 @@ const HomePage = () => {
 
 const App = () => {
   return (
-    <CartProvider>
       <Router>
+        <AuthProvider>
+          <CartProvider>
         <Routes>
           {/* ============================================
             PUBLIC ROUTES - Không cần đăng nhập
@@ -158,8 +167,9 @@ const App = () => {
 
           {/* Authentication */}
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Login />} /> {/* Có thể tạo component Register riêng */}
-          <Route path="/forgot-password" element={<Login />} /> {/* Có thể tạo component ForgotPassword riêng */}
+          <Route path="/register" element={<Register />} />
+          <Route path="/verify-otp" element={<OtpVerification />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Public Shop Pages (nested under CustomerLayout) */}
           <Route path="/shop" element={<CustomerLayout />}>
@@ -178,7 +188,7 @@ const App = () => {
           {/* Shopping Cart & Checkout */}
           <Route path="/cart" element={<CustomerLayout><CustomerCart /></CustomerLayout>} />
           <Route path="/checkout" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
-          <Route path="/checkout/success" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
+          <Route path="/checkout/success" element={<CustomerLayout><CustomerOrderConfirmation /></CustomerLayout>} />
           <Route path="/checkout/cancel" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
 
           {/* Customer Profile & Account */}
@@ -186,7 +196,11 @@ const App = () => {
           <Route path="/account" element={<Navigate to="/profile" replace />} />
           <Route path="/profile/edit" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
           <Route path="/profile/password" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-          <Route path="/profile/addresses" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
+          <Route path="/profile/addresses" element={<CustomerLayout><CustomerAddresses /></CustomerLayout>} />
+
+          {/* Additional customer pages */}
+          <Route path="/vouchers" element={<CustomerLayout><CustomerVouchers /></CustomerLayout>} />
+          <Route path="/loyalty" element={<CustomerLayout><CustomerLoyalty /></CustomerLayout>} />
 
           {/* Customer Orders */}
           <Route path="/orders" element={<CustomerLayout><CustomerOrders /></CustomerLayout>} />
@@ -408,8 +422,9 @@ const App = () => {
           {/* Catch all - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </CartProvider>
+        </AuthProvider>
       </Router>
-    </CartProvider>
   );
 };
 

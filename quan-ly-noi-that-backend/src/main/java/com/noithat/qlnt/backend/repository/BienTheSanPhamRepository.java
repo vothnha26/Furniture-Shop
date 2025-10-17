@@ -41,4 +41,9 @@ public interface BienTheSanPhamRepository extends JpaRepository<BienTheSanPham, 
 
     // Find by stock status (used by inventory checks)
     java.util.List<BienTheSanPham> findByTrangThaiKho(String trangThai);
+
+    // Atomically decrement stock if enough quantity exists. Returns number of rows updated (0 if not enough stock).
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE BienTheSanPham b SET b.soLuongTon = b.soLuongTon - :qty WHERE b.maBienThe = :id AND b.soLuongTon >= :qty")
+    int decrementStockIfAvailable(@org.springframework.data.repository.query.Param("id") Integer maBienThe, @org.springframework.data.repository.query.Param("qty") Integer qty);
 }

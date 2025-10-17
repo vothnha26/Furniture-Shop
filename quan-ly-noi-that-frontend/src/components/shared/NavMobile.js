@@ -4,8 +4,9 @@ import { navigation } from '../../data';
 const NavMobile = ({ isOpen, setIsOpen }) => {
   return (
     <div
+      aria-hidden={!isOpen}
       className={`${
-        isOpen ? 'right-0' : '-right-full'
+        isOpen ? 'right-0 pointer-events-auto' : '-right-full pointer-events-none'
       } fixed top-0 bottom-0 w-64 bg-white shadow-2xl transition-all duration-300 z-50`}
     >
       <div className='flex flex-col h-full'>

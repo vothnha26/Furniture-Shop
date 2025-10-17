@@ -1,23 +1,25 @@
 package com.noithat.qlnt.backend.service.impl;
 
-import com.noithat.qlnt.backend.dto.request.ChiTietDonHangRequest;
+import com.noithat.qlnt.backend.dto.request.CheckoutSummaryRequest;
 import com.noithat.qlnt.backend.dto.request.DonHangRequest;
-import com.noithat.qlnt.backend.dto.request.DonHangDichVuRequest;
+import com.noithat.qlnt.backend.dto.request.ThanhToanRequest;
 import com.noithat.qlnt.backend.dto.response.ChiTietDonHangResponse;
+import com.noithat.qlnt.backend.dto.response.CheckoutSummaryResponse;
 import com.noithat.qlnt.backend.dto.response.DonHangResponse;
-import com.noithat.qlnt.backend.dto.response.DonHangDichVuResponse;
 import com.noithat.qlnt.backend.dto.response.ThongKeBanHangResponse;
 import com.noithat.qlnt.backend.entity.*;
+import com.noithat.qlnt.backend.exception.AppException;
 import com.noithat.qlnt.backend.repository.*;
 import com.noithat.qlnt.backend.service.IDonHangService;
+import com.noithat.qlnt.backend.service.ThanhToanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,173 +28,106 @@ public class DonHangServiceImpl implements IDonHangService {
 
     private final DonHangRepository donHangRepository;
     private final KhachHangRepository khachHangRepository;
-    // Xóa SanPhamRepository không cần thiết và thêm BienTheSanPhamRepository
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final VoucherRepository voucherRepository;
-    private final DichVuRepository dichVuRepository;
-    private final com.noithat.qlnt.backend.service.VipBenefitProcessor vipBenefitProcessor;
-    
-    // Repositories cho xóa đơn hàng
+    private final ThanhToanService thanhToanService;
     private final GiaoDichThanhToanRepository giaoDichThanhToanRepository;
-    private final ChiTietDonHangRepository chiTietDonHangRepository;
-    private final DonHangDichVuRepository donHangDichVuRepository;
     private final LichSuTrangThaiDonHangRepository lichSuTrangThaiDonHangRepository;
 
     @Override
     @Transactional
     public DonHangResponse taoDonHang(DonHangRequest request) {
-        // 🔹 Lấy thông tin khách hàng
+        // 1. Xác thực khách hàng
         KhachHang khachHang = khachHangRepository.findById(request.getMaKhachHang())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng."));
+                .orElseThrow(() -> new AppException(404, "Không tìm thấy khách hàng."));
 
-        // 🔹 Tạo đơn hàng mới
+        // 2. Tạo đối tượng DonHang và map thông tin
         DonHang donHang = new DonHang();
         donHang.setKhachHang(khachHang);
-        donHang.setTrangThai(request.getTrangThai());
+        donHang.setNgayDatHang(LocalDateTime.now());
+        donHang.setTrangThaiDonHang(request.getTrangThaiDonHang() != null ? request.getTrangThaiDonHang() : "PENDING");
+        donHang.setTrangThaiThanhToan(
+                request.getTrangThaiThanhToan() != null ? request.getTrangThaiThanhToan() : "UNPAID");
         donHang.setPhuongThucThanhToan(request.getPhuongThucThanhToan());
         donHang.setGhiChu(request.getGhiChu());
+        donHang.setTenNguoiNhan(request.getTenNguoiNhan());
+        donHang.setSoDienThoaiNhan(request.getSoDienThoaiNhan());
+        donHang.setDiaChiGiaoHang(request.getDiaChiGiaoHang());
+        donHang.setDiemThuongNhanDuoc(request.getDiemThuongNhanDuoc());
 
-        // 🔹 Nếu có mã voucher
-        BigDecimal giamGiaVoucher = BigDecimal.ZERO;
-        Voucher voucher = null;
-        
-        // Ưu tiên sử dụng maCodeVoucher (String), nếu không có thì dùng maVoucher (Integer - deprecated)
-        if (request.getMaCodeVoucher() != null && !request.getMaCodeVoucher().trim().isEmpty()) {
-            voucher = voucherRepository.findByMaCode(request.getMaCodeVoucher())
-                    .orElseThrow(() -> new RuntimeException("Voucher với mã '" + request.getMaCodeVoucher() + "' không tồn tại."));
-        } else if (request.getMaVoucher() != null) {
-            voucher = voucherRepository.findById(request.getMaVoucher())
-                    .orElseThrow(() -> new RuntimeException("Voucher không tồn tại."));
-        }
-        
-        if (voucher != null) {
-            donHang.setVoucher(voucher);
-            giamGiaVoucher = voucher.getGiaTriGiam() != null ? voucher.getGiaTriGiam() : BigDecimal.ZERO;
-        }
-        
-        donHang.setGiamGiaVoucher(giamGiaVoucher);
+        // 3. Gọi procedure để tính toán lại toàn bộ giá trị
+        CheckoutSummaryRequest summaryRequest = new CheckoutSummaryRequest();
+        summaryRequest.setChiTietDonHang(request.getChiTietDonHangList());
+        summaryRequest.setMaKhachHang(request.getMaKhachHang());
+        summaryRequest.setDiemSuDung(request.getDiemThuongSuDung() != null ? request.getDiemThuongSuDung() : 0);
+        summaryRequest.setMaVoucherCode(request.getMaVoucherCode());
 
-        // 🔹 Xử lý chi tiết đơn hàng
+        CheckoutSummaryResponse summary = thanhToanService.getCheckoutSummary(summaryRequest);
+
+        // 4. Gán các giá trị đã tính vào DonHang
+        donHang.setTongTienGoc(summary.getTamTinh());
+        donHang.setGiamGiaVip(summary.getGiamGiaVip());
+        donHang.setGiamGiaVoucher(summary.getGiamGiaVoucher());
+        donHang.setDiemThuongSuDung(request.getDiemThuongSuDung());
+        donHang.setGiamGiaDiemThuong(summary.getGiamGiaDiem());
+        // summary.getDiemThuongNhanDuoc() returns BigDecimal (points may be returned
+        // from stored-proc). DonHang.diemThuongNhanDuoc is Integer, so convert
+        // safely (null -> 0).
+        if (summary.getDiemThuongNhanDuoc() != null) {
+            donHang.setDiemThuongNhanDuoc(summary.getDiemThuongNhanDuoc().intValue());
+        } else {
+            donHang.setDiemThuongNhanDuoc(0);
+        }
+
+        BigDecimal phiVanChuyen = "Miễn phí".equalsIgnoreCase(summary.getPhiGiaoHang()) ? BigDecimal.ZERO
+                : new BigDecimal(summary.getPhiGiaoHang());
+        donHang.setPhiGiaoHang(phiVanChuyen);
+        donHang.setThanhTien(summary.getTongCong());
+
+        // 5. Cập nhật Voucher
+        if (request.getMaVoucherCode() != null && !request.getMaVoucherCode().isEmpty()) {
+            Voucher voucher = voucherRepository.findByMaCode(request.getMaVoucherCode()).orElse(null);
+            if (voucher != null) {
+                donHang.setVoucher(voucher);
+                voucher.setSoLuongDaSuDung(voucher.getSoLuongDaSuDung() + 1);
+            }
+        }
+
+        // 6. Trừ điểm thưởng của khách hàng
+        if (request.getDiemThuongSuDung() != null && request.getDiemThuongSuDung() > 0) {
+            int diemHienCo = khachHang.getDiemThuong() != null ? khachHang.getDiemThuong() : 0;
+            if (request.getDiemThuongSuDung() > diemHienCo) {
+                throw new AppException(400, "Số điểm sử dụng vượt quá số điểm hiện có.");
+            }
+            khachHang.setDiemThuong(diemHienCo - request.getDiemThuongSuDung());
+        }
+
+        // 7. Tạo ChiTietDonHang và Trừ kho
         List<ChiTietDonHang> chiTietList = new ArrayList<>();
-        BigDecimal tongTienGoc = BigDecimal.ZERO;
+        for (ThanhToanRequest ct : request.getChiTietDonHangList()) {
+            BienTheSanPham bienThe = bienTheSanPhamRepository.findById(ct.getMaBienThe())
+                    .orElseThrow(() -> new AppException(404, "Không tìm thấy biến thể sản phẩm."));
 
-        for (ChiTietDonHangRequest ctReq : request.getChiTietDonHangList()) {
-            BienTheSanPham bienThe = bienTheSanPhamRepository.findById(ctReq.getMaBienThe())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể sản phẩm."));
+            if (bienThe.getSoLuongTon() < ct.getSoLuong()) {
+                throw new AppException(400, "Sản phẩm " + bienThe.getSku() + " không đủ số lượng tồn kho.");
+            }
+            bienThe.setSoLuongTon(bienThe.getSoLuongTon() - ct.getSoLuong());
 
             ChiTietDonHang chiTiet = new ChiTietDonHang();
+            chiTiet.setDonHang(donHang);
             chiTiet.setBienThe(bienThe);
-            chiTiet.setSoLuong(ctReq.getSoLuong());
-
-            BigDecimal donGia = bienThe.getGiaBan();
-            chiTiet.setDonGiaGoc(donGia);      // ✅ Thêm dòng này: set giá gốc
-            chiTiet.setDonGiaThucTe(donGia);   // Giá thực tế ban đầu = giá gốc
-
-            BigDecimal thanhTien = donGia.multiply(BigDecimal.valueOf(ctReq.getSoLuong()));
-            tongTienGoc = tongTienGoc.add(thanhTien);
-
-            chiTiet.setDonHang(donHang); // ⚠️ liên kết ngược bắt buộc
+            chiTiet.setSoLuong(ct.getSoLuong());
+            chiTiet.setDonGiaGoc(bienThe.getGiaBan());
+            chiTiet.setDonGiaThucTe(bienThe.getGiaBan());
             chiTietList.add(chiTiet);
         }
-
-        // 🔹 Xử lý dịch vụ (vận chuyển, lắp đặt...)
-        List<DonHangDichVu> dichVuList = new ArrayList<>();
-        BigDecimal chiPhiDichVu = BigDecimal.ZERO;
-
-        if (request.getDonHangDichVuList() != null && !request.getDonHangDichVuList().isEmpty()) {
-            for (DonHangDichVuRequest dvReq : request.getDonHangDichVuList()) {
-                DichVu dichVu = dichVuRepository.findById(dvReq.getMaDichVu())
-                        .orElseThrow(() -> new RuntimeException("Không tìm thấy dịch vụ."));
-
-                DonHangDichVu donHangDichVu = new DonHangDichVu();
-                donHangDichVu.setDichVu(dichVu);
-                donHangDichVu.setSoLuong(dvReq.getSoLuong());
-                donHangDichVu.setDonHang(donHang); // Liên kết ngược
-
-                BigDecimal thanhTienDichVu = dichVu.getChiPhi().multiply(BigDecimal.valueOf(dvReq.getSoLuong()));
-                chiPhiDichVu = chiPhiDichVu.add(thanhTienDichVu);
-
-                dichVuList.add(donHangDichVu);
-            }
-        }
-
-        donHang.setChiPhiDichVu(chiPhiDichVu);
-
-        // 🔹 Xử lý điểm thưởng (1 điểm = 1,000đ)
-        BigDecimal giamGiaDiemThuong = BigDecimal.ZERO;
-        Integer diemSuDung = request.getDiemThuongSuDung() != null ? request.getDiemThuongSuDung() : 0;
-
-        if (diemSuDung > 0) {
-            // Kiểm tra khách hàng có đủ điểm không
-            if (khachHang.getDiemThuong() < diemSuDung) {
-                throw new RuntimeException("Khách hàng chỉ có " + khachHang.getDiemThuong() + " điểm, không đủ để sử dụng " + diemSuDung + " điểm.");
-            }
-
-            // Tính giá trị giảm giá từ điểm (1 điểm = 1,000đ)
-            giamGiaDiemThuong = BigDecimal.valueOf(diemSuDung * 1000);
-
-            // Giảm điểm của khách hàng
-            khachHang.setDiemThuong(khachHang.getDiemThuong() - diemSuDung);
-            khachHangRepository.save(khachHang);
-
-            donHang.setDiemThuongSuDung(diemSuDung);
-            donHang.setGiamGiaDiemThuong(giamGiaDiemThuong);
-        } else {
-            donHang.setDiemThuongSuDung(0);
-            donHang.setGiamGiaDiemThuong(BigDecimal.ZERO);
-        }
-        
-        // Kiểm tra miễn phí vận chuyển từ VIP
-        boolean mienPhiVanChuyenVip = vipBenefitProcessor.hasFreshipping(khachHang);
-        BigDecimal chiPhiDichVuSauVip = vipBenefitProcessor.calculateShippingCostAfterVipBenefit(khachHang, chiPhiDichVu);
-
-        // 🔹 Tính tổng tiền và thành tiền sau tất cả giảm giá + chi phí dịch vụ
-        // Công thức: Thành tiền = (Tổng tiền gốc - Giảm VIP - Giảm voucher - Giảm điểm thưởng) + Chi phí dịch vụ sau VIP
-        donHang.setTongTienGoc(tongTienGoc);
-        donHang.setMienPhiVanChuyen(mienPhiVanChuyenVip);
-        donHang.setChiPhiDichVu(chiPhiDichVuSauVip); // Cập nhật chi phí sau khi áp dụng VIP
-        
-        BigDecimal thanhTienSauGiam = tongTienGoc
-                .subtract(giamGiaVoucher)    // 🎫 Giảm voucher
-                .subtract(giamGiaDiemThuong) // 🏆 Giảm điểm thưởng
-                .add(chiPhiDichVuSauVip);    // 🚚 Chi phí vận chuyển (có thể miễn phí)
-
-        donHang.setThanhTien(thanhTienSauGiam);
-
-        // 🔹 TÍCH ĐIỂM VIP THƯỞNG 🏆
-        Integer vipBonusPoints = vipBenefitProcessor.calculateVipBonusPoints(khachHang, thanhTienSauGiam);
-        donHang.setDiemVipThuong(vipBonusPoints);
-        
-        if (vipBonusPoints > 0) {
-            // Cộng điểm VIP vào tài khoản khách hàng
-            khachHang.setDiemThuong(khachHang.getDiemThuong() + vipBonusPoints);
-            
-            // Cập nhật tổng chi tiêu và số đơn hàng cho VIP tracking
-            if (khachHang.getTongChiTieu() == null) {
-                khachHang.setTongChiTieu(BigDecimal.ZERO);
-            }
-            khachHang.setTongChiTieu(khachHang.getTongChiTieu().add(thanhTienSauGiam));
-            
-            if (khachHang.getTongDonHang() == null) {
-                khachHang.setTongDonHang(0);
-            }
-            khachHang.setTongDonHang(khachHang.getTongDonHang() + 1);
-            khachHang.setDonHangCuoi(java.time.LocalDate.now());
-            
-            khachHangRepository.save(khachHang);
-        }
-
-        // 🔹 Gắn danh sách chi tiết và dịch vụ vào đơn hàng
         donHang.setChiTietDonHangs(chiTietList);
-        donHang.setDonHangDichVus(dichVuList);
 
-        // 🔹 Lưu đơn hàng và chi tiết
-        donHangRepository.save(donHang);
+        // 8. Lưu tất cả thay đổi
+        DonHang savedDonHang = donHangRepository.save(donHang);
 
-        // ✅ Trả về response
-        return mapToResponse(donHang);
+        return mapToResponse(savedDonHang);
     }
-
 
     @Override
     public DonHangResponse getDonHangById(Integer id) {
@@ -208,145 +143,106 @@ public class DonHangServiceImpl implements IDonHangService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<DonHangResponse> getDonHangByKhachHang(Integer maKhachHang) {
+        return donHangRepository.findByKhachHang(maKhachHang).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 
     @Override
+    @Transactional
     public void capNhatTrangThai(Integer id, String trangThai) {
         DonHang donHang = donHangRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + id));
-        donHang.setTrangThai(trangThai);
+        donHang.setTrangThaiDonHang(trangThai);
         donHangRepository.save(donHang);
     }
 
     @Override
     public ThongKeBanHangResponse thongKeBanHang() {
-        // Đếm tổng số đơn hàng
         long tongDonHang = donHangRepository.count();
+        long choXuLy = donHangRepository.countByTrangThaiDonHang("PENDING");
+        long hoanThanh = donHangRepository.countByTrangThaiDonHang("COMPLETED");
+        BigDecimal doanhThu = donHangRepository.sumThanhTienByTrangThaiDonHang("COMPLETED");
 
-        // Đếm theo trạng thái
-        long choXuLy = donHangRepository.findAll().stream()
-                .filter(dh -> "Chờ xử lý".equalsIgnoreCase(dh.getTrangThai()))
-                .count();
-
-        long hoanThanh = donHangRepository.findAll().stream()
-                .filter(dh -> "Hoàn thành".equalsIgnoreCase(dh.getTrangThai()))
-                .count();
-
-        // Tính doanh thu (lọc null)
-        BigDecimal doanhThuHomNay = donHangRepository.findAll().stream()
-                .map(DonHang::getThanhTien)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // Gán dữ liệu vào DTO
         ThongKeBanHangResponse response = new ThongKeBanHangResponse();
         response.setTongDonHang(tongDonHang);
         response.setChoXuLy(choXuLy);
         response.setHoanThanh(hoanThanh);
-        response.setDoanhThuHomNay(doanhThuHomNay);
-
+        response.setDoanhThuHomNay(doanhThu != null ? doanhThu : BigDecimal.ZERO);
         return response;
     }
-
 
     @Override
     @Transactional
     public void xoaDonHang(Integer id) {
         DonHang donHang = donHangRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + id));
-        
-        // 🔹 Xóa các bản ghi liên quan theo thứ tự
-        // 1. Xóa giao dịch thanh toán
+
+        // Hoàn kho, hoàn điểm, hoàn voucher...
+        // (Cần thêm logic chi tiết ở đây nếu trạng thái đơn hàng không phải là đã hủy)
+
+        // Xóa các bản ghi phụ thuộc trước
+        // Repository interfaces don't expose deleteByDonHang_MaDonHang; fetch the
+        // related entities and delete them via repository.deleteAll(...) to keep
+        // behavior explicit and avoid adding custom repository methods.
         List<GiaoDichThanhToan> giaoDichList = giaoDichThanhToanRepository.findByDonHang_MaDonHang(id);
-        if (!giaoDichList.isEmpty()) {
+        if (giaoDichList != null && !giaoDichList.isEmpty()) {
             giaoDichThanhToanRepository.deleteAll(giaoDichList);
         }
-        
-        // 2. Xóa lịch sử trạng thái đơn hàng
+
         List<LichSuTrangThaiDonHang> lichSuList = lichSuTrangThaiDonHangRepository.findByDonHangOrderByThoiGianThayDoiDesc(id);
-        if (!lichSuList.isEmpty()) {
+        if (lichSuList != null && !lichSuList.isEmpty()) {
             lichSuTrangThaiDonHangRepository.deleteAll(lichSuList);
         }
-        
-        // 3. Xóa chi tiết đơn hàng
-        List<ChiTietDonHang> chiTietList = chiTietDonHangRepository.findByDonHangId(id);
-        if (!chiTietList.isEmpty()) {
-            chiTietDonHangRepository.deleteAll(chiTietList);
-        }
-        
-        // 4. Xóa dịch vụ đơn hàng (nếu có)
-        // DonHangDichVu có composite key, cần xóa thông qua đơn hàng entity
-        if (donHang.getDonHangDichVus() != null && !donHang.getDonHangDichVus().isEmpty()) {
-            donHangDichVuRepository.deleteAll(donHang.getDonHangDichVus());
-        }
-        
-        // 5. Cuối cùng xóa đơn hàng
+
+        // Jpa tự xử lý xóa ChiTietDonHang nhờ CascadeType.ALL
+
+        // Cuối cùng xóa đơn hàng
         donHangRepository.delete(donHang);
     }
 
-    // =================== PRIVATE MAPPER ===================
-        // Lấy danh sách chi tiết đơn hàng trực tiếp từ quan hệ trong entity DonHang
-        // Điều này yêu cầu bạn phải định nghĩa đúng quan hệ @OneToMany trong entity DonHang
     private DonHangResponse mapToResponse(DonHang donHang) {
         DonHangResponse response = new DonHangResponse();
-            // ... các dòng code gán mã đơn hàng, tên khách hàng, v.v...
         response.setMaDonHang(donHang.getMaDonHang());
-        response.setTenKhachHang(donHang.getKhachHang().getHoTen());
+        if (donHang.getKhachHang() != null) {
+            response.setTenKhachHang(donHang.getKhachHang().getHoTen());
+        }
         response.setNgayDatHang(donHang.getNgayDatHang());
+        response.setTrangThai(donHang.getTrangThaiDonHang());
         response.setTongTienGoc(donHang.getTongTienGoc());
         response.setGiamGiaVoucher(donHang.getGiamGiaVoucher());
         response.setDiemThuongSuDung(donHang.getDiemThuongSuDung());
         response.setGiamGiaDiemThuong(donHang.getGiamGiaDiemThuong());
         response.setGiamGiaVip(donHang.getGiamGiaVip());
-        response.setDiemVipThuong(donHang.getDiemVipThuong());
-        response.setMienPhiVanChuyen(donHang.getMienPhiVanChuyen());
-        response.setChiPhiDichVu(donHang.getChiPhiDichVu());
+    // Compute total discount (VIP + Voucher + Điểm) for convenience on frontend
+    java.math.BigDecimal vipDisc = donHang.getGiamGiaVip() != null ? donHang.getGiamGiaVip() : java.math.BigDecimal.ZERO;
+    java.math.BigDecimal vouDisc = donHang.getGiamGiaVoucher() != null ? donHang.getGiamGiaVoucher() : java.math.BigDecimal.ZERO;
+    java.math.BigDecimal diemDisc = donHang.getGiamGiaDiemThuong() != null ? donHang.getGiamGiaDiemThuong() : java.math.BigDecimal.ZERO;
+    response.setTongGiamGia(vipDisc.add(vouDisc).add(diemDisc));
+        response.setChiPhiDichVu(donHang.getPhiGiaoHang());
         response.setThanhTien(donHang.getThanhTien());
-        response.setTrangThai(donHang.getTrangThai());
-        response.setVoucherCode(
-        donHang.getVoucher() != null ? String.valueOf(donHang.getVoucher().getMaVoucher()) : null
-        );
+        if (donHang.getVoucher() != null) {
+            response.setVoucherCode(donHang.getVoucher().getMaCode());
+        }
 
-            // SỬA LẠI LOGIC BÊN TRONG HÀM MAP
+        if (donHang.getChiTietDonHangs() != null) {
             List<ChiTietDonHangResponse> chiTietList = donHang.getChiTietDonHangs().stream()
                     .map(ct -> {
-                        // Lấy ra các thông tin cần thiết từ chi tiết đơn hàng (ct)
                         BienTheSanPham bienThe = ct.getBienThe();
-                        SanPham sanPham = bienThe.getSanPham();
-                        int soLuong = ct.getSoLuong();
-                        BigDecimal donGia = ct.getDonGiaThucTe();
+                        SanPham sanPham = bienThe != null ? bienThe.getSanPham() : null;
 
-                        // Tính toán thành tiền cho từng dòng sản phẩm
-                        BigDecimal thanhTien = donGia.multiply(BigDecimal.valueOf(soLuong));
-
-                        // Gọi constructor với đủ 5 tham số
                         return new ChiTietDonHangResponse(
-                                sanPham.getTenSanPham(),   // 1. tenSanPham (String)
-                                bienThe.getSku(),          // 2. sku (String)
-                                soLuong,                   // 3. soLuong (int)
-                                donGia,                    // 4. donGia (BigDecimal)
-                                thanhTien                  // 5. thanhTien (BigDecimal)
-                        );
+                                sanPham != null ? sanPham.getTenSanPham() : "N/A",
+                                bienThe != null ? bienThe.getSku() : "N/A",
+                                ct.getSoLuong(),
+                                ct.getDonGiaGoc(),
+                                ct.getDonGiaThucTe().multiply(BigDecimal.valueOf(ct.getSoLuong())));
                     }).collect(Collectors.toList());
-            
             response.setChiTietDonHangList(chiTietList);
+        }
 
-            // Map danh sách dịch vụ
-            List<DonHangDichVuResponse> dichVuList = donHang.getDonHangDichVus().stream()
-                    .map(dhdv -> {
-                        DichVu dichVu = dhdv.getDichVu();
-                        Integer soLuong = dhdv.getSoLuong();
-                        BigDecimal chiPhi = dichVu.getChiPhi();
-                        BigDecimal thanhTien = chiPhi.multiply(BigDecimal.valueOf(soLuong));
-
-                        return new DonHangDichVuResponse(
-                                dichVu.getTenDichVu(),
-                                soLuong,
-                                chiPhi,
-                                thanhTien
-                        );
-                    }).collect(Collectors.toList());
-
-            response.setDonHangDichVuList(dichVuList);
-            return response;
+        return response;
     }
 }

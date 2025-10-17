@@ -24,7 +24,7 @@ public class HoaDon {
     private LocalDateTime ngayXuat = LocalDateTime.now();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "MaNhanVienXuat", nullable = false)
+    @JoinColumn(name = "MaNhanVienXuat", nullable = true)
     private NhanVien nhanVienXuat;
 
     @Column(name = "TongTienThanhToan", precision = 18, scale = 2, nullable = false)

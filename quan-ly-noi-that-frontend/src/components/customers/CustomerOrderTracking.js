@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { IoSearch, IoLocation, IoTime, IoCheckmarkCircle, IoCar, IoClose, IoRefresh } from 'react-icons/io5';
 import api from '../../api';
 
@@ -47,8 +48,12 @@ const CustomerOrderTracking = () => {
   const searchOrderTracking = async (trackingNumberParam) => {
     try {
       const response = await api.get(`/api/v1/theo-doi-don-hang/ma-van-don/${trackingNumberParam}`);
-      return mapTrackingFromApi(response.data);
-    } catch (error) {
+      const data = response?.data ?? response;
+      if (!data) throw new Error('Không tìm thấy thông tin vận đơn');
+      return mapTrackingFromApi(data);
+    } catch (err) {
+      // attach original error for debugging
+      console.warn('searchOrderTracking error', err);
       throw new Error('Không tìm thấy thông tin vận đơn');
     }
   };
@@ -56,8 +61,11 @@ const CustomerOrderTracking = () => {
   const searchOrderById = async (orderId) => {
     try {
       const response = await api.get(`/api/v1/theo-doi-don-hang/${orderId}`);
-      return mapTrackingFromApi(response.data);
-    } catch (error) {
+      const data = response?.data ?? response;
+      if (!data) throw new Error('Không tìm thấy đơn hàng');
+      return mapTrackingFromApi(data);
+    } catch (err) {
+      console.warn('searchOrderById error', err);
       throw new Error('Không tìm thấy đơn hàng');
     }
   };
@@ -86,6 +94,29 @@ const CustomerOrderTracking = () => {
     }
   };
 
+  // Auto-search when route provides an id param (e.g. /orders/:id)
+  const params = useParams();
+  useEffect(() => {
+    const id = params?.id;
+    if (id) {
+      setTrackingNumber(String(id));
+      (async () => {
+        setIsSearching(true);
+        setError('');
+        try {
+          const result = await searchOrderById(id);
+          setSearchResult(result);
+        } catch (err) {
+          setError(err.message || 'Không tìm thấy');
+          setSearchResult(null);
+        } finally {
+          setIsSearching(false);
+        }
+      })();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.id]);
+
   // When no search result, keep searchResult null and show message in UI
 
   const getStatusInfo = (status) => {
@@ -100,6 +131,11 @@ const CustomerOrderTracking = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Tra cứu đơn hàng</h1>
           <p className="text-gray-600">Nhập mã vận đơn để theo dõi trạng thái giao hàng</p>
         </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-6">
+            {error}
+          </div>
+        )}
 
         {/* Search Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
@@ -201,7 +237,6 @@ const CustomerOrderTracking = () => {
                 {searchResult.timeline.map((step, index) => {
                   const statusInfo = getStatusInfo(step.status);
                   const IconComponent = statusInfo.icon;
-                  const isLast = index === searchResult.timeline.length - 1;
                   
                   return (
                     <div key={index} className="flex items-start space-x-4">

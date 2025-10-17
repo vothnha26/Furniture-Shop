@@ -289,6 +289,18 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         donHang.setGiamGiaDiemThuong(summary.getGiamGiaDiem());
         donHang.setDiemThuongSuDung(request.getDiemThuongSuDung());
 
+        // Persist server-calculated earned points into the order so the UI's preview matches the saved record
+        if (summary.getDiemThuongNhanDuoc() != null) {
+            try {
+                donHang.setDiemThuongNhanDuoc(summary.getDiemThuongNhanDuoc().intValue());
+            } catch (Exception ex) {
+                // fallback: if conversion fails, set zero
+                donHang.setDiemThuongNhanDuoc(0);
+            }
+        } else {
+            donHang.setDiemThuongNhanDuoc(0);
+        }
+
     // If frontend provided a shipping method, prefer configuration-based fees
     BigDecimal phiVanChuyen = null;
     String phuongThucGiaoHang = request.getPhuongThucGiaoHang();
@@ -351,6 +363,11 @@ public class ThanhToanServiceImpl implements ThanhToanService {
             ChiTietDonHang chiTiet = new ChiTietDonHang();
             chiTiet.setDonHang(donHang);
             chiTiet.setBienThe(bienThe);
+            // Ensure the embedded id has the variant id so Hibernate can set it and avoid NPEs
+            if (chiTiet.getId() == null) {
+                chiTiet.setId(new ChiTietDonHang.ChiTietDonHangId());
+            }
+            chiTiet.getId().setMaBienThe(bienThe.getMaBienThe());
             chiTiet.setSoLuong(ct.getSoLuong());
             chiTiet.setDonGiaGoc(detail.getGiaGoc()); // Lấy giá gốc từ SP
             chiTiet.setDonGiaThucTe(detail.getGiaHienThi()); // Gán giá thực tế đã có khuyến mãi

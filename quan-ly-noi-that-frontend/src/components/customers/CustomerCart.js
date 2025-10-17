@@ -38,14 +38,14 @@ const CustomerCart = () => {
           {/* Cart Items */}
           <div className="divide-y divide-gray-200">
             {cartItems.map((item) => (
-              <div key={item.id} className="p-6 flex items-center">
+              <div key={item.variantId ?? item.id} className="p-6 flex items-center">
                 <img
                   src={item.image || '/placeholder-product.jpg'}
                   alt={item.name}
                   className="w-20 h-20 object-cover rounded-lg mr-4"
                 />
                 <div className="flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">{item.name}</h3>
+                  <h3 className="text-lg font-medium text-gray-900">{item.displayName || item.name}</h3>
                   <p className="text-gray-600">{item.price?.toLocaleString('vi-VN')}₫</p>
                 </div>
                 <div className="flex items-center space-x-3">

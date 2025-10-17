@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 public class ChiTietDonHang implements Serializable {
 
     @EmbeddedId
-    private ChiTietDonHangId id = new ChiTietDonHangId();
+    private ChiTietDonHangId id = new ChiTietDonHangId(); // ensure an id object exists so Hibernate can set nested fields during persist
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("maDonHang")
@@ -53,7 +53,18 @@ public class ChiTietDonHang implements Serializable {
     public static ChiTietDonHang create(DonHang donHang, BienTheSanPham bienThe, 
                                        Integer soLuong, BigDecimal donGiaGoc, BigDecimal donGiaThucTe) {
         ChiTietDonHang chiTiet = new ChiTietDonHang();
-        chiTiet.setId(ChiTietDonHangId.of(donHang.getMaDonHang(), bienThe.getMaBienThe()));
+        // Populate the embedded id fields defensively. Always set maBienThe from the variant.
+        // Only set maDonHang if DonHang already has a generated id. When DonHang is new
+        // (not yet persisted, maDonHang == null) we avoid setting maDonHang; Hibernate will
+        // populate the composite key from the association when the parent is persisted.
+        ChiTietDonHangId id = new ChiTietDonHangId();
+        if (donHang != null && donHang.getMaDonHang() != null) {
+            id.setMaDonHang(donHang.getMaDonHang());
+        }
+        if (bienThe != null && bienThe.getMaBienThe() != null) {
+            id.setMaBienThe(bienThe.getMaBienThe());
+        }
+        chiTiet.setId(id);
         chiTiet.setDonHang(donHang);
         chiTiet.setBienThe(bienThe);
         chiTiet.setSoLuong(soLuong);

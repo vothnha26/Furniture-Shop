@@ -210,7 +210,12 @@ public class DonHangServiceImpl implements IDonHangService {
             response.setTenKhachHang(donHang.getKhachHang().getHoTen());
         }
         response.setNgayDatHang(donHang.getNgayDatHang());
+        if (donHang.getNgayDatHang() != null) {
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            response.setNgayDatHangStr(donHang.getNgayDatHang().format(fmt));
+        }
         response.setTrangThai(donHang.getTrangThaiDonHang());
+    response.setDiaChiGiaoHang(donHang.getDiaChiGiaoHang());
         response.setTongTienGoc(donHang.getTongTienGoc());
         response.setGiamGiaVoucher(donHang.getGiamGiaVoucher());
         response.setDiemThuongSuDung(donHang.getDiemThuongSuDung());

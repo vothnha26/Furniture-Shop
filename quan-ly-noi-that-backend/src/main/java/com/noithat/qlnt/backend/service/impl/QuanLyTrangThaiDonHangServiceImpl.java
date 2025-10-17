@@ -48,8 +48,9 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
 
     // Check if transition is valid
     if (!canChangeStatus(maDonHang, trangThaiMoi)) {
-        throw new RuntimeException("Không thể chuyển từ trạng thái '" + trangThaiCu +
-            "' sang '" + trangThaiMoi + "'");
+        // Log and return false so controller can return a 400 response instead of 500
+        System.out.println("Invalid status transition attempted for order " + maDonHang + ": '" + trangThaiCu + "' -> '" + trangThaiMoi + "'");
+        return false;
     }
 
         // Update order status
@@ -76,13 +77,32 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
         String trangThaiCuRaw = donHang.getTrangThaiDonHang();
         String trangThaiCu = normalizeStoredStatus(trangThaiCuRaw);
 
+        // Special-case: allow cancellation (HUY_BO) from most non-final states.
+        // Business rule: customers/staff should be able to cancel an order so long as
+        // it is not already completed or already canceled.
+        if (IQuanLyTrangThaiDonHangService.HUY_BO.equals(trangThaiMoi)) {
+            if (HOAN_THANH.equals(trangThaiCu) || HUY_BO.equals(trangThaiCu)) {
+                // Already finished or already canceled -> cannot cancel
+                System.out.println("Cannot cancel order " + maDonHang + " because current status is final: " + trangThaiCuRaw);
+                return false;
+            }
+            // Allow cancellation from other states
+            return true;
+        }
+
         // Check if current status exists in transition map
         if (!VALID_TRANSITIONS.containsKey(trangThaiCu)) {
+            // If the stored status is unknown, log for diagnostics and disallow non-cancellation transitions
+            System.out.println("Unknown current order status for order " + maDonHang + ": '" + trangThaiCuRaw + "' (normalized='" + trangThaiCu + "')");
             return false;
         }
 
         // Check if new status is in the list of valid transitions
-        return VALID_TRANSITIONS.get(trangThaiCu).contains(trangThaiMoi);
+        boolean allowed = VALID_TRANSITIONS.get(trangThaiCu).contains(trangThaiMoi);
+        if (!allowed) {
+            System.out.println("Invalid transition attempted for order " + maDonHang + ": '" + trangThaiCu + "' -> '" + trangThaiMoi + "'");
+        }
+        return allowed;
     }
 
     /**

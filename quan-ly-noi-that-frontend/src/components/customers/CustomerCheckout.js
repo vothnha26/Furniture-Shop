@@ -64,7 +64,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
           console.log('👤 [CustomerCheckout] Parsed user:', user);
 
           const customerData = {
-            customerId: user.maKhachHang || user.id || null,
+            customerId: 1 || user.id || null,
             name: user.hoTen || user.name || '',
             phone: user.soDienThoai || user.phone || '',
             email: user.email || ''
@@ -95,7 +95,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
       try {
         const payload = {
           chiTietDonHang: cartItems.map(item => ({
-            maBienThe: item.id,
+            maBienThe: item.variantId ?? item.id,
             soLuong: item.quantity
           }))
         };
@@ -344,7 +344,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
       }
 
       const payload = {
-        chiTietDonHang: cartItems.map(item => ({ maBienThe: item.id, soLuong: item.quantity })),
+        chiTietDonHang: cartItems.map(item => ({ maBienThe: item.variantId ?? item.id, soLuong: item.quantity })),
         maKhachHang: customerInfo.customerId || 1, // Default to 1 for guest
         diemSuDung: appliedLoyaltyPoints || 0,
         maVoucherCode: selectedVoucher?.code || null
@@ -489,10 +489,10 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
 
     try {
       // Build payload according to ThongTinGiaoHangRequest
-      const payload = {
-        maKhachHang: customerInfo.customerId || null,
-        phuongThucThanhToan: paymentMethod,
-        chiTietDonHangList: cartItems.map(i => ({ maBienThe: i.id, soLuong: i.quantity })),
+  const payload = {
+  maKhachHang: customerInfo.customerId || 1,
+  phuongThucThanhToan: paymentMethod,
+  chiTietDonHangList: cartItems.map(i => ({ maBienThe: i.variantId ?? i.id, soLuong: i.quantity })),
         tenNguoiNhan: shippingInfo.fullName,
         soDienThoaiNhan: shippingInfo.phone,
         diaChiGiaoHang: `${shippingInfo.address}${shippingInfo.ward ? ', ' + shippingInfo.ward : ''}${shippingInfo.district ? ', ' + shippingInfo.district : ''}${shippingInfo.city ? ', ' + shippingInfo.city : ''}`,
@@ -512,10 +512,25 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         diemThuongSuDung: appliedLoyaltyPoints || 0
       };
 
-      console.log('🔔 [PlaceOrder] Sending payload to /api/thanhtoan/tao-don-hang/', payload);
+      console.log('🔔 [PlaceOrder] Sending payload to /api/thanhtoan/tao-don-hang', { body: payload });
 
-      // Use trailing slash to avoid possible redirect (which can turn POST into GET)
-      const resp = await api.post('/api/thanhtoan/tao-don-hang/', payload);
+      // Try both variants (without and with trailing slash) to avoid server redirect issues
+      let resp = null;
+      const endpointsToTry = ['/api/thanhtoan/tao-don-hang', '/api/thanhtoan/tao-don-hang'];
+      let lastErr = null;
+      for (const ep of endpointsToTry) {
+        try {
+          console.log(`🔁 [PlaceOrder] Trying POST ${ep}`);
+          resp = await api.post(ep, payload);
+          console.log(`✅ [PlaceOrder] Success from ${ep}`);
+          lastErr = null;
+          break;
+        } catch (e) {
+          console.warn(`⚠️ [PlaceOrder] Attempt failed for ${ep}:`, e?.status, e?.data || e?.message || e);
+          lastErr = e;
+        }
+      }
+      if (!resp && lastErr) throw lastErr;
       console.log('✅ [PlaceOrder] Response:', resp);
       // save server response and current preview so success screen can show authoritative values
       setLastOrderResponse(resp || null);
@@ -543,8 +558,20 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
     } catch (err) {
       // Log more details from the API helper so we can see HTTP status and body
       console.error('❌ [PlaceOrder] Error creating order:', err, 'status=', err?.status, 'data=', err?.data);
-      const serverMsg = err?.data?.message || err?.data?.details || err?.data || err?.message;
-      const msg = serverMsg || 'Có lỗi xảy ra, vui lòng thử lại';
+
+      // Try to extract a friendly server message. Backend often returns { success:false, message: '...' }
+      let serverMsg = null;
+      if (err) {
+        if (err?.data && typeof err.data === 'object') {
+          serverMsg = err.data.message || err.data.detail || err.data.error || JSON.stringify(err.data);
+        } else if (typeof err === 'object') {
+          serverMsg = err.message || String(err);
+        } else {
+          serverMsg = String(err);
+        }
+      }
+
+      const msg = serverMsg || 'Có lỗi xảy ra khi tạo đơn hàng, vui lòng thử lại';
       showToast(msg, 'error');
     } finally {
       setIsProcessing(false);

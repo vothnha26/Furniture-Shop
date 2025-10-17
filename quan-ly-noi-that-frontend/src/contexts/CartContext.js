@@ -8,7 +8,24 @@ export const CartProvider = ({ children }) => {
   const [items, setItems] = useState(() => {
     try {
       const raw = localStorage.getItem(CART_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      // Normalize older saved items so we always have variantId and displayName
+      const migrated = parsed.map(i => {
+        const variant = i.variant || {};
+        const variantId = i.variantId || i.id || variant.id || variant.maBienThe || null;
+        const productName = i.name || i.displayName || (i.product && (i.product.tenSanPham || i.product.name)) || 'Sản phẩm';
+        const variantName = variant.name || variant.tenBienThe || (variant.attributes && Array.isArray(variant.attributes) ? variant.attributes.map(a => a.giaTri).join(' - ') : null) || null;
+        return {
+          ...i,
+          id: i.id || variantId,
+          variantId: variantId,
+          displayName: i.displayName || (variantName ? `${productName} - ${variantName}` : productName),
+          quantity: typeof i.quantity === 'number' ? i.quantity : 1
+        };
+      });
+      return migrated;
     } catch (err) {
       console.warn('Failed to read cart from localStorage', err);
       return [];
@@ -32,10 +49,13 @@ export const CartProvider = ({ children }) => {
         return prev.map(i => i.variantId === variantId ? { ...i, quantity: i.quantity + quantity } : i);
       }
       const item = {
-        id: product?.id ?? product?.maSanPham ?? variantId,
+        // Prefer variantId for uniqueness when a variant is selected. Fall back to product id.
+        id: variantId ?? product?.id ?? product?.maSanPham ?? Math.random().toString(36).slice(2,9),
         variantId,
+        // Prefer a variant-aware display name so different variants don't appear identical in the cart
+        displayName: variant?.name ? `${product?.tenSanPham ?? product?.name ?? 'Sản phẩm'} - ${variant.name}` : (product?.tenSanPham ?? product?.name ?? 'Sản phẩm'),
         name: product?.tenSanPham ?? product?.name ?? 'Sản phẩm',
-        image: (product?.hinhAnh && Array.isArray(product.hinhAnh) ? product.hinhAnh[0] : (product?.image || product?.images?.[0])) ?? null,
+        image: (variant?.image || (product?.hinhAnh && Array.isArray(product.hinhAnh) ? product.hinhAnh[0] : (product?.image || product?.images?.[0]))) ?? null,
         price: Number(variant?.price ?? variant?.giaSauGiam ?? variant?.giaBan ?? product?.giaBan ?? product?.price ?? 0),
         quantity,
         product,

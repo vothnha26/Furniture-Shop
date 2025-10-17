@@ -13,6 +13,7 @@ public class DonHangResponse {
     private Integer maDonHang;
     private String tenKhachHang;
     private LocalDateTime ngayDatHang;
+    private String ngayDatHangStr; // Human-friendly formatted date string
     private BigDecimal tongTienGoc;
     private BigDecimal giamGiaVoucher;
     private Integer diemThuongSuDung; // Số điểm thưởng đã sử dụng
@@ -24,6 +25,7 @@ public class DonHangResponse {
     private BigDecimal thanhTien;
     private BigDecimal tongGiamGia; // Tổng giảm giá (VIP + Voucher + Điểm)
     private String trangThai;
+    private String diaChiGiaoHang; // Shipping address, expose for frontend
     private String voucherCode;
     private List<ChiTietDonHangResponse> chiTietDonHangList;
     private List<DonHangDichVuResponse> donHangDichVuList; // Danh sách dịch vụ

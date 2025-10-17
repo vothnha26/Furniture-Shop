@@ -5,6 +5,7 @@ import com.noithat.qlnt.backend.dto.response.*;
 import com.noithat.qlnt.backend.entity.Voucher;
 import com.noithat.qlnt.backend.service.ThanhToanService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -78,11 +79,22 @@ public class ThanhToanController {
     /**
      * API cuối cùng: Đặt hàng.
      */
-    @PostMapping("/tao-don-hang")
-    public ResponseEntity<ThanhToanResponse> taoDonHangTuUser(@RequestBody ThongTinGiaoHangRequest request) {
-        // Logic của phương thức taoDonHangTuUser cũ của bạn vẫn có thể được giữ lại
-        ThanhToanResponse resp = thanhToanService.taoDonHangTuUser(request);
-        return ResponseEntity.ok(resp);
+    @PostMapping(value = "/tao-don-hang", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> taoDonHangTuUser(@RequestBody ThongTinGiaoHangRequest request) {
+        try {
+            System.out.println("[taoDonHangTuUser] Incoming request: maKhachHang=" + request.getMaKhachHang() + ", phuongThucThanhToan=" + request.getPhuongThucThanhToan());
+            ThanhToanResponse resp = thanhToanService.taoDonHangTuUser(request);
+            return ResponseEntity.ok(resp);
+        } catch (Exception e) {
+            // Print stacktrace to server console for debugging
+            e.printStackTrace();
+            // Return a JSON error payload so frontend can display details
+            java.util.Map<String, Object> err = new java.util.HashMap<>();
+            err.put("success", false);
+            err.put("message", "Lỗi khi tạo đơn hàng: " + e.getMessage());
+            err.put("details", e.toString());
+            return ResponseEntity.status(500).body(err);
+        }
     }
 
     @PostMapping("/apply-voucher")

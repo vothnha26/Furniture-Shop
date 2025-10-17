@@ -18,7 +18,9 @@ public class JacksonConfig {
         mapper.registerModule(hibernate6Module);
         
         // Add Java 8 date/time support
-        mapper.registerModule(new JavaTimeModule());
+    // Configure to write dates as ISO-8601 strings instead of timestamps
+    mapper.registerModule(new JavaTimeModule());
+    mapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         
         return mapper;
     }

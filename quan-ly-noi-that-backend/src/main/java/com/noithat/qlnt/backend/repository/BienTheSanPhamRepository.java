@@ -17,6 +17,10 @@ public interface BienTheSanPhamRepository extends JpaRepository<BienTheSanPham, 
 
     Optional<BienTheSanPham> findBySku(String sku);
 
+    // Search variants by sku or where the parent product name contains the keyword (case-insensitive)
+    @Query("SELECT b FROM BienTheSanPham b WHERE LOWER(b.sku) LIKE LOWER(CONCAT('%', :q, '%')) OR LOWER(b.sanPham.tenSanPham) LIKE LOWER(CONCAT('%', :q, '%'))")
+    java.util.List<BienTheSanPham> searchBySkuOrProductName(@Param("q") String q);
+
     // ================= Custom queries used by inventory service =================
     @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongTon <= b.mucTonToiThieu")
     java.util.List<BienTheSanPham> findLowStockProducts();

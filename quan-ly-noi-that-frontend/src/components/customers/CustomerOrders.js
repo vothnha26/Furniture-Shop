@@ -8,7 +8,19 @@ const mapOrderFromApi = (order) => {
 
   const id = order.maDonHang ?? order.ma_don_hang ?? order.id ?? order.maDonHang;
   const orderDate = order.ngayDatHang ?? order.ngay_dat ?? order.orderDate ?? order.ngayDatHang;
-  const status = order.trangThai ?? order.trang_thai ?? order.status;
+  // Normalize backend status values to client-friendly keys used in the UI
+  const rawStatus = order.trangThai ?? order.trang_thai ?? order.status ?? '';
+  const normalizeStatus = (s) => {
+    if (s == null) return 'processing';
+    const v = String(s).trim().toLowerCase();
+    if (!v) return 'processing';
+    if (['processing', 'dang xu ly', 'đang xử lý', 'xac_nhan', 'xac-nhan', 'cho_xac_nhan', 'cho xac nhan', 'pending'].includes(v)) return 'processing';
+    if (['shipping', 'shipped', 'dang_giao', 'dang giao', 'đang giao', 'dang_giao_hang', 'dang-giao-hang', 'dang_giao_hang', 'dang_giao_hang', 'dang_giao_hang'].includes(v) || v.includes('giao')) return 'shipping';
+    if (['delivered', 'completed', 'hoan_thanh', 'hoàn thành', 'hoan thanh', 'da giao', 'đã giao'].includes(v) || v.includes('hoan')) return 'delivered';
+    if (['cancelled', 'canceled', 'huy', 'hủy', 'da huy', 'đã hủy', 'huy_bo'].includes(v)) return 'cancelled';
+    return 'processing';
+  };
+  const status = normalizeStatus(rawStatus);
   const total = order.tongTienGoc ?? order.tong_tien ?? order.total ?? order.thanhTien ?? order.thanh_tien;
   const shippingFee = order.chiPhiDichVu ?? order.chi_phi_dich_vu ?? order.phi_giao_hang ?? order.phiGiaoHang;
   const discount = order.giamGiaVoucher ?? order.giam_gia ?? order.discount;
@@ -71,6 +83,7 @@ const CustomerOrders = () => {
   const [showTracking, setShowTracking] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [trackingHistory, setTrackingHistory] = useState([]);
+  const [cancelingId, setCancelingId] = useState(null);
 
   // API Functions
   const fetchCustomerOrders = async () => {
@@ -107,10 +120,20 @@ const CustomerOrders = () => {
 
   const cancelOrder = async (orderId) => {
     try {
-      const response = await api.put(`/api/banhang/donhang/${orderId}/huy`);
-      return mapOrderFromApi(response.data);
+      // try to get a friendly name for nguoiThayDoi from cached orders
+      const cached = orders.find(o => String(o.id) === String(orderId));
+      const nguoiThayDoi = cached?.customerName || cached?.customerId || 'Khách hàng';
+
+      // Backend expects POST to the order status controller
+      const response = await api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/cancel`, { nguoiThayDoi, ghiChu: 'Hủy đơn hàng bởi khách' });
+      const raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
+      const updatedRaw = raw?.order ?? raw;
+      return mapOrderFromApi(updatedRaw);
     } catch (error) {
-      throw new Error('Không thể hủy đơn hàng');
+      console.error('cancelOrder error', error);
+      // bubble meaningful server message when available
+      const msg = error?.data?.message || error?.message || 'Không thể hủy đơn hàng';
+      throw new Error(msg);
     }
   };
 
@@ -161,7 +184,26 @@ const CustomerOrders = () => {
   const handleViewDetail = async (order) => {
     try {
       const detail = await getOrderDetail(order.id);
-      setSelectedOrder(detail);
+
+      // try to fetch tracking/shipping details and merge so the UI shows address/tracking
+      try {
+        const trackingPayload = await trackOrder(order.id);
+        const tracking = trackingPayload || {};
+        const merged = {
+          ...detail,
+          trackingNumber: tracking.ma_van_don ?? tracking.maVanDon ?? detail.trackingNumber,
+          carrier: tracking.don_vi_van_chuyen ?? tracking.donViVanChuyen ?? detail.carrier,
+          shippingAddress: detail.shippingAddress || tracking.dia_chi_giao_hang || tracking.diaChiGiaoHang || detail.shippingAddress,
+          estimatedDelivery: tracking.ngay_giao_hang_du_kien ?? tracking.ngayGiaoHangDuKien ?? detail.estimatedDelivery,
+          actualDelivery: tracking.ngay_giao_hang_thuc_te ?? tracking.ngayGiaoHangThucTe ?? detail.actualDelivery,
+          trackingHistory: tracking.lich_su_van_chuyen ?? []
+        };
+        setSelectedOrder(merged);
+      } catch (e) {
+        // if tracking fetch fails, still show basic details
+        console.warn('Could not fetch tracking for order', order.id, e);
+        setSelectedOrder(detail);
+      }
       setShowOrderDetail(true);
     } catch (err) {
       console.error('Failed to fetch order detail', err);
@@ -183,12 +225,26 @@ const CustomerOrders = () => {
   };
 
   const handleCancelOrder = async (order) => {
+    // Ask for confirmation before cancelling
+    const confirmed = window.confirm(`Bạn có chắc muốn hủy đơn hàng #${order.id}?`);
+    if (!confirmed) return;
+
+    setCancelingId(order.id);
     try {
       const updated = await cancelOrder(order.id);
-      setOrders(prev => prev.map(o => (o.id === updated.id ? updated : o)));
+      // Refresh order list to reflect server state
+      await fetchCustomerOrders();
+      setError('');
+      // Optionally keep selectedOrder updated if detail modal is open
+      if (selectedOrder && String(selectedOrder.id) === String(order.id)) {
+        setSelectedOrder(updated);
+      }
     } catch (err) {
       console.error('Failed to cancel order', err);
-      setError('Không thể hủy đơn hàng');
+      const msg = err?.message || 'Không thể hủy đơn hàng';
+      setError(msg);
+    } finally {
+      setCancelingId(null);
     }
   };
 
@@ -405,8 +461,12 @@ const CustomerOrders = () => {
                       </button>
                     )}
                     {order.status === 'processing' && (
-                      <button onClick={() => handleCancelOrder(order)} className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-                        Hủy đơn hàng
+                      <button
+                        onClick={() => handleCancelOrder(order)}
+                        disabled={cancelingId === order.id}
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${cancelingId === order.id ? 'bg-red-400 cursor-wait' : 'bg-red-600 hover:bg-red-700'} text-white`}
+                      >
+                        {cancelingId === order.id ? 'Đang hủy...' : 'Hủy đơn hàng'}
                       </button>
                     )}
                   </div>

@@ -3,6 +3,7 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.entity.DonHang;
 import com.noithat.qlnt.backend.entity.LichSuTrangThaiDonHang;
 import com.noithat.qlnt.backend.service.IQuanLyTrangThaiDonHangService;
+import com.noithat.qlnt.backend.repository.DonHangRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,9 @@ public class QuanLyTrangThaiDonHangController {
     
     @Autowired
     private IQuanLyTrangThaiDonHangService orderStatusService;
+
+    @Autowired
+    private DonHangRepository donHangRepository;
     
     // =================== ORDER STATUS MANAGEMENT ===================
     
@@ -64,6 +68,8 @@ public class QuanLyTrangThaiDonHangController {
                 response.put("message", "Cập nhật trạng thái đơn hàng thành công");
                 response.put("maDonHang", maDonHang);
                 response.put("trangThaiMoi", trangThaiMoi);
+                // include updated order entity so frontend can apply change immediately
+                response.put("order", donHangRepository.findById(maDonHang).orElse(null));
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
@@ -123,6 +129,8 @@ public class QuanLyTrangThaiDonHangController {
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Log incoming payload for diagnostics
+            System.out.println("[confirmOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Xác nhận đơn hàng");
             
@@ -139,6 +147,7 @@ public class QuanLyTrangThaiDonHangController {
             if (success) {
                 response.put("success", true);
                 response.put("message", "Xác nhận đơn hàng thành công - Đã đặt trước hàng");
+                response.put("order", donHangRepository.findById(maDonHang).orElse(null));
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
@@ -146,6 +155,7 @@ public class QuanLyTrangThaiDonHangController {
                 return ResponseEntity.badRequest().body(response);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("message", "Lỗi: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
@@ -164,15 +174,24 @@ public class QuanLyTrangThaiDonHangController {
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Log incoming payload for diagnostics
+            System.out.println("[prepareOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Bắt đầu chuẩn bị đơn hàng");
-            
+
+            if (nguoiThayDoi == null || nguoiThayDoi.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Thiếu thông tin người thay đổi");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
                 IQuanLyTrangThaiDonHangService.DANG_CHUAN_BI, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
                 response.put("message", "Bắt đầu chuẩn bị đơn hàng thành công");
+                response.put("order", donHangRepository.findById(maDonHang).orElse(null));
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
@@ -180,6 +199,7 @@ public class QuanLyTrangThaiDonHangController {
                 return ResponseEntity.badRequest().body(response);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("message", "Lỗi: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
@@ -198,15 +218,24 @@ public class QuanLyTrangThaiDonHangController {
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Log incoming payload for diagnostics
+            System.out.println("[shipOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Bắt đầu giao hàng");
-            
+
+            if (nguoiThayDoi == null || nguoiThayDoi.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Thiếu thông tin người thay đổi");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
                 IQuanLyTrangThaiDonHangService.DANG_GIAO, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
                 response.put("message", "Bắt đầu giao hàng thành công");
+                response.put("order", donHangRepository.findById(maDonHang).orElse(null));
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
@@ -214,6 +243,7 @@ public class QuanLyTrangThaiDonHangController {
                 return ResponseEntity.badRequest().body(response);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("message", "Lỗi: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
@@ -232,15 +262,24 @@ public class QuanLyTrangThaiDonHangController {
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Log incoming payload for diagnostics
+            System.out.println("[completeOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Hoàn thành giao hàng");
-            
+
+            if (nguoiThayDoi == null || nguoiThayDoi.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Thiếu thông tin người thay đổi");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
                 IQuanLyTrangThaiDonHangService.HOAN_THANH, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
                 response.put("message", "Hoàn thành đơn hàng thành công - Đã trừ tồn kho");
+                response.put("order", donHangRepository.findById(maDonHang).orElse(null));
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
@@ -248,6 +287,7 @@ public class QuanLyTrangThaiDonHangController {
                 return ResponseEntity.badRequest().body(response);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("message", "Lỗi: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
@@ -266,15 +306,24 @@ public class QuanLyTrangThaiDonHangController {
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Log incoming payload for diagnostics
+            System.out.println("[cancelOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Hủy đơn hàng");
-            
+
+            if (nguoiThayDoi == null || nguoiThayDoi.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Thiếu thông tin người thay đổi");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             boolean success = orderStatusService.changeOrderStatus(maDonHang, 
                 IQuanLyTrangThaiDonHangService.HUY_BO, nguoiThayDoi, ghiChu);
             
             if (success) {
                 response.put("success", true);
                 response.put("message", "Hủy đơn hàng thành công - Đã hủy đặt trước");
+                response.put("order", donHangRepository.findById(maDonHang).orElse(null));
                 return ResponseEntity.ok(response);
             } else {
                 response.put("success", false);
@@ -282,6 +331,7 @@ public class QuanLyTrangThaiDonHangController {
                 return ResponseEntity.badRequest().body(response);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             response.put("success", false);
             response.put("message", "Lỗi: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);

@@ -44,20 +44,29 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
   // Normalize different variant shapes from backend
   const normalizeVariant = (v) => {
     if (!v) return null;
-    const id = v.maBienThe ?? v.id ?? v.variantId ?? v._id ?? null;
-    
+    const id = v.maBienThe ?? v.id ?? v.variantId ?? v._id ?? v.bienTheId ?? null;
+
     // Ưu tiên giá sau khi giảm nếu có
     const price = Number(v.giaSauGiam ?? v.giaBan ?? v.gia ?? v.price ?? v.unitPrice) || 0;
     const originalPrice = Number(v.giaBan ?? v.giaGoc ?? v.gia_goc ?? v.originalPrice ?? 0) || 0;
     const stock = Number(v.soLuong ?? v.soLuongTon ?? v.tonKho ?? v.stockQuantity ?? v.quantity ?? 0) || 0;
-    
-    // Build tên biến thể từ thuộc tính
-    let name = v.tenBienThe ?? v.ten ?? v.name;
-    if (!name && v.thuocTinh && Array.isArray(v.thuocTinh) && v.thuocTinh.length > 0) {
-      name = v.thuocTinh.map(attr => attr.giaTri).join(' - ');
+
+    // Build tên biến thể from many possible fields
+    let name = v.tenBienThe ?? v.ten ?? v.name ?? v.displayName ?? v.variantName ?? v.label;
+    // Try to derive from attribute arrays with multiple possible key names
+    if (!name && (v.thuocTinh || v.attributes || v.attrs)) {
+      const attrs = v.thuocTinh ?? v.attributes ?? v.attrs;
+      if (Array.isArray(attrs) && attrs.length > 0) {
+        const parts = attrs.map(attr => attr.giaTri ?? attr.value ?? attr.val ?? attr.gia_tri ?? attr.tenThuocTinh ?? (attr.name ? (attr.name + (attr.value ? ': ' + attr.value : '')) : null)).filter(Boolean);
+        if (parts.length > 0) name = parts.join(' - ');
+      }
     }
-    if (!name && v.mauSac) {
-      name = `${v.mauSac}${v.kichThuoc ? ' - ' + v.kichThuoc : ''}`;
+    // Fallbacks using color/size fields
+    if (!name && (v.mauSac || v.color || v.colorName)) {
+      name = `${v.mauSac ?? v.color ?? v.colorName}${v.kichThuoc ? ' - ' + v.kichThuoc : ''}`;
+    }
+    if (!name && v.sku) {
+      name = `SKU ${v.sku}`;
     }
     if (!name) name = 'Phiên bản';
     
@@ -65,18 +74,31 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
     const discountPercent = v.phanTramGiam ? Math.round(Number(v.phanTramGiam)) : 
                            (originalPrice > price && originalPrice > 0 ? Math.round((1 - price/originalPrice) * 100) : 0);
     
-    return { 
-      ...v, 
-      id, 
-      price, 
-      originalPrice, 
-      stock, 
+    return {
+      ...v,
+      id,
+      price,
+      originalPrice,
+      stock,
       name,
       discountPercent,
-      attributes: v.thuocTinh ?? [],
-      discount: v.giamGia
+      attributes: v.thuocTinh ?? v.attributes ?? [],
+      discount: v.giamGia ?? v.discount
     };
   };
+
+  // Debug: log normalized variants whenever productState changes (helpful to see backend shape)
+  useEffect(() => {
+    const variantsArr = Array.isArray(productState.bienThe) ? productState.bienThe : (Array.isArray(productState.variants) ? productState.variants : []);
+    if (variantsArr.length > 0) {
+      try {
+        const norm = variantsArr.map(v => normalizeVariant(v));
+        console.debug('[ProductDetail] normalized variants:', norm);
+      } catch (e) {
+        console.debug('[ProductDetail] failed to normalize variants', e);
+      }
+    }
+  }, [productState]);
 
   const handleAddToCart = () => {
     // Check if variant is selected
@@ -97,8 +119,10 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
       return;
     }
 
-    // Add to cart using context
-    addToCart(productState, selectedVariant, quantity);
+  // Debug: log selected variant details so we can confirm variant id/name
+  console.log('[AddToCart] product:', productState?.maSanPham ?? productState?.id, 'variant:', selectedVariant?.id, selectedVariant?.name || selectedVariant?.tenBienThe, 'quantity:', quantity);
+  // Add to cart using context
+  addToCart(productState, selectedVariant, quantity);
 
     // Show success message
     setAddedToCart(true);

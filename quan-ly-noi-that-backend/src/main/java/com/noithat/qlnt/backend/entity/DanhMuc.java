@@ -13,8 +13,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -35,17 +35,17 @@ public class DanhMuc {
     @Column(name = "TenDanhMuc", nullable = false, unique = true)
     private String tenDanhMuc;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
-    @JoinTable(
-            name = "DanhMuc_LienKet", // Tên bảng trung gian
-            joinColumns = @JoinColumn(name = "MaDanhMucCon"), // Khóa ngoại trỏ đến ID của lớp này (con)
-            inverseJoinColumns = @JoinColumn(name = "MaDanhMucCha") // Khóa ngoại trỏ đến ID của lớp kia (cha)
-    )
-    @JsonIgnoreProperties("children") // Tránh lặp vô hạn khi serialize
-    private Set<DanhMuc> parents = new HashSet<>();
+    @Column(name = "MoTa")
+    private String moTa;
 
-    @ManyToMany(mappedBy = "parents", fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
-    @JsonIgnoreProperties("parents") // Tránh lặp vô hạn khi serialize
+    // Adjacency-list: single parent reference
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ParentId")
+    @JsonIgnoreProperties("children") // avoid recursion when serializing
+    private DanhMuc parent;
+
+    @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+    @JsonIgnoreProperties("parent")
     private Set<DanhMuc> children = new HashSet<>();
 
     // Override equals and hashCode để Set hoạt động chính xác

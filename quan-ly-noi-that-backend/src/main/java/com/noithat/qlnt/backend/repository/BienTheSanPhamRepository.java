@@ -3,136 +3,51 @@ package com.noithat.qlnt.backend.repository;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface BienTheSanPhamRepository extends JpaRepository<BienTheSanPham, Integer> {
-    
-    // =================== BASIC QUERIES (Từ cả hai nhánh) ===================
-    
-    // Tìm theo SKU (từ cả hai nhánh)
-    Optional<BienTheSanPham> findBySku(String sku);
-    
-    // Kiểm tra tồn tại theo SKU (từ HEAD)
-    boolean existsBySku(String sku);
-    
-    // Tìm tất cả biến thể của một sản phẩm - method naming convention (từ HEAD)
     List<BienTheSanPham> findBySanPham_MaSanPham(Integer maSanPham);
-    
-    // Tìm tất cả biến thể của một sản phẩm - JPQL query (từ nhánh Phuc)
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.sanPham.maSanPham = :maSanPham")
-    List<BienTheSanPham> findBySanPhamId(@Param("maSanPham") Integer maSanPham);
-    
-    // =================== INVENTORY MANAGEMENT QUERIES ===================
-    
-    // Tìm sản phẩm sắp hết hàng
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongTon <= b.mucTonToiThieu AND b.trangThaiKho = 'ACTIVE'")
-    List<BienTheSanPham> findLowStockProducts();
-    
-    // Tìm sản phẩm hết hàng
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongTon <= 0 AND b.trangThaiKho = 'ACTIVE'")
-    List<BienTheSanPham> findOutOfStockProducts();
-    
-    // Tìm sản phẩm theo trạng thái kho
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.trangThaiKho = :trangThai")
-    List<BienTheSanPham> findByTrangThaiKho(@Param("trangThai") String trangThai);
-    
-    // Tìm sản phẩm theo vị trí kho
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.viTriKho = :viTri")
-    List<BienTheSanPham> findByViTriKho(@Param("viTri") String viTri);
-    
-    // Tìm sản phẩm có số lượng tồn trong khoảng
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongTon BETWEEN :min AND :max")
-    List<BienTheSanPham> findByStockRange(@Param("min") Integer min, @Param("max") Integer max);
-    
-    // Tìm sản phẩm có số lượng đặt trước > 0
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongDatTruoc > 0")
-    List<BienTheSanPham> findProductsWithPreorders();
-    
-    // =================== STOCK UPDATE QUERIES ===================
-    
-    // Cập nhật số lượng tồn kho
-    @Modifying
-    @Transactional
-    @Query("UPDATE BienTheSanPham b SET b.soLuongTon = b.soLuongTon + :quantity, " +
-           "b.ngayCapNhatKho = :updateTime WHERE b.maBienThe = :maBienThe")
-    int updateStock(@Param("maBienThe") Integer maBienThe, 
-                    @Param("quantity") Integer quantity, 
-                    @Param("updateTime") LocalDateTime updateTime);
-    
-    // Đặt trước hàng
-    @Modifying
-    @Transactional
-    @Query("UPDATE BienTheSanPham b SET b.soLuongDatTruoc = b.soLuongDatTruoc + :quantity " +
-           "WHERE b.maBienThe = :maBienThe AND b.soLuongTon >= :quantity")
-    int reserveStock(@Param("maBienThe") Integer maBienThe, 
-                     @Param("quantity") Integer quantity);
-    
-    // Hủy đặt trước
-    @Modifying
-    @Transactional
-    @Query("UPDATE BienTheSanPham b SET b.soLuongDatTruoc = b.soLuongDatTruoc - :quantity " +
-           "WHERE b.maBienThe = :maBienThe AND b.soLuongDatTruoc >= :quantity")
-    int releaseReservation(@Param("maBienThe") Integer maBienThe, 
-                           @Param("quantity") Integer quantity);
-    
-    // Xác nhận bán hàng (trừ tồn kho và đặt trước)
-    @Modifying
-    @Transactional
-    @Query("UPDATE BienTheSanPham b SET b.soLuongTon = b.soLuongTon - :quantity, " +
-           "b.soLuongDatTruoc = b.soLuongDatTruoc - :quantity, " +
-           "b.ngayCapNhatKho = :updateTime " +
-           "WHERE b.maBienThe = :maBienThe AND b.soLuongTon >= :quantity AND b.soLuongDatTruoc >= :quantity")
-    int confirmSale(@Param("maBienThe") Integer maBienThe, 
-                    @Param("quantity") Integer quantity, 
-                    @Param("updateTime") LocalDateTime updateTime);
-    
-    // Cập nhật trạng thái kho
-    @Modifying
-    @Transactional
-    @Query("UPDATE BienTheSanPham b SET b.trangThaiKho = :trangThai, " +
-           "b.ngayCapNhatKho = :updateTime WHERE b.maBienThe = :maBienThe")
-    int updateStockStatus(@Param("maBienThe") Integer maBienThe, 
-                         @Param("trangThai") String trangThai, 
-                         @Param("updateTime") LocalDateTime updateTime);
-    
-    // =================== REPORTING QUERIES ===================
-    
-    // Thống kê tồn kho theo sản phẩm
-    @Query("SELECT b.sanPham.tenSanPham, SUM(b.soLuongTon), SUM(b.soLuongDatTruoc) " +
-           "FROM BienTheSanPham b GROUP BY b.sanPham.maSanPham, b.sanPham.tenSanPham")
-    List<Object[]> getStockSummaryByProduct();
-    
-    // Thống kê tồn kho theo danh mục
-    @Query("SELECT dm.tenDanhMuc, SUM(b.soLuongTon), COUNT(b) " +
-           "FROM BienTheSanPham b JOIN b.sanPham sp JOIN sp.danhMuc dm " +
-           "GROUP BY dm.maDanhMuc, dm.tenDanhMuc")
-    List<Object[]> getStockSummaryByCategory();
-    
-    // Tính tổng giá trị tồn kho
-    @Query("SELECT SUM(b.soLuongTon * b.giaBan) FROM BienTheSanPham b WHERE b.trangThaiKho = 'ACTIVE'")
+
+    boolean existsBySku(String sku);
+
+    Optional<BienTheSanPham> findBySku(String sku);
+
+    // Search variants by sku or where the parent product name contains the keyword (case-insensitive)
+    @Query("SELECT b FROM BienTheSanPham b WHERE LOWER(b.sku) LIKE LOWER(CONCAT('%', :q, '%')) OR LOWER(b.sanPham.tenSanPham) LIKE LOWER(CONCAT('%', :q, '%'))")
+    java.util.List<BienTheSanPham> searchBySkuOrProductName(@Param("q") String q);
+
+    // ================= Custom queries used by inventory service =================
+    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongTon <= b.mucTonToiThieu")
+    java.util.List<BienTheSanPham> findLowStockProducts();
+
+    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongTon <= 0")
+    java.util.List<BienTheSanPham> findOutOfStockProducts();
+
+    @Query("SELECT CASE WHEN b.soLuongTon >= :quantity THEN true ELSE false END FROM BienTheSanPham b WHERE b.maBienThe = :id")
+    Boolean isAvailableForSale(@Param("id") Integer maBienThe, @Param("quantity") Integer quantity);
+
+    @Query("SELECT b.soLuongTon FROM BienTheSanPham b WHERE b.maBienThe = :id")
+    Integer getAvailableQuantity(@Param("id") Integer maBienThe);
+
+    @Query("SELECT SUM(b.giaBan * b.soLuongTon) FROM BienTheSanPham b")
     Double getTotalStockValue();
-    
-    // Sản phẩm bán chạy (dự đoán từ số lượng đặt trước)
-    @Query("SELECT b FROM BienTheSanPham b WHERE b.soLuongDatTruoc > 0 ORDER BY b.soLuongDatTruoc DESC")
-    List<BienTheSanPham> getPopularProducts();
-    
-    // Kiểm tra khả năng bán
-    @Query("SELECT CASE WHEN (b.soLuongTon - b.soLuongDatTruoc) >= :quantity THEN true ELSE false END " +
-           "FROM BienTheSanPham b WHERE b.maBienThe = :maBienThe")
-    Boolean isAvailableForSale(@Param("maBienThe") Integer maBienThe, 
-                               @Param("quantity") Integer quantity);
-    
-    // Lấy số lượng có thể bán
-    @Query("SELECT (b.soLuongTon - b.soLuongDatTruoc) FROM BienTheSanPham b WHERE b.maBienThe = :maBienThe")
-    Integer getAvailableQuantity(@Param("maBienThe") Integer maBienThe);
+
+    @Query("SELECT b.sanPham.maSanPham, b.sanPham.tenSanPham, SUM(b.soLuongTon) FROM BienTheSanPham b GROUP BY b.sanPham.maSanPham, b.sanPham.tenSanPham")
+    java.util.List<Object[]> getStockSummaryByProduct();
+
+    @Query("SELECT b.sanPham.danhMuc.maDanhMuc, b.sanPham.danhMuc.tenDanhMuc, SUM(b.soLuongTon) FROM BienTheSanPham b GROUP BY b.sanPham.danhMuc.maDanhMuc, b.sanPham.danhMuc.tenDanhMuc")
+    java.util.List<Object[]> getStockSummaryByCategory();
+
+    // Find by stock status (used by inventory checks)
+    java.util.List<BienTheSanPham> findByTrangThaiKho(String trangThai);
+
+    // Atomically decrement stock if enough quantity exists. Returns number of rows updated (0 if not enough stock).
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE BienTheSanPham b SET b.soLuongTon = b.soLuongTon - :qty WHERE b.maBienThe = :id AND b.soLuongTon >= :qty")
+    int decrementStockIfAvailable(@org.springframework.data.repository.query.Param("id") Integer maBienThe, @org.springframework.data.repository.query.Param("qty") Integer qty);
 }
-
-

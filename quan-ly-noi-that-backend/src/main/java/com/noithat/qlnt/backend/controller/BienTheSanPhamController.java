@@ -4,13 +4,7 @@ import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.BienTheUpdateRequestDto;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.service.IBienTheSanPhamService;
-
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,122 +13,141 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/bien-the-san-pham")
-@CrossOrigin(origins = "*")
 public class BienTheSanPhamController {
 
-    @Autowired
-    private IBienTheSanPhamService bienTheSanPhamService;
+    private final IBienTheSanPhamService bienTheSanPhamService;
 
-    /**
-     * Lấy tất cả biến thể sản phẩm với phân trang
-     */
+    public BienTheSanPhamController(IBienTheSanPhamService bienTheSanPhamService) {
+        this.bienTheSanPhamService = bienTheSanPhamService;
+    }
+
     @GetMapping
-    public ResponseEntity<Page<BienTheSanPham>> getAllBienTheSanPham(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "maBienThe") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-        
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
-                   Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-        
-        Page<BienTheSanPham> bienTheList = bienTheSanPhamService.getAllBienTheSanPham(pageable);
-        return ResponseEntity.ok(bienTheList);
+    public ResponseEntity<List<BienTheSanPham>> getAll() {
+        return ResponseEntity.ok(bienTheSanPhamService.getAll());
     }
 
-    /**
-     * Lấy biến thể sản phẩm theo ID
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<BienTheSanPham> getBienTheSanPhamById(@PathVariable Integer id) {
-        BienTheSanPham bienThe = bienTheSanPhamService.getBienTheSanPhamById(id);
-        return ResponseEntity.ok(bienThe);
+    public ResponseEntity<BienTheSanPham> getById(@PathVariable Integer id) {
+        return ResponseEntity.ok(bienTheSanPhamService.getById(id));
     }
 
-    /**
-     * Lấy danh sách biến thể theo mã sản phẩm
-     */
     @GetMapping("/san-pham/{maSanPham}")
-    public ResponseEntity<List<BienTheSanPham>> getBienTheBySanPhamId(@PathVariable Integer maSanPham) {
-        List<BienTheSanPham> bienTheList = bienTheSanPhamService.getBienTheBySanPhamId(maSanPham);
-        return ResponseEntity.ok(bienTheList);
+    public ResponseEntity<List<com.noithat.qlnt.backend.dto.response.BienTheSanPhamListItemResponse>> getBySanPhamId(@PathVariable Integer maSanPham) {
+        List<com.noithat.qlnt.backend.entity.BienTheSanPham> list = bienTheSanPhamService.getBySanPhamId(maSanPham);
+        List<com.noithat.qlnt.backend.dto.response.BienTheSanPhamListItemResponse> resp = list.stream().map(bt -> {
+            // map simple fields
+            List<Integer> ids = bt.getBienTheThuocTinhs() == null ? java.util.Collections.emptyList() : bt.getBienTheThuocTinhs().stream().map(btt -> btt.getId()).toList();
+            List<com.noithat.qlnt.backend.dto.request.ThuocTinhGiaTriTuDoDto> mappings = bt.getBienTheThuocTinhs() == null ? java.util.Collections.emptyList() : bt.getBienTheThuocTinhs().stream().map(btt -> new com.noithat.qlnt.backend.dto.request.ThuocTinhGiaTriTuDoDto(btt.getThuocTinh().getMaThuocTinh(), btt.getGiaTri())).toList();
+            return new com.noithat.qlnt.backend.dto.response.BienTheSanPhamListItemResponse(
+                    bt.getMaBienThe(), bt.getSku(), null, bt.getGiaMua(), bt.getGiaBan(), bt.getSoLuongTon(), ids, mappings
+            );
+        }).toList();
+        return ResponseEntity.ok(resp);
     }
 
-    /**
-     * Tạo mới biến thể sản phẩm
-     */
+    @PostMapping
+    public ResponseEntity<BienTheSanPham> create(@RequestBody BienTheSanPham bienThe) {
+        return ResponseEntity.ok(bienTheSanPhamService.create(bienThe));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<BienTheSanPham> update(@PathVariable Integer id, @RequestBody BienTheSanPham bienThe) {
+        return ResponseEntity.ok(bienTheSanPhamService.update(id, bienThe));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Integer id) {
+        bienTheSanPhamService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Extended endpoints used by frontends (implementation lives in the service
+    // impl)
     @PostMapping("/san-pham/{maSanPham}")
     public ResponseEntity<BienTheSanPham> createBienTheSanPham(
             @PathVariable Integer maSanPham,
             @Valid @RequestBody BienTheRequestDto request) {
-        
-        BienTheSanPham newBienThe = bienTheSanPhamService.createBienTheSanPham(maSanPham, request);
+
+        BienTheSanPham newBienThe = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .createBienTheSanPham(maSanPham, request);
         return new ResponseEntity<>(newBienThe, HttpStatus.CREATED);
     }
 
-    /**
-     * Cập nhật biến thể sản phẩm
-     */
-    @PutMapping("/{id}")
+    @PostMapping("/create")
+    public ResponseEntity<BienTheSanPham> createBienTheSanPhamNoPath(@Valid @RequestBody BienTheRequestDto request) {
+        Integer maSanPham = request.maSanPham();
+        BienTheSanPham newBienThe = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .createBienTheSanPham(maSanPham, request);
+        return new ResponseEntity<>(newBienThe, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/product/{productId}")
+    public ResponseEntity<List<BienTheSanPham>> getBienTheByProductAlias(@PathVariable Integer productId) {
+        List<BienTheSanPham> bienTheList = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .getBienTheBySanPhamId(productId);
+        return ResponseEntity.ok(bienTheList);
+    }
+
+    @PutMapping("/{id}/variant")
     public ResponseEntity<BienTheSanPham> updateBienTheSanPham(
             @PathVariable Integer id,
             @Valid @RequestBody BienTheUpdateRequestDto request) {
-        
-        BienTheSanPham updatedBienThe = bienTheSanPhamService.updateBienTheSanPham(id, request);
+
+        BienTheSanPham updatedBienThe = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .updateBienTheSanPham(id, request);
         return ResponseEntity.ok(updatedBienThe);
     }
 
-    /**
-     * Xóa biến thể sản phẩm
-     */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id}/variant")
     public ResponseEntity<Void> deleteBienTheSanPham(@PathVariable Integer id) {
-        bienTheSanPhamService.deleteBienTheSanPham(id);
+        ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .deleteBienTheSanPham(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Cập nhật số lượng tồn kho
-     */
     @PatchMapping("/{id}/so-luong-ton")
     public ResponseEntity<BienTheSanPham> updateSoLuongTon(
             @PathVariable Integer id,
             @RequestParam Integer soLuong) {
-        
-        BienTheSanPham updatedBienThe = bienTheSanPhamService.updateSoLuongTon(id, soLuong);
+
+        BienTheSanPham updatedBienThe = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .updateSoLuongTon(id, soLuong);
         return ResponseEntity.ok(updatedBienThe);
     }
 
-    /**
-     * Kiểm tra tồn kho
-     */
     @GetMapping("/{id}/kiem-tra-ton-kho")
     public ResponseEntity<Boolean> checkTonKho(
             @PathVariable Integer id,
             @RequestParam Integer soLuong) {
-        
-        boolean coTonKho = bienTheSanPhamService.checkTonKho(id, soLuong);
+
+        boolean coTonKho = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .checkTonKho(id, soLuong);
         return ResponseEntity.ok(coTonKho);
     }
 
-    /**
-     * Tìm biến thể theo SKU
-     */
     @GetMapping("/sku/{sku}")
     public ResponseEntity<BienTheSanPham> getBienTheBySku(@PathVariable String sku) {
-        BienTheSanPham bienThe = bienTheSanPhamService.findBySku(sku);
+        BienTheSanPham bienThe = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .findBySku(sku);
         return ResponseEntity.ok(bienThe);
     }
 
-    /**
-     * Lấy thông tin chi tiết biến thể sản phẩm
-     */
     @GetMapping("/{id}/chi-tiet")
     public ResponseEntity<com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse> getBienTheSanPhamDetail(
             @PathVariable Integer id) {
-        com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse detail = 
-                bienTheSanPhamService.getBienTheSanPhamDetail(id);
+        com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse detail = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .getBienTheSanPhamDetail(id);
         return ResponseEntity.ok(detail);
+    }
+
+    /**
+     * Delete a single BienTheThuocTinh mapping by its id.
+     * Frontend can call this when the admin removes an attribute from a variant.
+     */
+    @DeleteMapping("/thuoc-tinh/{id}")
+    public ResponseEntity<Void> deleteBienTheThuocTinhMapping(@PathVariable Integer id) {
+        ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .deleteBienTheThuocTinhById(id);
+        return ResponseEntity.noContent().build();
     }
 }

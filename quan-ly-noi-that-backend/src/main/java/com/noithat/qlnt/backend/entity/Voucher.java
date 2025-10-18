@@ -42,7 +42,8 @@ public class Voucher {
     
     private Integer soLuongDaSuDung = 0;
     
-    private Boolean trangThai = true;
+    // Voucher status: one of "CHUA_BAT_DAU", "DANG_HOAT_DONG", "DA_HET_HAN"
+    private String trangThai = "DANG_HOAT_DONG";
 
     private Boolean apDungChoMoiNguoi = true;
 

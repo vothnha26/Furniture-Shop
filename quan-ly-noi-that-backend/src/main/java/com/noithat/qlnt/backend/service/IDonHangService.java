@@ -11,6 +11,7 @@ public interface IDonHangService {
     DonHangResponse getDonHangById(Integer id);
     void xoaDonHang(Integer id);
     List<DonHangResponse> getTatCaDonHang();
+    List<DonHangResponse> getDonHangByKhachHang(Integer maKhachHang);
     void capNhatTrangThai(Integer id, String trangThai);
     ThongKeBanHangResponse thongKeBanHang();
 }

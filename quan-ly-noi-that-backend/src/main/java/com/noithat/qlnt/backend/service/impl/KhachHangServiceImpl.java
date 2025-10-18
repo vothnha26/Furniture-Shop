@@ -72,6 +72,13 @@ public class KhachHangServiceImpl implements IKhachHangService {
         existing.setHoTen(request.getHoTen());
         existing.setEmail(request.getEmail());
         existing.setSoDienThoai(request.getSoDienThoai());
+        // Persist address if provided
+        if (request.getDiaChi() != null) {
+            existing.setDiaChi(request.getDiaChi());
+        }
+        if (request.getNgaySinh() != null) {
+            existing.setNgaySinh(request.getNgaySinh());
+        }
         existing.setDiemThuong(request.getDiemThuong());
         if (request.getHangThanhVien() != null) {
             Integer hangId = request.getHangThanhVien().getMaHangThanhVien();
@@ -101,6 +108,12 @@ public class KhachHangServiceImpl implements IKhachHangService {
     public KhachHang getKhachHangProfile(Integer maKhachHang) {
         return khachHangRepository.findById(maKhachHang)
                 .orElseThrow(() -> new ResourceNotFoundException("Khách hàng ID: " + maKhachHang + " không tồn tại."));
+    }
+
+    @Override
+    public KhachHang findBySoDienThoai(String soDienThoai) {
+        if (soDienThoai == null || soDienThoai.trim().isEmpty()) return null;
+        return khachHangRepository.findBySoDienThoai(soDienThoai.trim()).orElse(null);
     }
 
     @Override

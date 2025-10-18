@@ -17,10 +17,59 @@ import java.util.Map;
 public class BanHangController {
 
     private final IDonHangService donHangService;
+    private final com.noithat.qlnt.backend.service.IKhachHangService khachHangService;
+    private final com.noithat.qlnt.backend.repository.KhachHangRepository khachHangRepository;
 
     @PostMapping("/donhang")
     public ResponseEntity<DonHangResponse> taoDonHang(@Valid @RequestBody DonHangRequest request) {
         return ResponseEntity.ok(donHangService.taoDonHang(request));
+    }
+
+    // Admin-friendly order creation: accepts a permissive payload from admin UI,
+    // ensures a customer exists (lookup by maKhachHang or phone), fills required
+    // receiver fields and delegates to existing taoDonHang service which performs
+    // all validation and calculations. This avoids forcing frontend to match
+    // DonHangRequest exactly.
+    @PostMapping("/donhang/admin")
+    public ResponseEntity<DonHangResponse> taoDonHangAdmin(@RequestBody com.noithat.qlnt.backend.dto.request.AdminDonHangRequest adminReq) {
+        // 1) Resolve or create customer
+        Integer maKhachHang = adminReq.getMaKhachHang();
+        com.noithat.qlnt.backend.entity.KhachHang kh = null;
+        if (maKhachHang != null) {
+            kh = khachHangRepository.findById(maKhachHang).orElse(null);
+        }
+        if (kh == null && adminReq.getSoDienThoai() != null && !adminReq.getSoDienThoai().isEmpty()) {
+            kh = khachHangService.findBySoDienThoai(adminReq.getSoDienThoai());
+        }
+
+        // If still null, do NOT auto-create a customer. Treat as guest/admin order.
+        // This ensures we only credit loyalty points when an existing customer ID
+        // was supplied or an existing customer was found by phone.
+
+        // Map AdminDonHangRequest -> DonHangRequest (fill required fields)
+        com.noithat.qlnt.backend.dto.request.DonHangRequest req = new com.noithat.qlnt.backend.dto.request.DonHangRequest();
+        if (kh != null) {
+            req.setMaKhachHang(kh.getMaKhachHang());
+        } else {
+            req.setMaKhachHang(null);
+        }
+        req.setChiTietDonHangList(adminReq.getChiTietDonHangList());
+        req.setPhuongThucThanhToan(adminReq.getPhuongThucThanhToan() != null ? adminReq.getPhuongThucThanhToan() : "cash");
+        req.setMaVoucherCode(adminReq.getMaVoucherCode());
+        // prefer diemThuongSuDung but fall back to giamGiaDiemThuong if provided by frontend
+        req.setDiemThuongSuDung(adminReq.getDiemThuongSuDung() != null ? adminReq.getDiemThuongSuDung() : adminReq.getGiamGiaDiemThuong());
+        req.setGhiChu(adminReq.getGhiChu());
+        req.setTrangThaiDonHang(adminReq.getTrangThai());
+
+    // Receiver info (null-safe): prefer admin-supplied values, otherwise use
+    // existing customer values; if neither exists, fall back to empty string
+    // to avoid NPE. Note: DonHangRequest uses @NotBlank for these fields,
+    // so admin UI should supply them when creating guest orders.
+    req.setTenNguoiNhan(adminReq.getTenKhachHang() != null ? adminReq.getTenKhachHang() : (kh != null ? kh.getHoTen() : ""));
+    req.setSoDienThoaiNhan(adminReq.getSoDienThoai() != null ? adminReq.getSoDienThoai() : (kh != null ? kh.getSoDienThoai() : ""));
+    req.setDiaChiGiaoHang(adminReq.getDiaChiGiaoHang() != null ? adminReq.getDiaChiGiaoHang() : (kh != null ? kh.getDiaChi() : ""));
+
+        return ResponseEntity.ok(donHangService.taoDonHang(req));
     }
 
     @GetMapping("/donhang")

@@ -18,7 +18,7 @@ public class ChuongTrinhGiamGiaRequest {
     @NotNull(message = "Ngày kết thúc không được để trống")
     private LocalDateTime ngayKetThuc;
     
-    private Boolean trangThai = true;
+    private String trangThai = "đang hoạt động";
     
     private String loaiGiamGia;
     

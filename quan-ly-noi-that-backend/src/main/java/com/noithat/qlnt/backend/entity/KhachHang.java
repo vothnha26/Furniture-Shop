@@ -48,6 +48,9 @@ public class KhachHang {
     @Column(name = "NgayThamGia")
     private java.time.LocalDate ngayThamGia; // Ngày tham gia VIP
 
+    @Column(name = "NgaySinh")
+    private java.time.LocalDate ngaySinh; // Ngày sinh của khách hàng
+
     @Column(name = "DonHangCuoi")
     private java.time.LocalDate donHangCuoi; // Ngày đơn hàng cuối cùng
 

@@ -2,203 +2,317 @@ package com.noithat.qlnt.backend.service.impl;
 
 import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.BienTheUpdateRequestDto;
-import com.noithat.qlnt.backend.entity.BienTheGiaTriThuocTinh;
+import com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse;
+import com.noithat.qlnt.backend.entity.BienTheGiamGia;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
-import com.noithat.qlnt.backend.entity.GiaTriThuocTinh;
 import com.noithat.qlnt.backend.entity.SanPham;
-import com.noithat.qlnt.backend.repository.BienTheGiaTriThuocTinhRepository;
+import com.noithat.qlnt.backend.exception.ResourceNotFoundException;
+import com.noithat.qlnt.backend.repository.BienTheGiamGiaRepository;
 import com.noithat.qlnt.backend.repository.BienTheSanPhamRepository;
-import com.noithat.qlnt.backend.repository.GiaTriThuocTinhRepository;
+import com.noithat.qlnt.backend.repository.BienTheThuocTinhRepository;
 import com.noithat.qlnt.backend.repository.SanPhamRepository;
+import com.noithat.qlnt.backend.repository.ThuocTinhRepository;
 import com.noithat.qlnt.backend.service.IBienTheSanPhamService;
-
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class BienTheSanPhamServiceImpl implements IBienTheSanPhamService {
 
-    @Autowired
-    private BienTheSanPhamRepository bienTheSanPhamRepository;
+    private final BienTheSanPhamRepository bienTheSanPhamRepository;
+    private final SanPhamRepository sanPhamRepository;
+    private final BienTheThuocTinhRepository bienTheThuocTinhRepository;
+    private final ThuocTinhRepository thuocTinhRepository;
+    private final BienTheGiamGiaRepository bienTheGiamGiaRepository;
 
-    @Autowired
-    private SanPhamRepository sanPhamRepository;
+    public BienTheSanPhamServiceImpl(BienTheSanPhamRepository bienTheSanPhamRepository,
+            SanPhamRepository sanPhamRepository,
+            BienTheThuocTinhRepository bienTheThuocTinhRepository,
+            ThuocTinhRepository thuocTinhRepository,
+            BienTheGiamGiaRepository bienTheGiamGiaRepository) {
+        this.bienTheSanPhamRepository = bienTheSanPhamRepository;
+        this.sanPhamRepository = sanPhamRepository;
+        this.bienTheThuocTinhRepository = bienTheThuocTinhRepository;
+        this.thuocTinhRepository = thuocTinhRepository;
+        this.bienTheGiamGiaRepository = bienTheGiamGiaRepository;
+    } // Basic CRUD from interface
 
-    @Autowired
-    private GiaTriThuocTinhRepository giaTriThuocTinhRepository;
-
-    @Autowired
-    private BienTheGiaTriThuocTinhRepository bienTheGiaTriThuocTinhRepository;
-
-    /**
-     * Lấy tất cả biến thể sản phẩm với phân trang
-     */
-    public Page<BienTheSanPham> getAllBienTheSanPham(Pageable pageable) {
-        return bienTheSanPhamRepository.findAll(pageable);
+    @Override
+    @Transactional(readOnly = true)
+    public List<BienTheSanPham> getAll() {
+        return bienTheSanPhamRepository.findAll();
     }
 
-    /**
-     * Lấy biến thể sản phẩm theo ID
-     */
-    public BienTheSanPham getBienTheSanPhamById(Integer id) {
+    @Override
+    @Transactional(readOnly = true)
+    public BienTheSanPham getById(Integer id) {
         return bienTheSanPhamRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể sản phẩm với ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Biến thể không tồn tại: " + id));
     }
 
-    /**
-     * Lấy danh sách biến thể theo mã sản phẩm
-     */
-    public List<BienTheSanPham> getBienTheBySanPhamId(Integer maSanPham) {
-        if (!sanPhamRepository.existsById(maSanPham)) {
-            throw new EntityNotFoundException("Không tìm thấy sản phẩm với ID: " + maSanPham);
-        }
+    @Override
+    @Transactional(readOnly = true)
+    public List<BienTheSanPham> getBySanPhamId(Integer maSanPham) {
         return bienTheSanPhamRepository.findBySanPham_MaSanPham(maSanPham);
     }
 
-    /**
-     * Tạo mới biến thể sản phẩm
-     */
+    @Override
+    @Transactional
+    public BienTheSanPham create(BienTheSanPham bienThe) {
+        if (bienThe.getSku() != null && bienTheSanPhamRepository.existsBySku(bienThe.getSku())) {
+            throw new IllegalArgumentException("SKU đã tồn tại: " + bienThe.getSku());
+        }
+        if (bienThe.getNgayCapNhatKho() == null)
+            bienThe.setNgayCapNhatKho(LocalDateTime.now());
+        return bienTheSanPhamRepository.save(bienThe);
+    }
+
+    @Override
+    @Transactional
+    public BienTheSanPham update(Integer id, BienTheSanPham bienThe) {
+        BienTheSanPham existing = getById(id);
+        if (bienThe.getSku() != null && !Objects.equals(existing.getSku(), bienThe.getSku())) {
+            if (bienTheSanPhamRepository.existsBySku(bienThe.getSku())) {
+                throw new IllegalArgumentException("SKU đã tồn tại: " + bienThe.getSku());
+            }
+            existing.setSku(bienThe.getSku());
+        }
+
+        if (bienThe.getGiaBan() != null)
+            existing.setGiaBan(bienThe.getGiaBan());
+        if (bienThe.getGiaMua() != null)
+            existing.setGiaMua(bienThe.getGiaMua());
+        if (bienThe.getSoLuongTon() != null)
+            existing.setSoLuongTon(bienThe.getSoLuongTon());
+        if (bienThe.getMucTonToiThieu() != null)
+            existing.setMucTonToiThieu(bienThe.getMucTonToiThieu());
+        if (bienThe.getTrangThaiKho() != null)
+            existing.setTrangThaiKho(bienThe.getTrangThaiKho());
+
+        existing.setNgayCapNhatKho(LocalDateTime.now());
+
+        return bienTheSanPhamRepository.save(existing);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Integer id) {
+        if (!bienTheSanPhamRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Biến thể không tồn tại: " + id);
+        }
+        // remove attribute links
+        bienTheThuocTinhRepository.deleteByBienTheSanPham_MaBienThe(id);
+        bienTheSanPhamRepository.deleteById(id);
+    }
+
+    // Additional helper methods used by controller
     @Transactional
     public BienTheSanPham createBienTheSanPham(Integer maSanPham, BienTheRequestDto request) {
-        // Kiểm tra sản phẩm tồn tại
-        SanPham sanPham = sanPhamRepository.findById(maSanPham)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy sản phẩm với ID: " + maSanPham));
+        if (request == null)
+            throw new IllegalArgumentException("Request không được null");
+        // validate product
+        SanPham sp = sanPhamRepository.findById(maSanPham)
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại: " + maSanPham));
 
-        // Kiểm tra SKU unique
         if (bienTheSanPhamRepository.existsBySku(request.sku())) {
             throw new IllegalArgumentException("SKU đã tồn tại: " + request.sku());
         }
 
-        // Tạo biến thể mới
-        BienTheSanPham bienThe = new BienTheSanPham();
-        bienThe.setSanPham(sanPham);
-        bienThe.setSku(request.sku());
-        bienThe.setGiaBan(request.giaBan());
-        bienThe.setSoLuongTon(request.soLuongTon());
+        BienTheSanPham bt = new BienTheSanPham();
+        bt.setSanPham(sp);
+        bt.setSku(request.sku());
+        bt.setGiaMua(request.giaMua());
+        bt.setGiaBan(request.giaBan());
+        bt.setSoLuongTon(request.soLuongTon() != null ? request.soLuongTon() : 0);
+        if (request.mucTonToiThieu() != null)
+            bt.setMucTonToiThieu(request.mucTonToiThieu());
+        if (request.trangThaiKho() != null)
+            bt.setTrangThaiKho(request.trangThaiKho());
+        bt.setNgayCapNhatKho(LocalDateTime.now());
 
-        // Lưu biến thể
-        BienTheSanPham savedBienThe = bienTheSanPhamRepository.save(bienThe);
-
-        // Tạo liên kết với giá trị thuộc tính
-        if (request.giaTriThuocTinhIds() != null && !request.giaTriThuocTinhIds().isEmpty()) {
-            for (Integer giaTriId : request.giaTriThuocTinhIds()) {
-                GiaTriThuocTinh giaTri = giaTriThuocTinhRepository.findById(giaTriId)
-                        .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy giá trị thuộc tính với ID: " + giaTriId));
-
-                BienTheGiaTriThuocTinh lienKet = new BienTheGiaTriThuocTinh();
-                BienTheGiaTriThuocTinh.BienTheGiaTriThuocTinhId id = 
-                    new BienTheGiaTriThuocTinh.BienTheGiaTriThuocTinhId();
-                id.setMaBienThe(savedBienThe.getMaBienThe());
-                id.setMaGiaTri(giaTriId);
-                
-                lienKet.setId(id);
-                lienKet.setBienTheSanPham(savedBienThe);
-                lienKet.setGiaTriThuocTinh(giaTri);
-
-                bienTheGiaTriThuocTinhRepository.save(lienKet);
-            }
+        BienTheSanPham saved = bienTheSanPhamRepository.save(bt);
+        // If free-text attribute mappings are provided, create BienTheThuocTinh entries
+        if (request.thuocTinhGiaTriTuDo() != null && !request.thuocTinhGiaTriTuDo().isEmpty()) {
+            request.thuocTinhGiaTriTuDo().forEach(mapping -> {
+                // resolve attribute
+                thuocTinhRepository.findById(mapping.maThuocTinh()).ifPresent(tt -> {
+                    com.noithat.qlnt.backend.entity.BienTheThuocTinh btt = new com.noithat.qlnt.backend.entity.BienTheThuocTinh();
+                    btt.setBienTheSanPham(saved);
+                    btt.setThuocTinh(tt);
+                    btt.setGiaTri(mapping.giaTri());
+                    bienTheThuocTinhRepository.save(btt);
+                    saved.getBienTheThuocTinhs().add(btt);
+                });
+            });
         }
-
-        return savedBienThe;
+        return saved;
     }
 
-    /**
-     * Cập nhật biến thể sản phẩm
-     */
+    @Transactional(readOnly = true)
+    public List<BienTheSanPham> getBienTheBySanPhamId(Integer productId) {
+        return getBySanPhamId(productId);
+    }
+
     @Transactional
     public BienTheSanPham updateBienTheSanPham(Integer id, BienTheUpdateRequestDto request) {
-        BienTheSanPham bienThe = getBienTheSanPhamById(id);
+        BienTheSanPham existing = getById(id);
 
-        // Kiểm tra SKU unique nếu thay đổi
-        if (!bienThe.getSku().equals(request.sku()) && 
-            bienTheSanPhamRepository.existsBySku(request.sku())) {
+        if (!Objects.equals(existing.getSku(), request.sku()) && bienTheSanPhamRepository.existsBySku(request.sku())) {
             throw new IllegalArgumentException("SKU đã tồn tại: " + request.sku());
         }
 
-        bienThe.setSku(request.sku());
-        bienThe.setGiaBan(request.giaBan());
-        bienThe.setSoLuongTon(request.soLuongTon());
+        existing.setSku(request.sku());
+        existing.setGiaMua(request.giaMua());
+        existing.setGiaBan(request.giaBan());
+        existing.setSoLuongTon(request.soLuongTon());
+        existing.setNgayCapNhatKho(LocalDateTime.now());
 
-        return bienTheSanPhamRepository.save(bienThe);
+        // handle textual attribute mappings: delete existing attribute links and
+        // recreate from request
+        if (request.thuocTinhGiaTriTuDo() != null && !request.thuocTinhGiaTriTuDo().isEmpty()) {
+            // remove existing
+            bienTheThuocTinhRepository.deleteByBienTheSanPham_MaBienThe(existing.getMaBienThe());
+            existing.getBienTheThuocTinhs().clear();
+            // create new ones
+            request.thuocTinhGiaTriTuDo().forEach(mapping -> {
+                thuocTinhRepository.findById(mapping.maThuocTinh()).ifPresent(tt -> {
+                    com.noithat.qlnt.backend.entity.BienTheThuocTinh btt = new com.noithat.qlnt.backend.entity.BienTheThuocTinh();
+                    btt.setBienTheSanPham(existing);
+                    btt.setThuocTinh(tt);
+                    btt.setGiaTri(mapping.giaTri());
+                    bienTheThuocTinhRepository.save(btt);
+                    existing.getBienTheThuocTinhs().add(btt);
+                });
+            });
+        }
+
+        return bienTheSanPhamRepository.save(existing);
     }
 
-    /**
-     * Xóa biến thể sản phẩm
-     */
     @Transactional
     public void deleteBienTheSanPham(Integer id) {
-        BienTheSanPham bienThe = getBienTheSanPhamById(id);
-        
-        // Xóa các liên kết với giá trị thuộc tính trước
-        bienTheGiaTriThuocTinhRepository.deleteByBienTheSanPham_MaBienThe(id);
-        
-        // Xóa biến thể
-        bienTheSanPhamRepository.delete(bienThe);
+        delete(id);
     }
 
-    /**
-     * Cập nhật số lượng tồn kho
-     */
     @Transactional
     public BienTheSanPham updateSoLuongTon(Integer id, Integer soLuong) {
-        BienTheSanPham bienThe = getBienTheSanPhamById(id);
-        bienThe.setSoLuongTon(soLuong);
-        return bienTheSanPhamRepository.save(bienThe);
+        BienTheSanPham existing = getById(id);
+        if (soLuong == null)
+            throw new IllegalArgumentException("Số lượng không được null");
+        existing.setSoLuongTon(soLuong);
+        existing.setNgayCapNhatKho(LocalDateTime.now());
+        // update trạng thái kho
+        // use entity helper by updating stock with difference if needed
+        bienTheSanPhamRepository.save(existing);
+        return existing;
     }
 
-    /**
-     * Kiểm tra tồn kho
-     */
-    public boolean checkTonKho(Integer id, Integer soLuongCanKiem) {
-        BienTheSanPham bienThe = getBienTheSanPhamById(id);
-        return bienThe.getSoLuongTon() >= soLuongCanKiem;
+    @Transactional(readOnly = true)
+    public boolean checkTonKho(Integer id, Integer soLuong) {
+        if (soLuong == null)
+            throw new IllegalArgumentException("Số lượng không được null");
+        Integer available = bienTheSanPhamRepository.getAvailableQuantity(id);
+        if (available == null)
+            return false;
+        return available >= soLuong;
     }
 
-    /**
-     * Tìm kiếm biến thể theo SKU
-     */
+    @Transactional(readOnly = true)
     public BienTheSanPham findBySku(String sku) {
         return bienTheSanPhamRepository.findBySku(sku)
-                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy biến thể với SKU: " + sku));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biến thể với SKU: " + sku));
+    }
+
+    @Transactional(readOnly = true)
+    public BienTheSanPhamDetailResponse getBienTheSanPhamDetail(Integer id) {
+        BienTheSanPham bt = getById(id);
+
+        // Map attributes
+        List<BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse> thuocTinhs = bienTheThuocTinhRepository
+                .findByBienTheSanPham_MaBienThe(id)
+                .stream()
+                .map(btt -> BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse.builder()
+                        .maThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getMaThuocTinh() : null)
+                        .tenThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getTenThuocTinh() : null)
+                        .maGiaTriThuocTinh(null)
+                        .giaTriThuocTinh(btt.getGiaTri())
+                        .build())
+                .collect(Collectors.toList());
+
+        // Map current variant-level discounts (if any)
+        List<BienTheGiamGia> giamGias = bienTheGiamGiaRepository
+                .findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+        List<BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse> giamGiaResponses = giamGias.stream()
+                .map(btg -> BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse.builder()
+                        .maChuongTrinhGiamGia(btg.getChuongTrinhGiamGia() != null
+                                ? btg.getChuongTrinhGiamGia().getMaChuongTrinhGiamGia()
+                                : null)
+                        .tenChuongTrinh(
+                                btg.getChuongTrinhGiamGia() != null ? btg.getChuongTrinhGiamGia().getTenChuongTrinh()
+                                        : null)
+                        .giaSauGiam(btg.getGiaSauGiam())
+                        .phanTramGiam(
+                                btg.getChuongTrinhGiamGia() != null ? btg.getChuongTrinhGiamGia().getGiaTriGiam()
+                                        : null)
+                        .build())
+                .collect(Collectors.toList());
+
+        BigDecimal bestPrice = giamGiaResponses.stream()
+                .map(BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse::getGiaSauGiam)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(bt.getGiaBan());
+
+        return BienTheSanPhamDetailResponse.builder()
+                .maBienThe(bt.getMaBienThe())
+                .sku(bt.getSku())
+                .giaBan(bt.getGiaBan())
+                .soLuongTon(bt.getSoLuongTon())
+                .maSanPham(bt.getSanPham() != null ? bt.getSanPham().getMaSanPham() : null)
+                .tenSanPham(bt.getSanPham() != null ? bt.getSanPham().getTenSanPham() : null)
+                .thuocTinhs(thuocTinhs)
+                .giaTotNhat(bestPrice)
+                .giamGias(giamGiaResponses)
+                .build();
     }
 
     /**
-     * Lấy thông tin chi tiết biến thể sản phẩm
+     * Delete a single BienTheThuocTinh mapping by its id.
+     * This is a small helper to support frontend requests that want to remove
+     * an individual variant->attribute mapping without deleting the whole variant.
      */
-    public com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse getBienTheSanPhamDetail(Integer id) {
-        BienTheSanPham bienThe = getBienTheSanPhamById(id);
-        
-        // Lấy thông tin thuộc tính
-        List<BienTheGiaTriThuocTinh> thuocTinhLinks = bienTheGiaTriThuocTinhRepository
-                .findByBienTheSanPham_MaBienThe(id);
-        
-        List<com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse> thuocTinhs = 
-                thuocTinhLinks.stream()
-                .<com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse>map(link -> {
-                    GiaTriThuocTinh giaTri = link.getGiaTriThuocTinh();
-                    return com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse.builder()
-                            .maThuocTinh(giaTri.getThuocTinh().getMaThuocTinh())
-                            .tenThuocTinh(giaTri.getThuocTinh().getTenThuocTinh())
-                            .maGiaTriThuocTinh(giaTri.getMaGiaTri())
-                            .giaTriThuocTinh(giaTri.getGiaTri())
-                            .build();
-                })
-                .collect(java.util.stream.Collectors.toList());
-        
-        return com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse.builder()
-                .maBienThe(bienThe.getMaBienThe())
-                .sku(bienThe.getSku())
-                .giaBan(bienThe.getGiaBan())
-                .soLuongTon(bienThe.getSoLuongTon())
-                .maSanPham(bienThe.getSanPham().getMaSanPham())
-                .tenSanPham(bienThe.getSanPham().getTenSanPham())
-                .thuocTinhs(thuocTinhs)
-                .build();
+    @Transactional
+    public void deleteBienTheThuocTinhById(Integer id) {
+        if (id == null)
+            throw new IllegalArgumentException("Id mapping không được null");
+        if (!bienTheThuocTinhRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Mapping BienTheThuocTinh không tồn tại: " + id);
+        }
+        bienTheThuocTinhRepository.deleteById(id);
+    }
+
+    // helper to compute price after discount (very small utility)
+    private BigDecimal calculatePriceAfterDiscount(BigDecimal basePrice, String loaiGiamGia, BigDecimal giaTri) {
+        if (basePrice == null)
+            return null;
+        if (loaiGiamGia == null || giaTri == null)
+            return basePrice;
+        try {
+            if ("PERCENTAGE".equalsIgnoreCase(loaiGiamGia)) {
+                BigDecimal factor = BigDecimal.ONE.subtract(giaTri.divide(BigDecimal.valueOf(100)));
+                return basePrice.multiply(factor);
+            } else { // assume FIXED
+                return basePrice.subtract(giaTri);
+            }
+        } catch (Exception e) {
+            return basePrice;
+        }
     }
 }

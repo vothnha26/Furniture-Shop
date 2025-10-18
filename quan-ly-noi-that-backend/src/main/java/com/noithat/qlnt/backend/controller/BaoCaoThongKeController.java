@@ -41,6 +41,9 @@ public class BaoCaoThongKeController {
 
     @Autowired
     private com.noithat.qlnt.backend.repository.ChiTietDonHangRepository chiTietDonHangRepository;
+
+    @Autowired
+    private com.noithat.qlnt.backend.service.IDashboardService dashboardService;
     
     /**
      * Lấy dữ liệu tổng quan cho Dashboard
@@ -75,6 +78,172 @@ public class BaoCaoThongKeController {
 
             response.put("success", true);
             response.put("data", dashboard);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Endpoint trả về các số liệu tổng quan (từ stored-proc)
+     * GET /api/v1/bao-cao-thong-ke/overview-metrics
+     */
+    @GetMapping("/overview-metrics")
+    public ResponseEntity<Map<String, Object>> getOverviewMetrics() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getOverviewMetrics();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/revenue-trend")
+    public ResponseEntity<Map<String, Object>> getRevenueTrend() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getRevenueTrend();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/sales-by-product")
+    public ResponseEntity<Map<String, Object>> getSalesByProduct() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getSalesByProduct();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/customer-metrics")
+    public ResponseEntity<Map<String, Object>> getCustomerMetrics() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getCustomerMetrics();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/inventory-metrics")
+    public ResponseEntity<Map<String, Object>> getInventoryMetricsProc() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getInventoryMetrics();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/inventory-alerts-proc")
+    public ResponseEntity<Map<String, Object>> getInventoryAlertsProc() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getInventoryAlerts();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/revenue-summary")
+    public ResponseEntity<Map<String, Object>> getRevenueSummaryProc() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getRevenueSummary();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/sales-metrics")
+    public ResponseEntity<Map<String, Object>> getSalesMetricsProc() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getSalesMetrics();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/vip-customer-analysis")
+    public ResponseEntity<Map<String, Object>> getVipCustomerAnalysisProc() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var rows = dashboardService.getVipCustomerAnalysis();
+            Map<String, Object> data = new HashMap<>();
+            data.put("rows", rows);
+            data.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            response.put("success", true);
+            response.put("data", data);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

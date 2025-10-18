@@ -17,4 +17,13 @@ public interface SanPhamRepository extends JpaRepository<SanPham, Integer> {
     // Hoặc dùng JPQL query
     @Query("SELECT s FROM SanPham s WHERE s.boSuuTap.maBoSuuTap = :maBoSuuTap")
     List<SanPham> findByBoSuuTapId(@Param("maBoSuuTap") Integer maBoSuuTap);
+    
+    // Tìm sản phẩm theo danh mục
+    List<SanPham> findByDanhMuc_MaDanhMuc(Integer maDanhMuc);
+
+    // Đếm số lượng sản phẩm trong một danh mục (không tính đệ quy)
+    long countByDanhMuc_MaDanhMuc(Integer maDanhMuc);
+
+    // Đếm số lượng sản phẩm trong một bộ sưu tập
+    long countByBoSuuTap_MaBoSuuTap(Integer maBoSuuTap);
 }

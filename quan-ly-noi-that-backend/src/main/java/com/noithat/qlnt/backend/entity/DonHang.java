@@ -15,129 +15,66 @@ public class DonHang {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maDonHang;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "MaKhachHang", nullable = false)
-    private KhachHang khachHang;
-
-    @Column(name = "NgayDatHang")
+    @Column(name = "NgayDatHang", nullable = false)
     private LocalDateTime ngayDatHang = LocalDateTime.now();
 
-    @Column(name = "TongTienGoc", precision = 18, scale = 2, nullable = false)
+    // ----- TRẠNG THÁI -----
+    @Column(name = "TrangThaiDonHang")
+    private String trangThaiDonHang = "CHO_XU_LY"; // Trạng thái xử lý: CHO_XU_LY, DANG_GIAO_HANG, HOAN_THANH, DA_HUY
+
+    @Column(name = "TrangThaiThanhToan")
+    private String trangThaiThanhToan = "UNPAID"; // Trạng thái thanh toán: UNPAID, PAID, FAILED...
+
+    // ----- THÔNG TIN THANH TOÁN (Lưu chi tiết tại thời điểm mua) -----
+    @Column(name = "TongTienGoc")
     private BigDecimal tongTienGoc;
 
-    @Column(name = "GiamGiaVoucher", precision = 18, scale = 2)
-    private BigDecimal giamGiaVoucher = BigDecimal.ZERO;
+    @Column(name = "GiamGiaVip")
+    private BigDecimal giamGiaVip = BigDecimal.ZERO;
 
+    @Column(name = "GiamGiaVoucher")
+    private BigDecimal giamGiaVoucher = BigDecimal.ZERO;
+    
     @Column(name = "DiemThuongSuDung")
     private Integer diemThuongSuDung = 0;
 
-    @Column(name = "GiamGiaDiemThuong", precision = 18, scale = 2)
+    @Column(name = "GiamGiaDiemThuong")
     private BigDecimal giamGiaDiemThuong = BigDecimal.ZERO;
 
-    @Column(name = "GiamGiaVip", precision = 18, scale = 2)
-    private BigDecimal giamGiaVip = BigDecimal.ZERO; // Giảm giá từ hạng thành viên VIP
+    @Column(name = "PhiGiaoHang")
+    private BigDecimal phiGiaoHang = BigDecimal.ZERO;
 
-    @Column(name = "DiemVipThuong")
-    private Integer diemVipThuong = 0; // Điểm thưởng VIP từ đơn hàng này
+    @Column(name = "ThanhTien", nullable = false)
+    private BigDecimal thanhTien; // Số tiền cuối cùng khách phải trả
 
-    @Column(name = "MienPhiVanChuyen")
-    private Boolean mienPhiVanChuyen = false; // Có miễn phí vận chuyển từ VIP không
+    @Column(name = "DiemThuongNhanDuoc")
+    private Integer diemThuongNhanDuoc = 0; // Điểm sẽ tích lũy được từ đơn này
 
-    @Column(name = "ChiPhiDichVu", precision = 18, scale = 2)
-    private BigDecimal chiPhiDichVu = BigDecimal.ZERO;
+    // ----- THÔNG TIN GIAO HÀNG (Lưu lại thông tin khách nhập) -----
+    @Column(name = "TenNguoiNhan", length = 100)
+    private String tenNguoiNhan;
 
-    @Column(name = "ThanhTien", precision = 18, scale = 2, nullable = false)
-    private BigDecimal thanhTien;
+    @Column(name = "SoDienThoaiNhan", length = 20)
+    private String soDienThoaiNhan;
 
-    @Column(name = "TrangThai", nullable = false)
-    private String trangThai = "PENDING"; // PENDING, CONFIRMED, PREPARING, READY_TO_SHIP, SHIPPING, DELIVERED, COMPLETED, CANCELLED, RETURNED
+    @Column(name = "DiaChiGiaoHang", length = 255)
+    private String diaChiGiaoHang;
 
     @Column(name = "PhuongThucThanhToan", nullable = false)
     private String phuongThucThanhToan;
-
+    
     @Column(length = 255)
     private String ghiChu;
-
+    
+    // ----- CÁC MỐI QUAN HỆ -----
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "MaNhanVienDuyet")
-    private NhanVien nhanVienDuyet;
+    @JoinColumn(name = "MaKhachHang", nullable = true)
+    private KhachHang khachHang;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaVoucher")
     private Voucher voucher;
 
-    @OneToMany(mappedBy = "donHang", 
-           cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE},
-           orphanRemoval = true)
+    @OneToMany(mappedBy = "donHang", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChiTietDonHang> chiTietDonHangs = new ArrayList<>();
-
-    @OneToMany(mappedBy = "donHang",
-            cascade = {CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REMOVE},
-            orphanRemoval = true)
-    private List<DonHangDichVu> donHangDichVus = new ArrayList<>();
-
-    // Order status management
-    public enum TrangThaiDonHang {
-        PENDING("Chờ xử lý"),
-        CONFIRMED("Đã xác nhận"),
-        PREPARING("Đang chuẩn bị"),
-        READY_TO_SHIP("Sẵn sàng giao hàng"),
-        SHIPPING("Đang giao hàng"),
-        DELIVERED("Đã giao hàng"),
-        COMPLETED("Hoàn thành"),
-        CANCELLED("Đã hủy"),
-        RETURNED("Đã trả hàng");
-        
-        private final String displayName;
-        
-        TrangThaiDonHang(String displayName) {
-            this.displayName = displayName;
-        }
-        
-        public String getDisplayName() {
-            return displayName;
-        }
-        
-        public boolean canTransitionTo(TrangThaiDonHang newStatus) {
-            switch (this) {
-                case PENDING:
-                    return newStatus == CONFIRMED || newStatus == CANCELLED;
-                case CONFIRMED:
-                    return newStatus == PREPARING || newStatus == CANCELLED;
-                case PREPARING:
-                    return newStatus == READY_TO_SHIP || newStatus == CANCELLED;
-                case READY_TO_SHIP:
-                    return newStatus == SHIPPING || newStatus == CANCELLED;
-                case SHIPPING:
-                    return newStatus == DELIVERED || newStatus == RETURNED;
-                case DELIVERED:
-                    return newStatus == COMPLETED || newStatus == RETURNED;
-                case COMPLETED:
-                    return false; // Final state
-                case CANCELLED:
-                    return false; // Final state
-                case RETURNED:
-                    return false; // Final state
-                default:
-                    return false;
-            }
-        }
-    }
-
-    // Business methods
-    public boolean canBeCancelled() {
-        return "PENDING".equals(trangThai) || "CONFIRMED".equals(trangThai);
-    }
-
-    public boolean isCompleted() {
-        return "COMPLETED".equals(trangThai);
-    }
-
-    public boolean needsStockReservation() {
-        return "PENDING".equals(trangThai);
-    }
-
-    public boolean needsStockDeduction() {
-        return "CONFIRMED".equals(trangThai);
-    }
 }

@@ -28,7 +28,7 @@ public class VoucherCreationRequest {
     private BigDecimal giaTriGiam;
 
     private BigDecimal giaTriDonHangToiThieu;
-    
+
     private BigDecimal giaTriGiamToiDa;
 
     @NotNull(message = "Ngày bắt đầu không được để trống.")
@@ -41,6 +41,11 @@ public class VoucherCreationRequest {
 
     private Boolean apDungChoMoiNguoi = true; // Mặc định áp dụng cho mọi người
 
-    // Danh sách MaHangThanhVien được áp dụng (Chỉ dùng nếu apDungChoMoiNguoi = false)
+    // Admin-controlled desired status (string): "CHUA_BAT_DAU", "DANG_HOAT_DONG", "DA_HET_HAN".
+    // Optional in PATCH. Server will map to boolean active flag.
+    private String trangThai;
+
+    // Danh sách MaHangThanhVien được áp dụng (Chỉ dùng nếu apDungChoMoiNguoi =
+    // false)
     private List<Integer> maHangThanhVienIds;
 }

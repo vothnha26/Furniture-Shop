@@ -20,7 +20,7 @@ public class DonHang {
 
     // ----- TRẠNG THÁI -----
     @Column(name = "TrangThaiDonHang")
-    private String trangThaiDonHang = "PENDING"; // Trạng thái xử lý: PENDING, CONFIRMED, SHIPPED...
+    private String trangThaiDonHang = "CHO_XU_LY"; // Trạng thái xử lý: CHO_XU_LY, DANG_GIAO_HANG, HOAN_THANH, DA_HUY
 
     @Column(name = "TrangThaiThanhToan")
     private String trangThaiThanhToan = "UNPAID"; // Trạng thái thanh toán: UNPAID, PAID, FAILED...

@@ -6,7 +6,7 @@ const AdminCreateOrder = () => {
   const [results, setResults] = useState([]);
   const [selected, setSelected] = useState([]); // {maBienThe, sku, tenSanPham, giaBan, soLuong}
   const [creating, setCreating] = useState(false);
-  const [customerId, setCustomerId] = useState('1');
+  const [customerId, setCustomerId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [address, setAddress] = useState('');
 
@@ -36,7 +36,7 @@ const AdminCreateOrder = () => {
     setCreating(true);
     try {
       const payload = {
-        maKhachHang: Number(customerId),
+  maKhachHang: customerId ? Number(customerId) : null,
         chiTietDonHangList: selected.map(s => ({ maBienThe: s.maBienThe, soLuong: s.soLuong })),
         phuongThucThanhToan: paymentMethod,
         tenNguoiNhan: 'Khách lẻ',

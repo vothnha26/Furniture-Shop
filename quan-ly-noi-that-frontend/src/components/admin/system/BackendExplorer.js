@@ -13,7 +13,7 @@ const BackendExplorer = () => {
       try {
         const [prodRes, custRes] = await Promise.all([
           api.get('/api/products').catch(() => []),
-          api.get('/api/customers').catch(() => [])
+          api.get('/api/v1/khach-hang').catch(() => [])
         ]);
 
         // products may be array or {content: []}

@@ -48,7 +48,7 @@ public class DonHangServiceImpl implements IDonHangService {
         DonHang donHang = new DonHang();
     donHang.setKhachHang(khachHang);
         donHang.setNgayDatHang(LocalDateTime.now());
-        donHang.setTrangThaiDonHang(request.getTrangThaiDonHang() != null ? request.getTrangThaiDonHang() : "PENDING");
+        donHang.setTrangThaiDonHang(request.getTrangThaiDonHang() != null ? request.getTrangThaiDonHang() : "CHO_XU_LY");
         donHang.setTrangThaiThanhToan(
                 request.getTrangThaiThanhToan() != null ? request.getTrangThaiThanhToan() : "UNPAID");
         donHang.setPhuongThucThanhToan(request.getPhuongThucThanhToan());
@@ -106,16 +106,12 @@ public class DonHangServiceImpl implements IDonHangService {
             khachHang.setDiemThuong(diemHienCo - request.getDiemThuongSuDung());
         }
 
-        // 6b. Cộng điểm thưởng cho khách hàng (nếu có) — thực hiện sau khi trừ điểm đã dùng
-        if (khachHang != null) {
-            Integer diemNhanDuoc = donHang.getDiemThuongNhanDuoc();
-            if (diemNhanDuoc != null && diemNhanDuoc > 0) {
-                int current = khachHang.getDiemThuong() != null ? khachHang.getDiemThuong() : 0;
-                khachHang.setDiemThuong(current + diemNhanDuoc);
-                // Persist the updated customer within the same transaction
-                khachHangRepository.save(khachHang);
-            }
-        }
+        // NOTE: Do NOT award earned loyalty points here. The order stores the
+        // server-calculated earned points in donHang.diemThuongNhanDuoc, but the
+        // actual increase to the customer's point balance should occur only when
+        // the order reaches HOAN_THANH. That behavior is implemented centrally in
+        // QuanLyTrangThaiDonHangServiceImpl to ensure a single place handles
+        // side-effects like awarding/refunding points and voucher/stock rollbacks.
 
         // 6c. Cập nhật tổng chi tiêu và tổng đơn hàng của khách hàng (nếu có)
         if (khachHang != null) {
@@ -188,9 +184,9 @@ public class DonHangServiceImpl implements IDonHangService {
     @Override
     public ThongKeBanHangResponse thongKeBanHang() {
         long tongDonHang = donHangRepository.count();
-        long choXuLy = donHangRepository.countByTrangThaiDonHang("PENDING");
-        long hoanThanh = donHangRepository.countByTrangThaiDonHang("COMPLETED");
-        BigDecimal doanhThu = donHangRepository.sumThanhTienByTrangThaiDonHang("COMPLETED");
+        long choXuLy = donHangRepository.countByTrangThaiDonHang("CHO_XU_LY");
+        long hoanThanh = donHangRepository.countByTrangThaiDonHang("HOAN_THANH");
+        BigDecimal doanhThu = donHangRepository.sumThanhTienByTrangThaiDonHang("HOAN_THANH");
 
         ThongKeBanHangResponse response = new ThongKeBanHangResponse();
         response.setTongDonHang(tongDonHang);
@@ -234,6 +230,8 @@ public class DonHangServiceImpl implements IDonHangService {
         response.setMaDonHang(donHang.getMaDonHang());
         if (donHang.getKhachHang() != null) {
             response.setTenKhachHang(donHang.getKhachHang().getHoTen());
+            response.setSoDienThoaiKhachHang(donHang.getKhachHang().getSoDienThoai());
+            response.setEmailKhachHang(donHang.getKhachHang().getEmail());
         }
         response.setNgayDatHang(donHang.getNgayDatHang());
         if (donHang.getNgayDatHang() != null) {

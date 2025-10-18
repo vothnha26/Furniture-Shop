@@ -27,6 +27,13 @@ public class ShopProductResponseDto {
     private Integer discountPercent; // e.g. 10 => 10% off from maxPrice down to minPrice
     private Integer availableVariantCount; // number of variants with stock > 0
     private Integer soLuongBienThe; // total variants count
+    // Variant-level lowest final price (after promotions) and metadata
+    private Integer lowestVariantId;
+    private String lowestVariantSku;
+    private Double lowestVariantPrice; // final price after discount (giaSauGiam) or giaBan if no discount
+    private Double lowestVariantOriginalPrice; // original variant price (giaBan)
+    private Integer lowestVariantDiscountPercent; // percent discount on that variant, if any
+    private Double lowestVariantDiscountAmount; // amount discounted on that variant, if any
     @Builder.Default
     private List<String> images = new ArrayList<>();
 

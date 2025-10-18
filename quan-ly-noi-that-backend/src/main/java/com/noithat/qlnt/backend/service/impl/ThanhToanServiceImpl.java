@@ -249,7 +249,7 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         donHang.setKhachHang(khachHang);
         donHang.setNgayDatHang(LocalDateTime.now());
         // Use the DonHang.trangThaiDonHang field (not a generic 'trangThai')
-        donHang.setTrangThaiDonHang("PENDING");
+        donHang.setTrangThaiDonHang("CHO_XU_LY");
         donHang.setPhuongThucThanhToan(request.getPhuongThucThanhToan());
         donHang.setGhiChu(request.getGhiChu());
         donHang.setDiaChiGiaoHang(request.getDiaChiGiaoHang());
@@ -289,17 +289,6 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         donHang.setGiamGiaDiemThuong(summary.getGiamGiaDiem());
         donHang.setDiemThuongSuDung(request.getDiemThuongSuDung());
 
-        // Persist server-calculated earned points into the order so the UI's preview matches the saved record
-        if (summary.getDiemThuongNhanDuoc() != null) {
-            try {
-                donHang.setDiemThuongNhanDuoc(summary.getDiemThuongNhanDuoc().intValue());
-            } catch (Exception ex) {
-                // fallback: if conversion fails, set zero
-                donHang.setDiemThuongNhanDuoc(0);
-            }
-        } else {
-            donHang.setDiemThuongNhanDuoc(0);
-        }
 
     // If frontend provided a shipping method, prefer configuration-based fees
     BigDecimal phiVanChuyen = null;

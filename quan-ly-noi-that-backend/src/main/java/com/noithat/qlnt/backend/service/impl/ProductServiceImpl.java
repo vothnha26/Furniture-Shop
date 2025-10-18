@@ -508,14 +508,71 @@ public class ProductServiceImpl implements IProductService {
                                         .map(h -> h.getDuongDanHinhAnh())
                                         .collect(java.util.stream.Collectors.toList());
 
-                                                // compute discount percent from max -> min
-                                                int discountPercent = 0;
-                                                if (max > 0.0 && max > min) {
-                                                        discountPercent = (int) Math.round(((max - min) / max) * 100.0);
-                                                }
+                        // Determine per-variant final price (giaSauGiam) if there is an active BienTheGiamGia
+                        Double lowestFinalPrice = null;
+                        Integer lowestFinalVariantId = null;
+                        String lowestFinalVariantSku = null;
+                        Double lowestFinalVariantOriginalPrice = null;
+                        Integer lowestFinalVariantDiscountPercent = null;
+                        Double lowestFinalVariantDiscountAmount = null;
 
-                                                // Map to frontend-friendly fields: price=min, originalPrice=max, stockQuantity=totalStock
-                        return com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()
+                        for (BienTheSanPham bt : variants) {
+                                Double variantOriginal = bt.getGiaBan() != null ? bt.getGiaBan().doubleValue() : null;
+                                Double variantFinal = variantOriginal;
+
+                                // check discounts for this variant
+                                java.util.List<BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+                                if (!discounts.isEmpty()) {
+                                        BienTheGiamGia disc = discounts.get(0);
+                                        com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = disc.getChuongTrinhGiamGia();
+                                        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                                        boolean isActive = (chuongTrinh.getNgayBatDau() == null || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
+                                                           (chuongTrinh.getNgayKetThuc() == null || !now.isAfter(chuongTrinh.getNgayKetThuc()));
+                                        if (isActive && disc.getGiaSauGiam() != null) {
+                                                variantFinal = disc.getGiaSauGiam().doubleValue();
+                                        }
+                                }
+
+                                if (variantFinal != null) {
+                                        if (variantFinal < min) min = variantFinal;
+                                        if (variantFinal > max) max = variantFinal;
+                                } else if (variantOriginal != null) {
+                                        double price = variantOriginal;
+                                        if (price < min) min = price;
+                                        if (price > max) max = price;
+                                }
+
+                                int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
+                                totalStock += qty;
+                                if (qty > 0) availableVariantCount++;
+
+                                // track lowest final price variant
+                                if (variantFinal != null) {
+                                        if (lowestFinalPrice == null || variantFinal < lowestFinalPrice) {
+                                                lowestFinalPrice = variantFinal;
+                                                lowestFinalVariantId = bt.getMaBienThe();
+                                                lowestFinalVariantSku = bt.getSku();
+                                                lowestFinalVariantOriginalPrice = variantOriginal;
+                                                // compute percent/amount
+                                                if (variantOriginal != null && variantOriginal > 0) {
+                                                        double amt = variantOriginal - variantFinal;
+                                                        lowestFinalVariantDiscountAmount = amt;
+                                                        lowestFinalVariantDiscountPercent = (int) Math.round((amt / variantOriginal) * 100.0);
+                                                } else {
+                                                        lowestFinalVariantDiscountAmount = null;
+                                                        lowestFinalVariantDiscountPercent = null;
+                                                }
+                                        }
+                                }
+                        }
+                        // compute discount percent from max -> min
+                        int discountPercent = 0;
+                        if (max > 0.0 && max > min) {
+                                discountPercent = (int) Math.round(((max - min) / max) * 100.0);
+                        }
+
+                        // Map to frontend-friendly fields: price=min, originalPrice=max, stockQuantity=totalStock
+                        com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()
                                         .maSanPham(sp.getMaSanPham())
                                         .tenSanPham(sp.getTenSanPham())
                                         .moTa(sp.getMoTa())
@@ -530,8 +587,19 @@ public class ProductServiceImpl implements IProductService {
                                         .availableVariantCount(availableVariantCount)
                                         .soLuongBienThe(variants.size())
                                         .images(imageUrls)
-                                        .discountPercent(discountPercent)
-                                        .build();
+                                        .discountPercent(discountPercent);
+
+                        // attach lowest variant info if found
+                        if (lowestFinalVariantId != null) {
+                                builder.lowestVariantId(lowestFinalVariantId)
+                                        .lowestVariantSku(lowestFinalVariantSku)
+                                        .lowestVariantPrice(lowestFinalPrice)
+                                        .lowestVariantOriginalPrice(lowestFinalVariantOriginalPrice)
+                                        .lowestVariantDiscountAmount(lowestFinalVariantDiscountAmount)
+                                        .lowestVariantDiscountPercent(lowestFinalVariantDiscountPercent);
+                        }
+
+                        return builder.build();
                 }).collect(java.util.stream.Collectors.toList());
         }
 
@@ -568,13 +636,69 @@ public class ProductServiceImpl implements IProductService {
                                         .map(h -> h.getDuongDanHinhAnh())
                                         .collect(java.util.stream.Collectors.toList());
 
-                                                // compute discount percent from max -> min
-                                                int discountPercent = 0;
-                                                if (max > 0.0 && max > min) {
-                                                        discountPercent = (int) Math.round(((max - min) / max) * 100.0);
-                                                }
+                        // Determine per-variant final price (giaSauGiam) if there is an active BienTheGiamGia
+                        Double lowestFinalPrice2 = null;
+                        Integer lowestFinalVariantId2 = null;
+                        String lowestFinalVariantSku2 = null;
+                        Double lowestFinalVariantOriginalPrice2 = null;
+                        Integer lowestFinalVariantDiscountPercent2 = null;
+                        Double lowestFinalVariantDiscountAmount2 = null;
 
-                                                return com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()
+                        for (BienTheSanPham bt : variants) {
+                                Double variantOriginal = bt.getGiaBan() != null ? bt.getGiaBan().doubleValue() : null;
+                                Double variantFinal = variantOriginal;
+
+                                java.util.List<BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+                                if (!discounts.isEmpty()) {
+                                        BienTheGiamGia disc = discounts.get(0);
+                                        com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = disc.getChuongTrinhGiamGia();
+                                        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                                        boolean isActive = (chuongTrinh.getNgayBatDau() == null || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
+                                                           (chuongTrinh.getNgayKetThuc() == null || !now.isAfter(chuongTrinh.getNgayKetThuc()));
+                                        if (isActive && disc.getGiaSauGiam() != null) {
+                                                variantFinal = disc.getGiaSauGiam().doubleValue();
+                                        }
+                                }
+
+                                if (variantFinal != null) {
+                                        if (variantFinal < min) min = variantFinal;
+                                        if (variantFinal > max) max = variantFinal;
+                                } else if (variantOriginal != null) {
+                                        double price = variantOriginal;
+                                        if (price < min) min = price;
+                                        if (price > max) max = price;
+                                }
+
+                                int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
+                                totalStock += qty;
+                                if (qty > 0) availableVariantCount++;
+
+                                // track lowest final price variant
+                                if (variantFinal != null) {
+                                        if (lowestFinalPrice2 == null || variantFinal < lowestFinalPrice2) {
+                                                lowestFinalPrice2 = variantFinal;
+                                                lowestFinalVariantId2 = bt.getMaBienThe();
+                                                lowestFinalVariantSku2 = bt.getSku();
+                                                lowestFinalVariantOriginalPrice2 = variantOriginal;
+                                                if (variantOriginal != null && variantOriginal > 0) {
+                                                        double amt = variantOriginal - variantFinal;
+                                                        lowestFinalVariantDiscountAmount2 = amt;
+                                                        lowestFinalVariantDiscountPercent2 = (int) Math.round((amt / variantOriginal) * 100.0);
+                                                } else {
+                                                        lowestFinalVariantDiscountAmount2 = null;
+                                                        lowestFinalVariantDiscountPercent2 = null;
+                                                }
+                                        }
+                                }
+                        }
+
+                        // compute discount percent from max -> min
+                        int discountPercent2 = 0;
+                        if (max > 0.0 && max > min) {
+                                discountPercent2 = (int) Math.round(((max - min) / max) * 100.0);
+                        }
+
+                        com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder2 = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()
                                         .maSanPham(sp.getMaSanPham())
                                         .tenSanPham(sp.getTenSanPham())
                                         .moTa(sp.getMoTa())
@@ -589,8 +713,19 @@ public class ProductServiceImpl implements IProductService {
                                         .availableVariantCount(availableVariantCount)
                                         .soLuongBienThe(variants.size())
                                         .images(imageUrls)
-                                        .discountPercent(discountPercent)
-                                        .build();
+                                        .discountPercent(discountPercent2);
+
+                        // attach lowest variant info if found
+                        if (lowestFinalVariantId2 != null) {
+                                builder2.lowestVariantId(lowestFinalVariantId2)
+                                        .lowestVariantSku(lowestFinalVariantSku2)
+                                        .lowestVariantPrice(lowestFinalPrice2)
+                                        .lowestVariantOriginalPrice(lowestFinalVariantOriginalPrice2)
+                                        .lowestVariantDiscountAmount(lowestFinalVariantDiscountAmount2)
+                                        .lowestVariantDiscountPercent(lowestFinalVariantDiscountPercent2);
+                        }
+
+                        return builder2.build();
                 }).collect(java.util.stream.Collectors.toList());
 
                 com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto pageDto = com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto.builder()

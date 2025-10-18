@@ -1,5 +1,6 @@
 package com.noithat.qlnt.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -13,6 +14,7 @@ public class LichSuTrangThaiDonHang {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maLichSu;
     
+    @JsonIgnore  // Prevent circular reference when serializing to JSON
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaDonHang", nullable = false)
     private DonHang donHang;

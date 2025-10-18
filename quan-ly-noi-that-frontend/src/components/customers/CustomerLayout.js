@@ -161,8 +161,8 @@ const CustomerLayout = ({ children }) => {
         )}
       </header>
 
-      {/* Main Content */}
-      <main>
+      {/* Main Content (add top padding to avoid being covered by sticky header) */}
+      <main className="pt-16">
         {renderCurrentView()}
       </main>
 

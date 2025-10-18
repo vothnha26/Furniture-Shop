@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IoBarChart, IoPieChart, IoTrendingUp, IoTrendingDown, IoDownload, IoCalendar, IoRefresh, IoEye, IoWarning } from 'react-icons/io5';
+import { IoBarChart, IoPieChart, IoDownload, IoRefresh, IoEye, IoWarning } from 'react-icons/io5';
 import api from '../../../api';
 
 const ReportsAnalytics = () => {
@@ -113,7 +113,17 @@ const ReportsAnalytics = () => {
           });
         }
 
-        setSalesData(normalizedSales);
+        // Map various backend row shapes to a canonical shape used by the UI
+        const mapSalesRow = (r) => {
+          if (!r || typeof r !== 'object') return { date: '', revenue: 0, orders: 0 };
+          const date = r.date ?? r.Ngay ?? r.ngay ?? r.ngayStr ?? r.dateStr ?? r.Date ?? r.createdAt ?? r.thoiGianTao ?? '';
+          const revenue = Number(r.revenue ?? r.doanhThu ?? r.DoanhThu ?? r.TongDoanhThu ?? r.TotalRevenue ?? r.total ?? r.Total ?? r.value ?? 0) || 0;
+          const orders = Number(r.orders ?? r.soDonHang ?? r.SoDonHang ?? r.TongSoDonHang ?? r.TongDonHang ?? r.totalOrders ?? r.ordersCount ?? 0) || 0;
+          return { ...r, date, revenue, orders };
+        };
+
+        const mappedSales = Array.isArray(normalizedSales) ? normalizedSales.map(mapSalesRow) : [];
+        setSalesData(mappedSales);
         setProductSales(finalProducts);
         setCustomerStats(normalizedCustomers);
         setInventoryAlerts(normalizedInventory);
@@ -130,11 +140,8 @@ const ReportsAnalytics = () => {
 
   const exportReport = async (reportType) => {
     try {
-      // Use fetch directly to handle binary response
-      const url = api.buildUrl(`/api/reports/export/${reportType}`);
-      const res = await fetch(url, { method: 'GET' });
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
+      // Use api.download to include Authorization header and credentials
+      const blob = await api.download(`/api/reports/export/${reportType}`);
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;

@@ -8,4 +8,8 @@ import lombok.Data;
 public class AuthenticationResponse {
     private String token;
     private String refreshToken;
+    // The role name of the authenticated account (e.g., USER, ADMIN)
+    private String vaiTro;
+    // The primary key id of TaiKhoan
+    private Integer maTaiKhoan;
 }

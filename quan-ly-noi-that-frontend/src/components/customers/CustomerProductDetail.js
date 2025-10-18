@@ -201,14 +201,15 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
 
   // Resolve possibly-relative backend image paths to absolute URLs
   const resolveImageUrl = (img) => {
-    if (!img) return api.buildUrl('/default-product.jpg');
+    // Prefer client-hosted default assets to avoid calling backend for static files
+    if (!img) return '/default-product.jpg';
     if (typeof img === 'string') {
       const s = img.trim();
       if (s.startsWith('http://') || s.startsWith('https://')) return s;
       return api.buildUrl(s);
     }
     if (img.duongDanHinhAnh) return resolveImageUrl(img.duongDanHinhAnh);
-    return api.buildUrl('/default-product.jpg');
+    return '/default-product.jpg';
   };
 
   return (
@@ -242,7 +243,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
               )}
               alt={productState.tenSanPham}
               className="w-full h-full object-cover"
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = api.buildUrl('/logo192.png'); }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo192.png'; }}
             />
           </div>
 
@@ -259,12 +260,12 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                   selectedImage === index ? 'border-blue-500' : 'border-gray-200'
                 }`}
               >
-                <img
-                  src={resolveImageUrl(image)}
-                  alt={`${productState.tenSanPham} ${index + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = api.buildUrl('/logo192.png'); }}
-                />
+                  <img
+                    src={resolveImageUrl(image)}
+                    alt={`${productState.tenSanPham} ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo192.png'; }}
+                  />
               </button>
             ))}
           </div>
@@ -700,7 +701,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                     className="w-full h-48 object-cover"
                     onError={(e) => { 
                       e.currentTarget.onerror = null; 
-                      e.currentTarget.src = api.buildUrl('/logo192.png'); 
+                      e.currentTarget.src = '/logo192.png'; 
                     }}
                   />
                   <div className="p-4">

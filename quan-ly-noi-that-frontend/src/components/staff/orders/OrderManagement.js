@@ -10,6 +10,47 @@ const MOCK_ORDER_ITEM = {
     price: 1000000
 };
 
+// Move mapping functions outside component to avoid re-creation
+const mapOrderStatus = (status) => {
+    if (!status) return 'pending';
+    const s = status.toUpperCase();
+    // Map backend status codes to frontend display codes
+    if (s === 'CHO_XU_LY' || s === 'CHO_XAC_NHAN' || s === 'PENDING') return 'pending';
+    if (s === 'XAC_NHAN' || s === 'CONFIRMED') return 'confirmed';
+    if (s === 'DANG_CHUAN_BI' || s === 'PROCESSING') return 'processing';
+    if (s === 'DANG_GIAO_HANG' || s === 'DANG_GIAO' || s === 'SHIPPING' || s === 'SHIPPED') return 'shipping';
+    if (s === 'HOAN_THANH' || s === 'COMPLETED') return 'completed';
+    if (s === 'DA_HUY' || s === 'HUY_BO' || s === 'CANCELLED') return 'cancelled';
+    return 'pending';
+};
+
+const mapOrderFromApi = (order) => ({
+    id: order.maDonHang || order.id,
+    orderNumber: `ORD-${order.maDonHang || Date.now()}`,
+    customerName: order.tenKhachHang || 'N/A',
+    customerPhone: order.soDienThoaiKhachHang || order.soDienThoai || 'N/A',
+    customerEmail: order.emailKhachHang || order.email || 'N/A',
+    items: order.chiTietDonHangList?.map(item => ({
+        id: item.maChiTiet || item.id,
+        name: item.tenSanPham || 'Sản phẩm',
+        quantity: item.soLuong || 0,
+        price: item.donGia || 0
+    })) || [],
+    subtotal: order.tongTienGoc || 0,
+    discount: (order.giamGiaVoucher || 0) + (order.giamGiaDiemThuong || 0) + (order.giamGiaVip || 0),
+    total: order.thanhTien || 0,
+    status: mapOrderStatus(order.trangThai || 'pending'),
+    paymentMethod: order.phuongThucThanhToan || 'cash',
+    paymentStatus: order.trangThaiThanhToan || 'unpaid',
+    shippingAddress: order.diaChiGiaoHang || 'N/A',
+    createdAt: order.ngayDatHang ? new Date(order.ngayDatHang).toLocaleString('vi-VN') : 'N/A',
+    updatedAt: order.ngayCapNhat ? new Date(order.ngayCapNhat).toLocaleString('vi-VN') : 'N/A',
+    notes: order.ghiChu || '',
+    // Loyalty points
+    loyaltyPointsUsed: order.diemThuongSuDung || 0,
+    loyaltyPointsEarned: order.diemThuongNhanDuoc || 0
+});
+
 const OrderManagement = () => {
     // FIX 1: Thêm state orders bị thiếu
     const [orders, setOrders] = useState([]); 
@@ -40,50 +81,7 @@ const OrderManagement = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [newStatus, setNewStatus] = useState('');
 
-    // --- MAPPING LOGIC ---
-
-    const mapOrderStatus = (status) => {
-        const statusMap = {
-            'Chờ xác nhận': 'pending',
-            'Đã xác nhận': 'confirmed',
-            'Đang xử lý': 'processing',
-            'Đang giao hàng': 'shipping',
-            'Đã giao hàng': 'completed',
-            'Hoàn thành': 'completed',
-            'Đã hủy': 'cancelled',
-            'pending': 'pending', 
-            'processing': 'processing', 
-            'shipped': 'shipped', 
-            'completed': 'completed', 
-            'cancelled': 'cancelled', 
-            'confirmed': 'confirmed'
-        };
-        return statusMap[status] || status;
-    };
-
-    const mapOrderFromApi = (order) => ({
-        id: order.maDonHang || order.id,
-        orderNumber: order.soDonHang || `ORD-${order.maDonHang || Date.now()}`,
-        customerName: order.khachHang?.hoTen || order.customerName || 'N/A',
-        customerPhone: order.khachHang?.soDienThoai || order.customerPhone || 'N/A',
-        customerEmail: order.khachHang?.email || order.customerEmail || 'N/A',
-        items: order.chiTietDonHangList?.map(item => ({
-            id: item.maChiTiet || item.id,
-            name: item.bienTheSanPham?.sanPham?.tenSanPham || item.name || 'Sản phẩm',
-            quantity: item.soLuong || item.quantity || 0,
-            price: item.donGia || item.price || 0
-        })) || [],
-        subtotal: order.tongTien || order.subtotal || 0,
-        discount: order.giamGia || order.discount || 0,
-        total: order.tongTienSauGiam || order.total || 0,
-        status: mapOrderStatus(order.trangThai || order.status),
-        paymentMethod: order.phuongThucThanhToan || order.paymentMethod || 'cash',
-        paymentStatus: order.trangThaiThanhToan || (order.daThanhToan ? 'paid' : 'unpaid'),
-        shippingAddress: order.diaChiGiaoHang || order.shippingAddress || 'N/A',
-        createdAt: new Date(order.ngayTao || order.createdAt).toLocaleString('vi-VN') || 'N/A',
-        updatedAt: new Date(order.ngayCapNhat || order.updatedAt).toLocaleString('vi-VN') || 'N/A',
-        notes: order.ghiChu || order.notes || ''
-    });
+    // --- MAPPING LOGIC (functions moved outside component to avoid re-creation) ---
 
     const mapOrderToApi = (order) => ({
         // Giả định bạn đã có logic lấy maKhachHang, nếu không, bạn cần thêm nó vào UI
@@ -468,8 +466,15 @@ const OrderManagement = () => {
                                                     {order.items.length > 2 && '...'}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
-                                                {order.total.toLocaleString('vi-VN')}đ
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                <div className="font-semibold text-gray-900">
+                                                    {order.total.toLocaleString('vi-VN')}đ
+                                                </div>
+                                                {order.discount > 0 && (
+                                                    <div className="text-xs text-green-600">
+                                                        Giảm giá: {order.discount.toLocaleString('vi-VN')}đ
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
@@ -613,8 +618,20 @@ const OrderManagement = () => {
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span>Giảm giá:</span>
-                                                <span>{selectedOrder.discount.toLocaleString('vi-VN')}đ</span>
+                                                <span className="text-green-600">-{selectedOrder.discount.toLocaleString('vi-VN')}đ</span>
                                             </div>
+                                            {selectedOrder.loyaltyPointsUsed > 0 && (
+                                                <div className="flex justify-between text-sm text-orange-600">
+                                                    <span>Điểm đã sử dụng:</span>
+                                                    <span>-{selectedOrder.loyaltyPointsUsed} điểm</span>
+                                                </div>
+                                            )}
+                                            {selectedOrder.loyaltyPointsEarned > 0 && (
+                                                <div className="flex justify-between text-sm text-blue-600">
+                                                    <span>Điểm thưởng nhận được:</span>
+                                                    <span>+{selectedOrder.loyaltyPointsEarned} điểm</span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
                                                 <span>Tổng cộng:</span>
                                                 <span className="text-blue-600">{selectedOrder.total.toLocaleString('vi-VN')}đ</span>

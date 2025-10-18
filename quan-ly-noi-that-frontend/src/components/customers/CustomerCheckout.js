@@ -22,13 +22,14 @@ import Toast from '../shared/Toast';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import api from '../../api';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CustomerCheckout = ({ onBack, onOrderComplete }) => {
   const { items: cartItems, updateQuantity: ctxUpdateQuantity, removeItem: ctxRemoveItem, clearCart } = useCart();
   const [step, setStep] = useState(1); // 1: Cart Review, 2: Shipping Info, 3: Payment, 4: Confirmation
 
   // Customer info from localStorage or auth context
-  const [customerInfo, setCustomerInfo] = useState({ customerId: 1, name: '', phone: '', email: '' });
+  const [customerInfo, setCustomerInfo] = useState({ ma_khach_hang: null, name: '', phone: '', email: '' });
   const [cartDetails, setCartDetails] = useState([]); // Cart items from server
 
   // Debug: Check localStorage on mount
@@ -43,7 +44,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         const parsedUser = JSON.parse(userStr);
         console.log('👤 User object:', parsedUser);
         console.log('🔑 Fields available:', Object.keys(parsedUser));
-        console.log('🆔 maKhachHang:', parsedUser.maKhachHang);
+        console.log('🆔 ma_khach_hang:', parsedUser.ma_khach_hang);
         console.log('🆔 id:', parsedUser.id);
       } catch (e) {
         console.error('❌ Failed to parse user:', e);
@@ -52,36 +53,78 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
     console.log('=========================');
   }, []);
 
-  // Load customer info from localStorage
+  // Prefer AuthContext.user, fallback to localStorage and/or server-by-phone
+  const auth = useAuth();
   useEffect(() => {
-    const loadCustomerInfo = () => {
+    const loadCustomerInfo = async () => {
       try {
-        const userStr = localStorage.getItem('user');
-        console.log('📦 [CustomerCheckout] localStorage user:', userStr);
+        // 1) Prefer the auth context user when available
+        if (auth && auth.user) {
+          const u = auth.user;
+          const customerData = {
+            ma_khach_hang: u?.ma_khach_hang ?? u?.id ?? null,
+            name: u?.hoTen || u?.name || u?.tenDangNhap || '',
+            phone: u?.soDienThoai || u?.phone || '',
+            email: u?.email || ''
+          };
+          console.log('✅ [CustomerCheckout] Using auth.user:', customerData);
+          setCustomerInfo(customerData);
+          // Persist ma_khach_hang back into localStorage.user if missing
+          try {
+            const raw = localStorage.getItem('user');
+            const parsed = raw ? JSON.parse(raw) : {};
+            if (!parsed.ma_khach_hang && customerData.ma_khach_hang) {
+              parsed.ma_khach_hang = customerData.ma_khach_hang;
+              localStorage.setItem('user', JSON.stringify(parsed));
+            }
+          } catch (e) { /* ignore */ }
+          return;
+        }
 
+        // 2) Then try localStorage.user as before
+        const userStr = localStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
-          console.log('👤 [CustomerCheckout] Parsed user:', user);
-
           const customerData = {
-            customerId: 1 || user.id || null,
+            ma_khach_hang: user?.ma_khach_hang ?? user?.id ?? null,
             name: user.hoTen || user.name || '',
             phone: user.soDienThoai || user.phone || '',
             email: user.email || ''
           };
-
-          console.log('✅ [CustomerCheckout] Customer info set:', customerData);
+          console.log('✅ [CustomerCheckout] Using localStorage.user:', customerData);
           setCustomerInfo(customerData);
-        } else {
-          console.warn('⚠️ [CustomerCheckout] No user found in localStorage');
-          console.log('💡 TIP: Please login first to use checkout features');
+          return;
         }
+
+        // 3) If we have no local info, fall back to server profile (safe) or leave null
+        try {
+          const resp = await api.get('/api/v1/auth/me');
+          const prof = resp?.data ?? resp;
+          if (prof) {
+            const customerData = {
+              ma_khach_hang: prof.ma_khach_hang ?? prof.id ?? null,
+              name: prof.hoTen || prof.name || '',
+              phone: prof.soDienThoai || prof.phone || '',
+              email: prof.email || ''
+            };
+            console.log('✅ [CustomerCheckout] Using /api/v1/auth/me:', customerData);
+            setCustomerInfo(customerData);
+            try {
+              localStorage.setItem('user', JSON.stringify(prof));
+            } catch (e) { /* ignore */ }
+            return;
+          }
+        } catch (e) {
+          // ignore - we may be unauthenticated
+        }
+
+        console.log('⚠️ [CustomerCheckout] No user profile available yet');
       } catch (err) {
         console.error('❌ [CustomerCheckout] Failed to load customer info:', err);
       }
     };
     loadCustomerInfo();
-  }, []);
+  }, [auth]);
 
   // Fetch cart details from server
   useEffect(() => {
@@ -124,26 +167,85 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
   useEffect(() => {
     const fetchAvailableVouchers = async () => {
       try {
-        const customerId = 1;
-        console.log('🎟️ [Vouchers] Customer ID:', customerId);
+        let ma_khach_hang = customerInfo.maKhachHang || customerInfo.ma_khach_hang;
+        console.log('🎟️ [Vouchers] Customer ID (before fetch):', ma_khach_hang);
 
-        if (customerId && cartItems.length > 0) {
-          const subtotal = cartItems.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.quantity || 0)), 0);
-          const url = `/api/thanhtoan/applicable-vouchers?maKhachHang=${customerId}&tongTienDonHang=${subtotal}`;
-
-          console.log('🔄 [Vouchers] Fetching from:', url);
-          console.log('🔄 [Vouchers] Params:', { maKhachHang: customerId, tongTienDonHang: subtotal });
-
-          const data = await api.get(url);
-          console.log('✅ [Vouchers] Response:', data);
-
-          if (Array.isArray(data)) {
-            setAvailableVouchers(data);
-            console.log('📦 [Vouchers] Set vouchers:', data.length, 'items');
+        // If we don't have a ma_khach_hang persisted yet, try to fetch profile from server
+        if (!ma_khach_hang) {
+          try {
+            console.log('🔎 [Vouchers] No ma_khach_hang in localStorage.user — calling /api/v1/khach-hang/me');
+            const profileResp = await api.get('/api/v1/khach-hang/me');
+            const prof = profileResp?.data ?? profileResp;
+            console.log('🔎 [Vouchers] Profile from /api/v1/khach-hang/me:', prof);
+            if (prof) {
+              // Backend returns camelCase (maKhachHang), normalize to snake_case for internal use
+              ma_khach_hang = prof.maKhachHang ?? prof.ma_khach_hang ?? prof.id ?? null;
+              try {
+                const raw = localStorage.getItem('user');
+                const parsed = raw ? JSON.parse(raw) : {};
+                parsed.ma_khach_hang = parsed.ma_khach_hang ?? ma_khach_hang;
+                parsed.maKhachHang = parsed.maKhachHang ?? ma_khach_hang;
+                localStorage.setItem('user', JSON.stringify(parsed));
+              } catch (e) { /* ignore */ }
+              setCustomerInfo(prev => ({ ...prev, ma_khach_hang, name: prof.hoTen || prof.name || prev.name }));
+            }
+          } catch (e) {
+            console.warn('⚠️ [Vouchers] Could not fetch /api/v1/khach-hang/me to populate ma_khach_hang:', e);
           }
-        } else {
-          console.log('⚠️ [Vouchers] Skipping - customerId:', customerId, 'cartItems:', cartItems.length);
+
+          // If still no ma_khach_hang, try lookup by phone (if we have a phone in any source)
+          if (!ma_khach_hang) {
+            try {
+              const possiblePhone = customerInfo.phone || (auth && auth.user && (auth.user.soDienThoai || auth.user.phone)) || (() => {
+                try { const u = JSON.parse(localStorage.getItem('user') || '{}'); return u?.soDienThoai || u?.phone || null; } catch (er) { return null; }
+              })();
+              if (possiblePhone) {
+                console.log('🔎 [Vouchers] Trying /api/v1/khach-hang/by-phone with phone=', possiblePhone);
+                const byPhone = await api.get(`/api/v1/khach-hang/by-phone/${encodeURIComponent(possiblePhone)}`);
+                const byPhoneData = byPhone?.data ?? byPhone;
+                console.log('🔎 [Vouchers] Response from by-phone:', byPhoneData);
+                if (byPhoneData) {
+                  // Backend returns camelCase (maKhachHang), normalize to snake_case
+                  ma_khach_hang = byPhoneData.maKhachHang ?? byPhoneData.ma_khach_hang ?? byPhoneData.id ?? null;
+                  setCustomerInfo(prev => ({ ...prev, ma_khach_hang, name: byPhoneData.hoTen || byPhoneData.name || prev.name, phone: possiblePhone }));
+                  try { const raw = localStorage.getItem('user'); const parsed = raw ? JSON.parse(raw) : {}; parsed.ma_khach_hang = parsed.ma_khach_hang ?? ma_khach_hang; parsed.maKhachHang = parsed.maKhachHang ?? ma_khach_hang; localStorage.setItem('user', JSON.stringify(parsed)); } catch (e) { }
+                }
+              }
+            } catch (ex) {
+              console.warn('⚠️ [Vouchers] by-phone lookup failed:', ex);
+            }
+          }
         }
+
+        // Only fetch vouchers when we have a ma_khach_hang and at least one cart item
+        if (!ma_khach_hang || cartItems.length === 0) {
+          console.log('⚠️ [Vouchers] Skipping - ma_khach_hang:', ma_khach_hang, 'cartItems:', cartItems.length);
+          return;
+        }
+
+        // Prefer server-provided cartDetails subtotal if available (more accurate)
+        const subtotal = (cartDetails && cartDetails.length > 0)
+          ? cartDetails.reduce((s, it) => s + Number(it.thanhTien || it.thanhTien || 0), 0)
+          : cartItems.reduce((sum, item) => sum + (Number(item.price || item.giaHienThi || 0) * Number(item.quantity || 0)), 0);
+
+        // Backend uses camelCase: maKhachHang (not ma_khach_hang)
+        const url = `/api/thanhtoan/applicable-vouchers?maKhachHang=${ma_khach_hang}&tongTienDonHang=${subtotal}`;
+        console.log('🔄 [Vouchers] Fetching from:', url);
+        console.log('🔄 [Vouchers] Params:', { maKhachHang: ma_khach_hang, tongTienDonHang: subtotal });
+
+        const data = await api.get(url);
+        console.log('✅ [Vouchers] Raw response:', data);
+
+        // Normalize different response shapes: direct array OR { data: [...] } OR { success:true, data: [...] }
+        let vouchers = [];
+        if (!data) vouchers = [];
+        else if (Array.isArray(data)) vouchers = data;
+        else if (Array.isArray(data.data)) vouchers = data.data;
+        else if (Array.isArray(data.vouchers)) vouchers = data.vouchers;
+        else if (data.success && Array.isArray(data.data)) vouchers = data.data;
+
+        setAvailableVouchers(vouchers);
+        console.log('📦 [Vouchers] Set vouchers:', vouchers.length, 'items');
       } catch (err) {
         console.error('❌ [Vouchers] Failed to fetch:', err);
         console.error('Error details:', err.response?.data || err.message);
@@ -151,7 +253,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
     };
 
     fetchAvailableVouchers();
-  }, [customerInfo.customerId, cartItems]);
+  }, [customerInfo.maKhachHang, customerInfo.ma_khach_hang, customerInfo.phone, cartItems, cartDetails, auth]);
   const [shippingInfo, setShippingInfo] = useState({
     fullName: '',
     phone: '',
@@ -345,7 +447,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
 
       const payload = {
         chiTietDonHang: cartItems.map(item => ({ maBienThe: item.variantId ?? item.id, soLuong: item.quantity })),
-        maKhachHang: customerInfo.customerId || 1, // Default to 1 for guest
+        maKhachHang: customerInfo.maKhachHang || customerInfo.ma_khach_hang, // Support both formats
         diemSuDung: appliedLoyaltyPoints || 0,
         maVoucherCode: selectedVoucher?.code || null
       };
@@ -389,13 +491,19 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
 
     const t = setTimeout(fetchPreview, 300);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [customerInfo.customerId, cartItems, selectedVoucher, appliedLoyaltyPoints]);
+  }, [customerInfo.maKhachHang, customerInfo.ma_khach_hang, cartItems, selectedVoucher, appliedLoyaltyPoints]);
 
   const applyVoucher = async (voucher) => {
     try {
       const subtotal = calculateSubtotal();
+      const customerId = customerInfo.maKhachHang || customerInfo.ma_khach_hang;
+      if (!customerId) {
+        showToast('Vui lòng đăng nhập để áp dụng voucher', 'warning');
+        return;
+      }
+
       const res = await api.post('/api/thanhtoan/apply-voucher', {
-        maKhachHang: customerInfo.customerId || 1,
+        maKhachHang: customerInfo.maKhachHang || customerInfo.ma_khach_hang, // Support both formats
         maVoucherCode: voucher.maCode || voucher.code,
         orderAmountForCheck: subtotal
       });
@@ -489,10 +597,10 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
 
     try {
       // Build payload according to ThongTinGiaoHangRequest
-  const payload = {
-  maKhachHang: customerInfo.customerId || 1,
-  phuongThucThanhToan: paymentMethod,
-  chiTietDonHangList: cartItems.map(i => ({ maBienThe: i.variantId ?? i.id, soLuong: i.quantity })),
+      const payload = {
+        maKhachHang: customerInfo.maKhachHang || customerInfo.ma_khach_hang, // Support both formats
+        phuongThucThanhToan: paymentMethod,
+        chiTietDonHangList: cartItems.map(i => ({ maBienThe: i.variantId ?? i.id, soLuong: i.quantity })),
         tenNguoiNhan: shippingInfo.fullName,
         soDienThoaiNhan: shippingInfo.phone,
         diaChiGiaoHang: `${shippingInfo.address}${shippingInfo.ward ? ', ' + shippingInfo.ward : ''}${shippingInfo.district ? ', ' + shippingInfo.district : ''}${shippingInfo.city ? ', ' + shippingInfo.city : ''}`,

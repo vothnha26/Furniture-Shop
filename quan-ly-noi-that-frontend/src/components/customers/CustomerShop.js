@@ -42,13 +42,63 @@ const CustomerShop = () => {
       }
     }
 
+    // compute discount percent/amount in a few fallback ways so UI can render reliably
+    let rawDiscountPercent = product.phanTramGiamGia ?? product.discountPercent ?? null;
+    let discountPercent = rawDiscountPercent != null ? Number(rawDiscountPercent) || 0 : 0;
+    if ((!rawDiscountPercent || rawDiscountPercent === null) && originalPrice > 0 && price < originalPrice) {
+      discountPercent = Math.round(((originalPrice - price) / originalPrice) * 100);
+    }
+    const discountAmount = originalPrice > 0 && price < originalPrice ? (originalPrice - price) : 0;
+
+    // If variants exist, compute the variant with the lowest final price (consider variant price and any variant-level discount fields)
+    let lowestVariant = null;
+    try {
+      const rawVariants = product.bienTheList ?? product.bienThe ?? product.variants ?? [];
+      if (Array.isArray(rawVariants) && rawVariants.length > 0) {
+        rawVariants.forEach(v => {
+          const vPrice = Number(v.giaBan ?? v.gia ?? v.price ?? v.priceAfterDiscount ?? 0) || 0;
+          const vOriginal = Number((v.giaGoc ?? v.gia_goc ?? v.originalPrice ?? originalPrice) || 0) || 0;
+          // compute percent/amount for variant
+          let vDiscountPercent = v.phanTramGiamGia ?? v.discountPercent ?? null;
+          vDiscountPercent = vDiscountPercent != null ? Number(vDiscountPercent) || 0 : 0;
+          if ((!v.phanTramGiamGia && !v.discountPercent) && vOriginal > 0 && vPrice < vOriginal) {
+            vDiscountPercent = Math.round(((vOriginal - vPrice) / vOriginal) * 100);
+          }
+          const vDiscountAmount = vOriginal > 0 && vPrice < vOriginal ? (vOriginal - vPrice) : 0;
+
+          const finalPrice = vPrice; // assume provided price already reflects any variant-level applied discounts
+
+          if (!lowestVariant || finalPrice < lowestVariant.finalPrice) {
+            lowestVariant = {
+              id: v.maBienThe ?? v.id ?? v.variantId,
+              name: v.tenBienThe ?? v.ten ?? v.name ?? null,
+              price: vPrice,
+              originalPrice: vOriginal,
+              discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null,
+              discountAmount: vDiscountAmount,
+              finalPrice
+            };
+          }
+        });
+      }
+    } catch (e) {
+      // ignore any variant parsing errors
+      console.warn('Variant parsing error', e);
+      lowestVariant = null;
+    }
+
     return {
       id: product.maSanPham ?? product.id ?? product.productId,
       name: product.tenSanPham ?? product.ten ?? product.name ?? 'Sản phẩm',
+      // expose both category id and name when available so we can merge with API categories
+      categoryId: product.danhMuc?.maDanhMuc ?? product.maDanhMuc ?? product.danhMucId ?? null,
       category: product.danhMuc?.tenDanhMuc ?? product.category ?? '',
       price,
       originalPrice,
-      discount: Number(product.phanTramGiamGia ?? product.giam_gia ?? 0) || 0,
+  // percentage value (if available or computed) and absolute amount
+  discount: Number(product.phanTramGiamGia ?? product.giam_gia ?? 0) || 0,
+  discountPercent: discountPercent > 0 ? discountPercent : null,
+  discountAmount,
       rating: Number(product.danhGia ?? product.rating) || 0,
       reviews: Number(product.soLuongDanhGia ?? product.reviews) || 0,
       // store the raw image value; the rendering layer will convert it to absolute URL
@@ -63,6 +113,14 @@ const CustomerShop = () => {
         price: Number(variant.giaBan ?? variant.gia ?? variant.price) || 0,
         inStock: Number(variant.tonKho ?? variant.soLuong ?? 0) > 0
       })),
+      // expose lowest variant pricing so the shop list can show the best (lowest) variant price and discount
+      lowestVariantId: lowestVariant?.id ?? null,
+      lowestVariantName: lowestVariant?.name ?? null,
+      lowestVariantPrice: lowestVariant?.price ?? null,
+      lowestVariantOriginalPrice: lowestVariant?.originalPrice ?? null,
+      lowestVariantDiscountPercent: lowestVariant?.discountPercent ?? null,
+      lowestVariantDiscountAmount: lowestVariant?.discountAmount ?? 0,
+      lowestVariantFinalPrice: lowestVariant?.finalPrice ?? null,
       isOnSale: originalPrice > 0 && price < originalPrice
     };
   };
@@ -123,16 +181,62 @@ const CustomerShop = () => {
             imageRaw = it.hinhAnh;
           }
 
+          // derive discount info and lowest variant price if variants included in the shop DTO
+          let dtoOriginalPrice = Number(it.giaGoc ?? it.originalPrice ?? 0) || 0;
+          let dtoDiscountPercent = it.discountPercent ?? it.phanTramGiamGia ?? null;
+          dtoDiscountPercent = dtoDiscountPercent != null ? Number(dtoDiscountPercent) || 0 : null;
+          let dtoDiscountAmount = 0;
+          if ((dtoDiscountPercent == null || dtoDiscountPercent === 0) && dtoOriginalPrice > 0 && displayPrice.min < dtoOriginalPrice) {
+            dtoDiscountAmount = dtoOriginalPrice - displayPrice.min;
+            dtoDiscountPercent = Math.round(((dtoOriginalPrice - displayPrice.min) / dtoOriginalPrice) * 100);
+          } else if (dtoDiscountPercent != null && dtoDiscountPercent > 0 && dtoOriginalPrice > 0) {
+            dtoDiscountAmount = Math.round((dtoDiscountPercent / 100) * dtoOriginalPrice);
+          }
+
+          // compute lowest variant in shop DTO if present
+          let dtoLowestVariant = null;
+          try {
+            const rawVariants = it.bienTheList ?? it.bienThe ?? it.variants ?? it.variantDtos ?? [];
+            if (Array.isArray(rawVariants) && rawVariants.length > 0) {
+              rawVariants.forEach(v => {
+                const vPrice = Number(v.giaBan ?? v.gia ?? v.price ?? v.priceAfterDiscount ?? displayPrice.min) || 0;
+                const vOriginal = Number((v.giaGoc ?? v.gia_goc ?? v.originalPrice ?? dtoOriginalPrice) || 0) || 0;
+                let vDiscountPercent = v.phanTramGiamGia ?? v.discountPercent ?? null;
+                vDiscountPercent = vDiscountPercent != null ? Number(vDiscountPercent) || 0 : 0;
+                if ((!v.phanTramGiamGia && !v.discountPercent) && vOriginal > 0 && vPrice < vOriginal) {
+                  vDiscountPercent = Math.round(((vOriginal - vPrice) / vOriginal) * 100);
+                }
+                const vDiscountAmount = vOriginal > 0 && vPrice < vOriginal ? (vOriginal - vPrice) : 0;
+                const finalPrice = vPrice;
+                if (!dtoLowestVariant || finalPrice < dtoLowestVariant.finalPrice) {
+                  dtoLowestVariant = {
+                    id: v.maBienThe ?? v.id ?? v.variantId,
+                    name: v.tenBienThe ?? v.ten ?? v.name ?? null,
+                    price: vPrice,
+                    originalPrice: vOriginal,
+                    discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null,
+                    discountAmount: vDiscountAmount,
+                    finalPrice
+                  };
+                }
+              });
+            }
+          } catch (e) {
+            dtoLowestVariant = null;
+          }
+
           return {
             id: it.maSanPham ?? it.id ?? it.productId,
             name: it.tenSanPham ?? it.ten ?? it.name ?? 'Sản phẩm',
+            categoryId: it.maDanhMuc ?? it.danhMuc?.maDanhMuc ?? null,
             category: it.tenDanhMuc ?? it.danhMuc?.tenDanhMuc ?? '',
             // use min price for singular display; we will render range when min!=max
             price: displayPrice.min,
             priceRange: displayPrice,
             originalPrice: it.giaGoc ?? it.originalPrice ?? 0,
-            // prefer backend-provided discountPercent if available
-            discount: Number(it.discountPercent ?? it.phanTramGiamGia ?? it.giam_gia ?? 0) || 0,
+            // prefer backend-provided discountPercent if available; fall back to computed dtoDiscountPercent
+            discount: Number(it.discountPercent ?? it.phanTramGiamGia ?? it.giam_gia ?? dtoDiscountPercent ?? 0) || 0,
+            discountAmount: dtoDiscountAmount,
             rating: Number(it.danhGia ?? it.rating) || 0,
             reviews: Number(it.soLuongDanhGia ?? it.reviews) || 0,
             image: imageRaw,
@@ -142,7 +246,15 @@ const CustomerShop = () => {
             description: it.moTa ?? it.description ?? '',
             variants: [], // the shop DTO intentionally does not include full variants; keep empty here
             isOnSale: (it.giaGoc ?? it.originalPrice ?? 0) > 0 && (displayPrice.min < (it.giaGoc ?? it.originalPrice ?? Number.POSITIVE_INFINITY)),
-            discountPercent: it.discountPercent != null ? it.discountPercent : null
+            discountPercent: dtoDiscountPercent != null && dtoDiscountPercent > 0 ? dtoDiscountPercent : (it.discountPercent != null ? it.discountPercent : null),
+            // expose dto-level lowest variant if computed
+            lowestVariantId: dtoLowestVariant?.id ?? null,
+            lowestVariantName: dtoLowestVariant?.name ?? null,
+            lowestVariantPrice: dtoLowestVariant?.price ?? null,
+            lowestVariantOriginalPrice: dtoLowestVariant?.originalPrice ?? null,
+            lowestVariantDiscountPercent: dtoLowestVariant?.discountPercent ?? null,
+            lowestVariantDiscountAmount: dtoLowestVariant?.discountAmount ?? 0,
+            lowestVariantFinalPrice: dtoLowestVariant?.finalPrice ?? null
           };
   });
 
@@ -169,6 +281,8 @@ const CustomerShop = () => {
             name: cat.tenDanhMuc,
             count: cat.soLuongSanPham || 0
           }));
+          // store API categories separately; we'll merge counts with product-derived counts below
+          setApiCategories(mappedCategories);
           setCategories([{ id: 'all', name: 'Tất cả', count: mappedCategories.reduce((sum, cat) => sum + cat.count, 0) }, ...mappedCategories]);
         }
       } catch (err) {
@@ -186,6 +300,52 @@ const CustomerShop = () => {
   const [products, setProducts] = useState([
     // start empty and rely on API fetch
   ]);
+  // Keep API categories in a separate state so we can merge product counts into them
+  const [apiCategories, setApiCategories] = useState([]);
+
+  // When products load, derive category counts from product data and merge with API categories.
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      // fallback to API categories if present
+      if (apiCategories && apiCategories.length > 0) {
+        const total = apiCategories.reduce((s, c) => s + (c.count || 0), 0);
+        setCategories([{ id: 'all', name: 'Tất cả', count: total }, ...apiCategories]);
+      } else {
+        setCategories([{ id: 'all', name: 'Tất cả', count: 0 }]);
+      }
+      return;
+    }
+
+    // compute counts from products
+    const countsById = {};
+    const countsByName = {};
+    products.forEach(p => {
+      const id = p.categoryId ?? null;
+      const name = (p.category && p.category !== '') ? p.category : 'Khác';
+      if (id) countsById[id] = (countsById[id] || 0) + 1;
+      countsByName[name] = (countsByName[name] || 0) + 1;
+    });
+
+    // prefer merging into apiCategories (keeps canonical ids/names) when available
+    let merged = [];
+    if (apiCategories && apiCategories.length > 0) {
+      merged = apiCategories.map(ac => ({
+        id: ac.id,
+        name: ac.name,
+        count: countsById[ac.id] ?? ac.count ?? 0
+      }));
+      // add any product-derived names that were not present in API categories
+      Object.keys(countsByName).forEach(name => {
+        const exists = merged.some(m => m.name === name);
+        if (!exists) merged.push({ id: name, name, count: countsByName[name] });
+      });
+    } else {
+      merged = Object.keys(countsByName).map(name => ({ id: name, name, count: countsByName[name] }));
+    }
+
+    const total = products.length;
+    setCategories([{ id: 'all', name: 'Tất cả', count: total }, ...merged]);
+  }, [products, apiCategories]);
   const navigate = useNavigate();
 
   const filteredProducts = products.filter(product => {
@@ -213,8 +373,19 @@ const CustomerShop = () => {
   const handleViewProduct = (product) => {
     try {
       const id = product.id ?? product.maSanPham;
-      // Use SPA navigation instead of full reload
-      navigate(`/shop/products/${id}`);
+      // debug: ensure click reaches here and id is present
+      // eslint-disable-next-line no-console
+      console.log('CustomerShop: handleViewProduct', { productId: id, product });
+      if (!id) {
+        // missing id -> open modal fallback
+        // eslint-disable-next-line no-console
+        console.warn('CustomerShop: product has no id, opening modal instead', product);
+        setSelectedProduct(product);
+        setShowProductDetail(true);
+        return;
+      }
+  // Use SPA navigation (relative) instead of full reload — this file is mounted under /shop
+  navigate(`products/${id}`);
     } catch (e) {
       // fallback to modal if routing fails
       setSelectedProduct(product);
@@ -257,9 +428,12 @@ const CustomerShop = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Cửa hàng nội thất</h1>
-          <p className="text-gray-600">Khám phá bộ sưu tập nội thất cao cấp</p>
+        <div className="mb-6 lg:flex lg:items-center lg:justify-between">
+          <div className="mb-3 lg:mb-0">
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">Cửa hàng nội thất</h1>
+            <p className="text-gray-600">Khám phá bộ sưu tập nội thất cao cấp</p>
+          </div>
+          <div className="w-full lg:w-1/2" />
         </div>
 
         {/* Search and Filters */}
@@ -334,7 +508,14 @@ const CustomerShop = () => {
             : 'grid-cols-1'
         }`}>
           {filteredProducts.map((product) => (
-            <div key={product.id} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+            <div
+              key={product.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => handleViewProduct(product)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleViewProduct(product); } }}
+              className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+            >
               {/* Product Image */}
               <div className="relative">
                 <img
@@ -347,8 +528,10 @@ const CustomerShop = () => {
                     // Log failing URL for easier debugging in browser console
                     // eslint-disable-next-line no-console
                     console.error('Image load failed for', e.currentTarget.src);
-                    e.currentTarget.onerror = null; 
-                    e.currentTarget.src = api.buildUrl('/logo192.png'); 
+                    // Prevent infinite loop by clearing onerror before changing src
+                    e.currentTarget.onerror = null;
+                    // Use a frontend-hosted fallback asset (served from public/) instead of calling backend
+                    e.currentTarget.src = '/logo192.png'; 
                   }}
                 />
                 {product.isNew && (
@@ -356,18 +539,31 @@ const CustomerShop = () => {
                     Mới
                   </span>
                 )}
-                {product.discountPercent != null && product.discountPercent > 0 && (
+                {/* Prefer lowest-variant discount if available */}
+                {product.lowestVariantDiscountPercent != null && product.lowestVariantDiscountPercent > 0 ? (
+                  <span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                    -{product.lowestVariantDiscountPercent}%
+                  </span>
+                ) : product.lowestVariantDiscountAmount > 0 ? (
+                  <span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                    -{formatPrice(product.lowestVariantDiscountAmount)}
+                  </span>
+                ) : product.discountPercent != null && product.discountPercent > 0 ? (
                   <span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
                     -{product.discountPercent}%
                   </span>
-                )}
+                ) : product.discountAmount > 0 ? (
+                  <span className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium">
+                    -{formatPrice(product.discountAmount)}
+                  </span>
+                ) : null}
                 {!product.inStock && (
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                     <span className="text-white font-medium">Hết hàng</span>
                   </div>
                 )}
                 <button 
-                  onClick={() => toggleFavorite(product.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }}
                   className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50"
                 >
                   <IoHeart className={`w-5 h-5 ${favorites.includes(product.id) ? 'text-red-500' : 'text-gray-400'}`} />
@@ -397,12 +593,40 @@ const CustomerShop = () => {
 
                 {/* Price */}
                 <div className="flex items-center gap-2 mb-4">
+
                   <span className="text-lg font-bold text-primary">
-                    {product.priceRange && product.priceRange.min != null && product.priceRange.max != null && product.priceRange.min !== product.priceRange.max
+                    {/* Prefer showing lowest variant final price when available */}
+                    {product.lowestVariantFinalPrice != null ? (
+                      formatPrice(product.lowestVariantFinalPrice)
+                    ) : product.priceRange && product.priceRange.min != null && product.priceRange.max != null && product.priceRange.min !== product.priceRange.max
                       ? `${formatPrice(product.priceRange.min)} - ${formatPrice(product.priceRange.max)}`
                       : (product.price > 0 ? formatPrice(product.price) : 'Liên hệ')
                     }
                   </span>
+
+                  {/* show discount amount or percent inline next to price when available, prefer variant-level */}
+                  {product.lowestVariantDiscountPercent != null && product.lowestVariantDiscountPercent > 0 && (
+                    <span className="text-sm text-red-600 font-medium">
+                      &nbsp;(-{product.lowestVariantDiscountPercent}%)
+                    </span>
+                  )}
+                  {((!product.lowestVariantDiscountPercent || product.lowestVariantDiscountPercent === null) && product.lowestVariantDiscountAmount > 0) && (
+                    <span className="text-sm text-red-600 font-medium">
+                      &nbsp;(-{formatPrice(product.lowestVariantDiscountAmount)})
+                    </span>
+                  )}
+                  {/* fallbacks to product-level discount */}
+                  {product.lowestVariantDiscountPercent == null && (!product.lowestVariantDiscountAmount || product.lowestVariantDiscountAmount === 0) && product.discountPercent != null && product.discountPercent > 0 && (
+                    <span className="text-sm text-red-600 font-medium">
+                      &nbsp;(-{product.discountPercent}%)
+                    </span>
+                  )}
+                  {product.lowestVariantDiscountPercent == null && (!product.lowestVariantDiscountAmount || product.lowestVariantDiscountAmount === 0) && (!product.discountPercent || product.discountPercent === null) && product.discountAmount > 0 && (
+                    <span className="text-sm text-red-600 font-medium">
+                      &nbsp;(-{formatPrice(product.discountAmount)})
+                    </span>
+                  )}
+
                   {product.originalPrice > 0 && product.isOnSale && (
                     <span className="text-sm text-gray-500 line-through">
                       {formatPrice(product.originalPrice)}
@@ -413,14 +637,14 @@ const CustomerShop = () => {
                 {/* Actions */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleViewProduct(product)}
+                    onClick={(e) => { e.stopPropagation(); handleViewProduct(product); }}
                     className="flex items-center justify-center gap-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <IoEye className="w-4 h-4" />
                     Chi tiết
                   </button>
                   <button
-                    onClick={() => handleAddToCart(product)}
+                    onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
                     disabled={!product.inStock}
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                       product.inStock

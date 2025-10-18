@@ -81,7 +81,32 @@ public class JwtService {
     }
 
     private Key getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        byte[] keyBytes = null;
+        try {
+            // Try base64 first (recommended)
+            keyBytes = Decoders.BASE64.decode(secretKey);
+        } catch (IllegalArgumentException ex) {
+            // Fallback: try hex decoding (some configs provide hex strings)
+            try {
+                keyBytes = hexStringToByteArray(secretKey);
+            } catch (Exception ex2) {
+                // Re-throw the original exception to preserve context
+                throw new RuntimeException("Invalid JWT secret format: neither base64 nor hex", ex);
+            }
+        }
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        if (len % 2 != 0) throw new IllegalArgumentException("Invalid hex string");
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            int hi = Character.digit(s.charAt(i), 16);
+            int lo = Character.digit(s.charAt(i + 1), 16);
+            if (hi == -1 || lo == -1) throw new IllegalArgumentException("Invalid hex character in JWT secret");
+            data[i / 2] = (byte) ((hi << 4) + lo);
+        }
+        return data;
     }
 }

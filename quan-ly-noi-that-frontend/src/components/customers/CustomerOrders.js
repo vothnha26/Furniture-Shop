@@ -14,10 +14,11 @@ const mapOrderFromApi = (order) => {
     if (s == null) return 'processing';
     const v = String(s).trim().toLowerCase();
     if (!v) return 'processing';
-    if (['processing', 'dang xu ly', 'đang xử lý', 'xac_nhan', 'xac-nhan', 'cho_xac_nhan', 'cho xac nhan', 'pending'].includes(v)) return 'processing';
-    if (['shipping', 'shipped', 'dang_giao', 'dang giao', 'đang giao', 'dang_giao_hang', 'dang-giao-hang', 'dang_giao_hang', 'dang_giao_hang', 'dang_giao_hang'].includes(v) || v.includes('giao')) return 'shipping';
-    if (['delivered', 'completed', 'hoan_thanh', 'hoàn thành', 'hoan thanh', 'da giao', 'đã giao'].includes(v) || v.includes('hoan')) return 'delivered';
-    if (['cancelled', 'canceled', 'huy', 'hủy', 'da huy', 'đã hủy', 'huy_bo'].includes(v)) return 'cancelled';
+    if (['processing', 'dang xu ly', 'đang xử lý', 'xac_nhan', 'xac-nhan', 'cho_xac_nhan', 'cho xac nhan', 'pending', 'cho_xu_ly', 'cho xu ly'].includes(v)) return 'processing';
+    if (['shipping', 'shipped', 'dang_giao', 'dang giao', 'đang giao', 'dang_giao_hang', 'dang-giao-hang', 'đang giao hàng'].includes(v)) return 'shipping';
+    if (['da_giao_hang', 'da giao hang', 'đã giao hàng'].includes(v)) return 'delivered';
+    if (['delivered', 'completed', 'hoan_thanh', 'hoàn thành', 'hoan thanh'].includes(v) || v.includes('hoan')) return 'completed';
+    if (['cancelled', 'canceled', 'huy', 'hủy', 'da huy', 'đã hủy', 'huy_bo', 'da_huy'].includes(v)) return 'cancelled';
     return 'processing';
   };
   const status = normalizeStatus(rawStatus);
@@ -89,7 +90,17 @@ const CustomerOrders = () => {
   const fetchCustomerOrders = async () => {
     setLoading(true);
     try {
-      const customerId = 1; // Assuming customer ID is stored
+      const userStr = localStorage.getItem('user');
+      let customerId = null;
+      if (userStr) {
+        try { const u = JSON.parse(userStr); customerId = u?.maKhachHang ?? u?.id ?? null; } catch(e) {}
+      }
+      if (!customerId) {
+        // No logged-in customer: nothing to fetch
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
       const response = await api.get(`/api/v1/khach-hang/${customerId}/don-hang`);
       // api.get returns parsed body directly. But some endpoints may wrap in { data: ... }
       const raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
@@ -137,6 +148,33 @@ const CustomerOrders = () => {
     }
   };
 
+  const confirmReceive = async (order) => {
+    try {
+      const userStr = localStorage.getItem('user');
+      let customerId = null;
+      if (userStr) {
+        try { const u = JSON.parse(userStr); customerId = u?.maKhachHang ?? u?.id ?? null; } catch(e) {}
+      }
+      if (!customerId) {
+        setError('Vui lòng đăng nhập để xác nhận nhận hàng');
+        return;
+      }
+
+      await api.post(`/api/v1/khach-hang/${customerId}/don-hang/${order.id}/xac-nhan-nhan-hang`);
+      // Refresh list and detail
+      await fetchCustomerOrders();
+      if (selectedOrder && String(selectedOrder.id) === String(order.id)) {
+        const updated = await getOrderDetail(order.id);
+        setSelectedOrder(updated);
+      }
+      setError('');
+    } catch (err) {
+      console.error('confirmReceive error', err);
+      const msg = err?.data?.message || err?.message || 'Không thể xác nhận nhận hàng';
+      setError(msg);
+    }
+  };
+
   const trackOrder = async (orderId) => {
     try {
       const response = await api.get(`/api/v1/theo-doi-don-hang/${orderId}`);
@@ -168,6 +206,12 @@ const CustomerOrders = () => {
       bg: 'bg-green-100',
       icon: IoCheckmarkCircle,
       label: 'Đã giao hàng'
+    },
+    completed: {
+      color: 'text-green-800',
+      bg: 'bg-green-200',
+      icon: IoCheckmarkCircle,
+      label: 'Hoàn thành'
     },
     cancelled: {
       color: 'text-red-600',
@@ -456,9 +500,14 @@ const CustomerOrders = () => {
                       </button>
                     )}
                     {order.status === 'delivered' && (
-                      <button className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-                        Đánh giá sản phẩm
-                      </button>
+                      <>
+                        <button className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                          Đánh giá sản phẩm
+                        </button>
+                        <button onClick={() => confirmReceive(order)} className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                          Xác nhận đã nhận hàng
+                        </button>
+                      </>
                     )}
                     {order.status === 'processing' && (
                       <button

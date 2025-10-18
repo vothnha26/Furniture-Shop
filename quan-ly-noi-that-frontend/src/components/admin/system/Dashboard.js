@@ -139,6 +139,44 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
+  // Helper to normalize various API shapes (arrays, objects, rows) into
+  // [{ label, value }] so the UI never tries to render a raw object.
+  const normalizeMetrics = (data, fallback = []) => {
+    if (!data) return fallback;
+
+    // If data is an array, try to map rows to sensible label/value pairs
+    if (Array.isArray(data)) {
+      if (data.length === 0) return fallback;
+      // If rows are objects with keys like Ngay/DoanhThu or date/revenue
+      if (typeof data[0] === 'object' && data[0] !== null) {
+        // If each row has date & value keys, map them
+        const first = data[0];
+        const dateKey = Object.keys(first).find(k => /ngay|date|day/i.test(k));
+        const valueKey = Object.keys(first).find(k => /doanhthu|revenue|value|total/i.test(k));
+        if (dateKey && valueKey) {
+          return data.map((row) => ({
+            label: row[dateKey] ?? '',
+            value: row[valueKey] ?? ''
+          }));
+        }
+
+        // Fallback: map each object row to a JSON/string summary
+        return data.map((row, i) => ({ label: `#${i + 1}`, value: JSON.stringify(row) }));
+      }
+
+      // Array of primitives
+      return data.map((v, i) => ({ label: `#${i + 1}`, value: v }));
+    }
+
+    // If data is an object, convert entries into label/value pairs.
+    if (typeof data === 'object') {
+      return Object.entries(data).map(([k, v]) => ({ label: k, value: (typeof v === 'object' ? JSON.stringify(v) : v) }));
+    }
+
+    // Primitive
+    return [{ label: String(data), value: data }];
+  };
+
   const handleQuickAction = (act) => {
     if (!act) return;
     if (act.action === 'route' && act.route) {
@@ -260,12 +298,12 @@ const Dashboard = () => {
               )}
 
               {selectedWidget === 'sales' && (
-                (salesData ? Object.entries(salesData).map(([k,v],i)=>({label:k,value:v})) : [
+                (normalizeMetrics(salesData, [
                   { label: 'Doanh thu hôm nay', value: '—' },
                   { label: 'Đơn hôm nay', value: '—' },
                   { label: 'Tỉ lệ chuyển đổi', value: '—' },
                   { label: 'Giá trị trung bình', value: '—' }
-                ]).map((item,idx)=>(
+                ])).map((item, idx) => (
                   <div key={idx} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium text-gray-600">{item.label}</h4>
@@ -277,12 +315,12 @@ const Dashboard = () => {
               )}
 
               {selectedWidget === 'inventory' && (
-                (inventoryData ? Object.entries(inventoryData).map(([k,v],i)=>({label:k,value:v})) : [
+                normalizeMetrics(inventoryData, [
                   { label: 'Tổng tồn', value: '—' },
                   { label: 'Sắp hết', value: '—' },
                   { label: 'Hết hàng', value: '—' },
                   { label: 'Giá trị tồn', value: '—' }
-                ]).map((item,idx)=>(
+                ]).map((item, idx) => (
                   <div key={idx} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium text-gray-600">{item.label}</h4>
@@ -294,12 +332,12 @@ const Dashboard = () => {
               )}
 
               {selectedWidget === 'customers' && (
-                (customersData ? Object.entries(customersData).map(([k,v],i)=>({label:k,value:v})) : [
+                normalizeMetrics(customersData, [
                   { label: 'Khách mới', value: '—' },
                   { label: 'VIP', value: '—' },
                   { label: 'Tỉ lệ giữ chân', value: '—' },
                   { label: 'Độ hài lòng', value: '—' }
-                ]).map((item,idx)=>(
+                ]).map((item, idx) => (
                   <div key={idx} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium text-gray-600">{item.label}</h4>

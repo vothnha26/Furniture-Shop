@@ -43,7 +43,8 @@ import CustomerShopPage from './components/customers/CustomerShopPage';
 import InventoryAlerts from './components/staff/inventory/InventoryAlerts';
 import OrderManagement from './components/staff/orders/OrderManagement';
 import SalesManagement from './components/staff/orders/SalesManagement';
-import StaffLayout from './components/staff/StaffLayout';
+import StaffLayoutBase from './components/staff/StaffLayout';
+import ProtectedRoute from './components/shared/ProtectedRoute';
 import InvoiceManagement from './components/staff/orders/InvoiceManagement';
 import OrderDetailManagement from './components/staff/orders/OrderDetailManagement';
 import PaymentTransactionManagement from './components/staff/orders/PaymentTransactionManagement';
@@ -54,7 +55,6 @@ import Register from './components/shared/Register';
 import OtpVerification from './components/shared/OtpVerification';
 import ForgotPassword from './components/shared/ForgotPassword';
 import PendingTasks from './components/shared/PendingTasks';
-import MainDashboard from './components/shared/MainDashboard';
 import Header from './components/shared/Header';
 import Hero from './components/shared/Hero';
 import Stats from './components/shared/Stats';
@@ -68,14 +68,14 @@ import Footer from './components/shared/Footer';
 
 import MembershipTierManagement from './components/admin/products/MembershipTierManagement';
 import { CartProvider } from './contexts/CartContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Import styles
 import './slider.css';
 import './animations.css';
 
-// Admin Layout Component
-const AdminLayout = ({ children }) => {
+// Admin Layout Component (base)
+const AdminLayoutBase = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Navigation */}
@@ -133,6 +133,43 @@ const AdminLayout = ({ children }) => {
   );
 };
 
+// Protected Admin Layout - only ADMIN and MANAGER can access admin routes
+const AdminLayout = ({ children }) => {
+  const auth = useAuth();
+  const isAuthenticated = !!auth?.isAuthenticated;
+  const rawRole = (auth?.user?.vaiTro || auth?.user?.role || auth?.user?.roleName || '') || '';
+  const role = rawRole.toString().toUpperCase().replace(/^ROLE_/, '').trim();
+
+  // Defensive redirect: if an authenticated USER (customer) tries to access admin, send to shop
+  if (isAuthenticated && role === 'USER') {
+    return <Navigate to="/shop" replace />;
+  }
+
+  return (
+    <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+      <AdminLayoutBase>{children}</AdminLayoutBase>
+    </ProtectedRoute>
+  );
+};
+
+// Protected Staff Layout - STAFF, MANAGER, and ADMIN can access staff routes
+const StaffLayout = ({ children }) => {
+  const auth = useAuth();
+  const isAuthenticated = !!auth?.isAuthenticated;
+  const rawRole = (auth?.user?.vaiTro || auth?.user?.role || auth?.user?.roleName || '') || '';
+  const role = rawRole.toString().toUpperCase().replace(/^ROLE_/, '').trim();
+
+  if (isAuthenticated && role === 'USER') {
+    return <Navigate to="/shop" replace />;
+  }
+
+  return (
+    <ProtectedRoute requiredRole={["STAFF", "MANAGER", "ADMIN"]}>
+      <StaffLayoutBase>{children}</StaffLayoutBase>
+    </ProtectedRoute>
+  );
+};
+
 // Home Page Component
 const HomePage = () => {
   return (
@@ -149,6 +186,23 @@ const HomePage = () => {
       <Footer />
     </div>
   );
+};
+
+// DashboardRouter: redirect user based on role
+const DashboardRouter = () => {
+  const auth = useAuth();
+  const isAuthenticated = !!auth?.isAuthenticated;
+  const rawRole = (auth?.user?.vaiTro || auth?.user?.role || auth?.user?.roleName || '') || '';
+  const role = rawRole.toString().toUpperCase().replace(/^ROLE_/, '').trim();
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (role === 'USER') return <Navigate to="/shop" replace />;
+  if (role === 'STAFF') return <Navigate to="/staff/dashboard" replace />;
+  if (role === 'MANAGER' || role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
+
+  // Fallback to home
+  return <Navigate to="/" replace />;
 };
 
 const App = () => {
@@ -407,8 +461,8 @@ const App = () => {
           <Route path="/tasks" element={<Navigate to="/pending" replace />} />
 
           {/* Main Dashboard (Role-based redirect) */}
-          <Route path="/main-dashboard" element={<MainDashboard />} />
-          <Route path="/dashboard" element={<MainDashboard />} />
+          <Route path="/main-dashboard" element={<DashboardRouter />} />
+          <Route path="/dashboard" element={<DashboardRouter />} />
 
           <Route path="/admin/membership/tiers" element={<AdminLayout><MembershipTierManagement /></AdminLayout>} />
 

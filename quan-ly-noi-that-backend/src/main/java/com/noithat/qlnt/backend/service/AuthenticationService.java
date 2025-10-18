@@ -133,18 +133,23 @@ public class AuthenticationService {
                         nv.setChucVu(null);
                         // Persist NhanVien using repository
                         // Acquire bean via repository field (add import if necessary)
-                        // We don't have NhanVienRepository as a field here, so use a quick save via EntityManager alternative
-                        // To avoid adding new dependencies, attempt to resolve repository from Spring context
+                        // We don't have NhanVienRepository as a field here, so use a quick save via
+                        // EntityManager alternative
+                        // To avoid adding new dependencies, attempt to resolve repository from Spring
+                        // context
                         try {
                             var repo = org.springframework.web.context.ContextLoader.getCurrentWebApplicationContext()
                                     .getBean(com.noithat.qlnt.backend.repository.NhanVienRepository.class);
                             repo.save(nv);
                         } catch (Exception ex) {
-                            // Fallback: ignore if saving NhanVien fails here; admin account creation shouldn't fail because of this
-                            logger.warn("Failed to persist NhanVien for account {}: {}", taiKhoan.getTenDangNhap(), ex.getMessage());
+                            // Fallback: ignore if saving NhanVien fails here; admin account creation
+                            // shouldn't fail because of this
+                            logger.warn("Failed to persist NhanVien for account {}: {}", taiKhoan.getTenDangNhap(),
+                                    ex.getMessage());
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         } catch (IllegalStateException e) {
             // rethrow known bad-request exceptions
@@ -163,9 +168,16 @@ public class AuthenticationService {
                         request.getPassword()));
         var user = taiKhoanRepository.findByTenDangNhap(request.getTenDangNhap())
                 .orElseThrow();
-        var jwtToken = jwtService.generateToken(user);
+        java.util.Map<String, Object> extraClaims = new java.util.HashMap<>();
+        String roleName = user.getVaiTro() != null ? user.getVaiTro().getTenVaiTro() : null;
+        if (roleName != null)
+            extraClaims.put("role", roleName);
+        extraClaims.put("maTaiKhoan", user.getMaTaiKhoan());
+        var jwtToken = jwtService.generateToken(extraClaims, user);
         return AuthenticationResponse.builder()
                 .token(jwtToken)
+                .vaiTro(roleName)
+                .maTaiKhoan(user.getMaTaiKhoan())
                 .build();
     }
 
@@ -216,6 +228,11 @@ public class AuthenticationService {
             return "Mật khẩu đã được đặt lại thành công.";
         }
         return "OTP không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.";
+    }
+
+    // Helper to lookup account by username
+    public java.util.Optional<TaiKhoan> findByTenDangNhap(String tenDangNhap) {
+        return taiKhoanRepository.findByTenDangNhap(tenDangNhap);
     }
 
     private String generateOtp() {

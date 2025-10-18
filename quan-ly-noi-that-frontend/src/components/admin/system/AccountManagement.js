@@ -21,7 +21,7 @@ const AccountManagement = () => {
             fullName: account.hoTen || account.fullName,
             email: account.email || account.email,
             phone: account.soDienThoai || account.phone,
-            role: String(account.vaiTro || account.role || '').toUpperCase(),
+              role: normalizeRole(account.vaiTro || account.role),
             status: account.trangThai !== false ? 'active' : 'inactive',
             lastLogin: account.lanDangNhapCuoi || account.lastLogin || 'Chưa đăng nhập'
           })));
@@ -35,6 +35,7 @@ const AccountManagement = () => {
     };
     fetchAccounts();
   }, []);
+    const normalizeRole = (r) => String(r || '').toUpperCase().replace(/^ROLE_/, '').trim();
 
   // API Functions
   const createAccount = async (accountData) => {
@@ -79,7 +80,7 @@ const AccountManagement = () => {
         hoTen: newAccount.fullName,
         email: newAccount.email,
         soDienThoai: newAccount.phone,
-        vaiTro: (newAccount.role || 'STAFF').toString().toUpperCase(),
+          vaiTro: normalizeRole(newAccount.role || 'STAFF'),
         matKhau: newAccount.password,
         trangThai: true
       };
@@ -157,7 +158,7 @@ const AccountManagement = () => {
         hoTen: editingAccount.fullName,
         email: editingAccount.email,
         soDienThoai: editingAccount.phone,
-        vaiTro: editingAccount.role,
+          vaiTro: normalizeRole(editingAccount.role),
         trangThai: editingAccount.status === 'active'
       };
 

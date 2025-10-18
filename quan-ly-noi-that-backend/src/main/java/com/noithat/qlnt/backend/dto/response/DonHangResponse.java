@@ -12,6 +12,8 @@ import java.util.List;
 public class DonHangResponse {
     private Integer maDonHang;
     private String tenKhachHang;
+    private String soDienThoaiKhachHang; // Customer phone number
+    private String emailKhachHang; // Customer email
     private LocalDateTime ngayDatHang;
     private String ngayDatHangStr; // Human-friendly formatted date string
     private BigDecimal tongTienGoc;

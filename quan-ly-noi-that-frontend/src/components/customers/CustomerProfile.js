@@ -54,8 +54,18 @@ const CustomerProfile = () => {
 
           // Fetch recent orders
           try {
-            const ordersResponse = await api.get('/api/customers/orders?limit=3&sort=desc');
-            const orders = ordersResponse.data?.orders || ordersResponse.data || ordersResponse || [];
+            // Use khach-hang/me first to find customer id, then fetch orders
+            let orders = [];
+            try {
+              const me = await api.get('/api/v1/khach-hang/me');
+              const customerId = me.maKhachHang || me.data?.maKhachHang;
+              if (customerId) {
+                const ordersResponse = await api.get(`/api/v1/khach-hang/${customerId}/don-hang?limit=3&sort=desc`);
+                orders = ordersResponse.data?.orders || ordersResponse.data || ordersResponse || [];
+              }
+            } catch (err) {
+              console.error('Failed to fetch recent orders:', err);
+            }
             setRecentOrders(orders.slice(0, 3));
           } catch (err) {
             console.error('Failed to fetch recent orders:', err);

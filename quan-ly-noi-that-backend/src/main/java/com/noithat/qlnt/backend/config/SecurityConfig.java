@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+// UsernamePasswordAuthenticationFilter import removed (not used in session-based config)
 
 @Configuration
 @EnableWebSecurity
@@ -18,38 +19,45 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity // Bật tính năng phân quyền trên từng phương thức (tùy chọn nhưng nên có)
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
     
     @Value("${app.security.enabled:true}")
     private boolean securityEnabled;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.disable());
+        http.csrf(csrf -> csrf.disable());
 
-    if (!securityEnabled) {
-        // Development mode: disable all security for testing
-        http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
-        http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        if (!securityEnabled) {
+            // Development mode: disable all security for testing
+            http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+            return http.build();
+        }
+
+        http
+            .authorizeHttpRequests(auth -> auth
+                // 1. Allow authentication endpoints
+                .requestMatchers("/api/v1/auth/**").permitAll()
+
+                // 2. Admin-only routes
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+
+                // 3. All other requests require authentication
+                .anyRequest().authenticated()
+            )
+            // Use stateful sessions so backend manages authentication via HttpSession/cookie
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .authenticationProvider(authenticationProvider);
+
+        // If Authorization header with Bearer token is present, JwtAuthenticationFilter will authenticate
+        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        // NOTE: JWT filter removed for session-based authentication. If JWT is desired,
+        // set app.security.enabled=false and use JWT exclusively, or adapt the frontend
+        // to attach Bearer tokens.
+
         return http.build();
-    }
-
-    http
-        .authorizeHttpRequests(auth -> auth
-            // 1. Cho phép tất cả các request đến trang xác thực
-            .requestMatchers("/api/v1/auth/**").permitAll()
-
-            // 2. Chỉ cho phép ADMIN truy cập vào các route admin
-            .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-
-            // 3. Tất cả các request còn lại yêu cầu phải xác thực (đăng nhập)
-            .anyRequest().authenticated()
-        )
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .authenticationProvider(authenticationProvider)
-        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-
-    return http.build();
     }
 }

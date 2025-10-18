@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { IoEye, IoEyeOff, IoLockClosed, IoPerson } from 'react-icons/io5';
-import { api } from '../../api';
+// auth handled via AuthContext
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +13,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const auth = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -28,37 +30,26 @@ const Login = () => {
     console.log('🔐 [Login] Submitting login form...');
 
     try {
-      const response = await api.post('/api/v1/auth/authenticate', {
-        tenDangNhap: formData.tenDangNhap,
-        password: formData.password
-      });
-
-      console.log('✅ [Login] Authentication successful');
-      console.log('Token received:', response.token ? 'Yes' : 'No');
-
-      // Store token in localStorage
-      localStorage.setItem('authToken', response.token);
-      console.log('💾 [Login] Token saved to localStorage');
-
-      // Fetch and store user info
-      try {
-        console.log('👤 [Login] Fetching user info...');
-        const userResponse = await api.get('/api/customers/me');
-        const userData = userResponse.data || userResponse;
-        
-        console.log('✅ [Login] User info received:', userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        console.log('💾 [Login] User info saved to localStorage');
-      } catch (err) {
-        console.error('❌ [Login] Failed to fetch user info:', err);
+      // Use AuthContext.login so provider state updates and ProtectedRoute can pick up the user
+      const result = await auth.login({ tenDangNhap: formData.tenDangNhap, password: formData.password });
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Đăng nhập thất bại');
       }
 
-      console.log('🚀 [Login] Redirecting to dashboard...');
-      // Navigate to dashboard or home
-      navigate('/admin/dashboard'); // or wherever you want to redirect after login
+      // Determine role for routing: try backend response (if returned), then context user, then localStorage
+      const respData = result.data || {};
+      const rawRole = respData.vaiTro || respData.role || auth.user?.vaiTro || auth.user?.role || localStorage.getItem('userRole');
+      const normalizeRole = (r) => (r || '').toString().toUpperCase().replace(/^ROLE_/, '').trim();
+      const role = normalizeRole(rawRole);
+
+      console.log('🚀 [Login] Redirecting for role:', role || 'UNKNOWN');
+      if (role === 'USER' || !role) navigate('/shop');
+      else if (role === 'ADMIN' || role === 'MANAGER') navigate('/admin/dashboard');
+      else if (role === 'STAFF' || role === 'EMPLOYEE') navigate('/staff/dashboard');
+      else navigate('/shop');
     } catch (err) {
       console.error('❌ [Login] Authentication failed:', err);
-      setError(err.data?.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+      setError(err.data?.message || err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }

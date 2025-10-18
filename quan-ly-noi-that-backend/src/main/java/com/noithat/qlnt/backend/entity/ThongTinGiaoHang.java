@@ -1,5 +1,6 @@
 package com.noithat.qlnt.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -11,6 +12,7 @@ public class ThongTinGiaoHang {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maGiaoHang;
 
+    @JsonIgnore  // Prevent circular reference when serializing to JSON
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "MaDonHang", nullable = false, unique = true)
     private DonHang donHang;

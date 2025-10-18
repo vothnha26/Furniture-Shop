@@ -19,8 +19,7 @@ public class AuthenticationController {
     // Đăng ký tài khoản mới
     @PostMapping("/register")
     public ResponseEntity<String> register(
-            @Valid @RequestBody RegisterRequest request
-    ) {
+            @Valid @RequestBody RegisterRequest request) {
         try {
             service.register(request);
             return ResponseEntity.ok("Đăng ký thành công. Vui lòng kiểm tra email để lấy mã OTP kích hoạt tài khoản.");
@@ -28,7 +27,7 @@ public class AuthenticationController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-    
+
     // Xác thực tài khoản bằng mã OTP
     @PostMapping("/verify-account")
     public ResponseEntity<String> verifyAccount(@Valid @RequestBody OtpRequest request) {
@@ -43,9 +42,27 @@ public class AuthenticationController {
     // Đăng nhập và nhận JWT
     @PostMapping("/authenticate")
     public ResponseEntity<AuthenticationResponse> authenticate(
-            @RequestBody AuthenticationRequest request
-    ) {
+            @RequestBody AuthenticationRequest request) {
         return ResponseEntity.ok(service.authenticate(request));
+    }
+
+    // Return current authenticated account (session or token)
+    @GetMapping("/me")
+    public ResponseEntity<java.util.Map<String, Object>> me(java.security.Principal principal) {
+        if (principal == null)
+            return ResponseEntity.status(401).build();
+        String username = principal.getName();
+        java.util.Optional<com.noithat.qlnt.backend.entity.TaiKhoan> opt = service.findByTenDangNhap(username);
+        if (opt.isEmpty())
+            return ResponseEntity.status(404).build();
+        com.noithat.qlnt.backend.entity.TaiKhoan t = opt.get();
+        java.util.Map<String, Object> out = new java.util.HashMap<>();
+        out.put("maTaiKhoan", t.getMaTaiKhoan());
+        out.put("tenDangNhap", t.getTenDangNhap());
+        out.put("email", t.getEmail());
+        out.put("vaiTro", t.getVaiTro() != null ? t.getVaiTro().getTenVaiTro() : null);
+        out.put("trangThai", t.isEnabled());
+        return ResponseEntity.ok(out);
     }
 
     // Quên mật khẩu - gửi mã OTP đến email

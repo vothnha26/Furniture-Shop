@@ -32,7 +32,7 @@ import Footer from '../shared/Footer';
 import '../../slider.css';
 import '../../animations.css';
 
-const StaffLayout = ({ userRole = 'staff' }) => {
+const StaffLayout = ({ userRole = 'staff', children }) => {
   const [currentView, setCurrentView] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -95,6 +95,8 @@ const StaffLayout = ({ userRole = 'staff' }) => {
   }, [showCategoryDropdown]);
 
   const renderCurrentView = () => {
+    // If a routed child component was passed (e.g. <StaffLayout><InventoryManagement/></StaffLayout>), render it.
+    if (children) return children;
     // Handle home page
     if (currentView === 'home') {
       return (

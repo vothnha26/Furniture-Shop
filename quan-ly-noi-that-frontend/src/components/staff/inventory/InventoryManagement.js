@@ -17,6 +17,9 @@ const InventoryManagement = () => {
     nguoiNhap: localStorage.getItem('username') || 'admin',
     lyDo: ''
   });
+  const [suppliers, setSuppliers] = useState([]);
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState('');
 
   const [exportForm, setExportForm] = useState({
     soLuong: '',
@@ -108,6 +111,48 @@ const InventoryManagement = () => {
       setIsLoading(true);
       try {
         await refreshInventoryFromServer();
+        // load products list from backend (for consistency)
+        try {
+          const prodResp = await api.get('/api/products');
+          const prodList = Array.isArray(prodResp) ? prodResp : (prodResp?.data || prodResp?.content || []);
+          setProducts(prodList.map(p => ({ maSanPham: p.maSanPham ?? p.id, tenSanPham: p.tenSanPham ?? p.name })));
+        } catch (e) {
+          console.warn('Không lấy được danh sách sản phẩm', e);
+        }
+        // load recent transactions (from stock history table) - fetch last 20 entries
+        try {
+          const recent = await api.get('/api/v1/quan-ly-ton-kho/lich-su-xuat-nhap/0?limit=20');
+          const recentList = Array.isArray(recent) ? recent : (recent?.data || recent?.content || []);
+          setTransactions(recentList.map((r, i) => ({
+            id: r.maLichSu ?? i,
+            productName: r.bienTheSanPham?.sanPham?.tenSanPham ?? r.bienTheSanPham?.tenSanPham ?? `VT-${r.bienTheSanPham?.maBienThe}`,
+            type: r.loaiGiaoDich?.toLowerCase?.() ?? 'unknown',
+            quantity: r.soLuongThayDoi ?? r.soLuong ?? 0,
+            unitPrice: 0,
+            totalValue: 0,
+            date: r.thoiGianThucHien?.split?.('T')?.[0] ?? r.thoiGianThucHien,
+            note: r.lyDo || ''
+          })));
+        } catch (e) {
+          // ignore
+        }
+        // fetch suppliers for import modal
+        try {
+          const supResp = await api.get('/api/suppliers');
+          setSuppliers(Array.isArray(supResp) ? supResp : (supResp?.data || []));
+        } catch (err) {
+          console.warn('Không lấy được danh sách nhà cung cấp', err);
+        }
+        // Auto-open import modal if quick-launch flag is set
+        try {
+          const shouldOpen = localStorage.getItem('openImportModal');
+          if (shouldOpen) {
+            setShowImportModal(true);
+            localStorage.removeItem('openImportModal');
+          }
+        } catch (e) {
+          // ignore
+        }
         setError(null);
       } catch (err) {
         console.error('Fetch inventory error', err);
@@ -123,7 +168,14 @@ const InventoryManagement = () => {
     try {
       const variantsResp = await api.get('/api/bien-the-san-pham', { params: { size: 1000 } });
       const variantsList = Array.isArray(variantsResp) ? variantsResp : (variantsResp?.content || variantsResp?.variants || []);
-      setInventory(variantsList.map(mapInventoryFromApi));
+      const mapped = variantsList.map(mapInventoryFromApi);
+      // apply low-stock flag if soLuongTon <= threshold
+      const threshold = 5;
+      mapped.forEach(m => {
+        m.isLowStock = (m.soLuongTon ?? 0) <= threshold && (m.soLuongTon ?? 0) > 0;
+        m.isOutOfStock = (m.soLuongTon ?? 0) === 0;
+      });
+      setInventory(mapped);
     } catch (err) {
       console.error('Refresh inventory error', err);
     }
@@ -132,45 +184,39 @@ const InventoryManagement = () => {
   // inventory will be populated from backend on mount
   const [inventory, setInventory] = useState([]);
 
-  const [transactions, setTransactions] = useState([
-    {
-      id: 1,
-      productName: 'Ghế gỗ cao cấp',
-      type: 'import',
-      quantity: 20,
-      unitPrice: 2500000,
-      totalValue: 50000000,
-      date: '2024-01-15',
-      note: 'Nhập hàng từ nhà cung cấp ABC'
-    },
-    {
-      id: 2,
-      productName: 'Bàn ăn 6 người',
-      type: 'export',
-      quantity: 2,
-      unitPrice: 4500000,
-      totalValue: 9000000,
-      date: '2024-01-14',
-      note: 'Bán cho khách hàng XYZ'
-    }
-  ]);
+  const [transactions, setTransactions] = useState([]);
 
 
   const getStatusColor = (status) => {
+    // accept both english keys (from getStockStatus) and vietnamese keys
     switch (status) {
-      case 'binh_thuong': return 'bg-green-100 text-green-800';
-      case 'thap': return 'bg-yellow-100 text-yellow-800';
-      case 'het_hang': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'normal':
+      case 'binh_thuong':
+        return 'bg-green-100 text-green-800';
+      case 'low':
+      case 'thap':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'out_of_stock':
+      case 'het_hang':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'binh_thuong': return 'Bình thường';
-      case 'thap': return 'Sắp hết';
-      case 'het_hang': return 'Hết hàng';
-      default: return 'Không xác định';
+      case 'normal':
+      case 'binh_thuong':
+        return 'Bình thường';
+      case 'low':
+      case 'thap':
+        return 'Sắp hết';
+      case 'out_of_stock':
+      case 'het_hang':
+        return 'Hết hàng';
+      default:
+        return 'Không xác định';
     }
   };
 
@@ -188,6 +234,8 @@ const InventoryManagement = () => {
       try {
         setIsLoading(true);
         const payload = { maBienThe, soLuong, nguoiNhap, lyDo };
+        // include supplier if selected
+        if (importForm.maNhaCungCap) payload.maNhaCungCap = parseInt(importForm.maNhaCungCap);
         const resp = await api.post('/api/v1/quan-ly-ton-kho/nhap-kho', { body: payload });
         if (resp && resp.success) {
           // Refresh inventory from server
@@ -217,6 +265,33 @@ const InventoryManagement = () => {
         setShowImportModal(false);
       }
     })();
+  };
+
+  const handleCreateSupplierInline = async () => {
+    if (!newSupplierName || !newSupplierName.trim()) {
+      alert('Tên nhà cung cấp không được để trống');
+      return;
+    }
+    try {
+      const body = { tenNhaCungCap: newSupplierName };
+      const resp = await api.post('/api/suppliers', body);
+      if (resp) {
+        // refresh suppliers list and select newly created
+        const supResp = await api.get('/api/suppliers');
+        const list = Array.isArray(supResp) ? supResp : (supResp?.data || []);
+        setSuppliers(list);
+        const created = list.find(s => (s.tenNhaCungCap || s.name) === newSupplierName) || list[list.length - 1];
+        setImportForm(prev => ({ ...prev, maNhaCungCap: created.maNhaCungCap || created.id }));
+        setCreatingSupplier(false);
+        setNewSupplierName('');
+        alert('Tạo nhà cung cấp thành công');
+      } else {
+        alert('Không thể tạo nhà cung cấp');
+      }
+    } catch (err) {
+      console.error('Create supplier error', err);
+      alert('Lỗi khi tạo nhà cung cấp');
+    }
   };
 
   const handleExport = () => {
@@ -420,11 +495,14 @@ const InventoryManagement = () => {
     alert(`Đã nhập thành công sản phẩm "${newItem.productName}" với ${newItem.variants.length} biến thể!`);
   };
 
-  const filteredInventory = inventory.filter(item =>
-    (item.sanPham.tenSanPham.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     item.sku.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (selectedStatus === 'all' || item.trangThai === selectedStatus)
-  );
+  const filteredInventory = inventory.filter(item => {
+    const name = (item?.sanPham?.tenSanPham ?? item?.sanPham ?? '').toString().toLowerCase();
+    const sku = (item?.sku ?? '').toString().toLowerCase();
+    const term = (searchTerm ?? '').toString().toLowerCase();
+    const matchesSearch = term === '' || name.includes(term) || sku.includes(term);
+    const matchesStatus = selectedStatus === 'all' || item.trangThai === selectedStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -437,56 +515,30 @@ const InventoryManagement = () => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <IoTrendingUp className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Tổng sản phẩm</p>
-                <p className="text-2xl font-bold text-gray-900">{inventory.length}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <IoRefresh className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Tồn kho bình thường</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {inventory.filter(item => item.status === 'normal').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <IoTrendingDown className="w-6 h-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Sắp hết hàng</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {inventory.filter(item => item.status === 'low').length}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <IoTrash className="w-6 h-6 text-red-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Hết hàng</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {inventory.filter(item => item.status === 'out').length}
-                </p>
-              </div>
-            </div>
-          </div>
+          {/** compute counts from inventory so UI updates when data refreshes **/}
+          {(() => {
+            const lowCount = inventory.filter(i => (i.isLowStock) || (i.trangThai === 'low' || i.trangThai === 'thap')).length;
+            const outCount = inventory.filter(i => (i.isOutOfStock) || (i.trangThai === 'out_of_stock' || i.trangThai === 'het_hang')).length;
+            return (
+              <>
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <p className="text-sm font-medium text-gray-600">Sắp hết</p>
+                  <p className="text-2xl font-bold text-gray-900">{lowCount}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <IoTrash className="w-6 h-6 text-red-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Hết hàng</p>
+                      <p className="text-2xl font-bold text-gray-900">{outCount}</p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Action Bar */}
@@ -516,7 +568,7 @@ const InventoryManagement = () => {
               </select>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - keep only main actions: Nhập hàng, Cập nhật tồn kho, Tải lại */}
             <div className="flex gap-3">
               <button
                 onClick={() => setShowImportModal(true)}
@@ -526,25 +578,18 @@ const InventoryManagement = () => {
                 Nhập hàng
               </button>
               <button
-                onClick={() => setShowExportModal(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <IoTrendingDown className="w-5 h-5" />
-                Xuất hàng
-              </button>
-              <button
                 onClick={() => setShowAdjustModal(true)}
-                className="flex items-center gap-2 bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors"
-              >
-                <IoRefresh className="w-5 h-5" />
-                Điều chỉnh
-              </button>
-              <button
-                onClick={refreshInventoryFromServer}
                 className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
               >
                 <IoRefresh className="w-5 h-5" />
                 Cập nhật tồn kho
+              </button>
+              <button
+                onClick={refreshInventoryFromServer}
+                className="flex items-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                <IoRefresh className="w-5 h-5" />
+                Tải lại
               </button>
             </div>
           </div>
@@ -605,6 +650,7 @@ const InventoryManagement = () => {
                         </div>
                       </div>
                     </td>
+                    {/* removed extra history column to align with table headers */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-1">
                         {item.thuocTinh.map((attr, index) => (
@@ -715,8 +761,11 @@ const InventoryManagement = () => {
         {/* Import Modal */}
         {showImportModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-              <h3 className="text-lg font-semibold mb-4">Nhập hàng</h3>
+              <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Nhập hàng</h3>
+                  <span className="text-sm text-gray-500">Thêm số lượng cho biến thể đã có</span>
+                </div>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -730,10 +779,46 @@ const InventoryManagement = () => {
                     <option value="">Chọn sản phẩm</option>
                     {inventory.map(product => (
                       <option key={product.maBienThe} value={product.maBienThe}>
-                        {product.sanPham?.tenSanPham || product.sanPham || `VT-${product.maBienThe}`}
+                        {`${product.sanPham?.tenSanPham ?? `VT-${product.maBienThe}`} — SKU: ${product.sku || '-'} — Tồn: ${product.soLuongTon ?? 0}`}
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp (tùy chọn)</label>
+                  {!creatingSupplier ? (
+                    <div className="flex gap-2">
+                      <select
+                        value={importForm.maNhaCungCap || ''}
+                        onChange={(e) => setImportForm({...importForm, maNhaCungCap: e.target.value})}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">Chọn nhà cung cấp (nếu có)</option>
+                        {suppliers.map(s => (
+                          <option key={s.maNhaCungCap || s.id} value={s.maNhaCungCap || s.id}>{String(s.tenNhaCungCap ?? s.name ?? '')}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setCreatingSupplier(true)}
+                        className="px-3 py-2 bg-gray-100 rounded-lg"
+                      >
+                        Thêm
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newSupplierName}
+                        onChange={(e) => setNewSupplierName(e.target.value)}
+                        placeholder="Tên nhà cung cấp"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                      <button onClick={handleCreateSupplierInline} className="px-3 py-2 bg-green-600 text-white rounded-lg">Lưu</button>
+                      <button onClick={() => { setCreatingSupplier(false); setNewSupplierName(''); }} className="px-3 py-2 bg-gray-100 rounded-lg">Hủy</button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -784,6 +869,69 @@ const InventoryManagement = () => {
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   Nhập hàng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Adjust Modal (Cập nhật tồn kho) */}
+        {showAdjustModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Cập nhật tồn kho</h3>
+                <span className="text-sm text-gray-500">Chỉnh số lượng hiện có cho biến thể</span>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Biến thể</label>
+                  <select
+                    value={newTransaction.productId}
+                    onChange={(e) => setNewTransaction({...newTransaction, productId: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Chọn biến thể</option>
+                    {inventory.map(v => (
+                      <option key={v.maBienThe} value={v.maBienThe}>
+                        {`${v.sanPham?.tenSanPham ?? `VT-${v.maBienThe}`} — SKU: ${v.sku || '-'} — Tồn: ${v.soLuongTon ?? 0}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng mới</label>
+                  <input
+                    type="number"
+                    value={newTransaction.quantity}
+                    onChange={(e) => setNewTransaction({...newTransaction, quantity: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Nhập số lượng mới (ví dụ: 50)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú (lý do)</label>
+                  <textarea
+                    value={newTransaction.note}
+                    onChange={(e) => setNewTransaction({...newTransaction, note: e.target.value})}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Lý do điều chỉnh (tùy chọn)"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => { setShowAdjustModal(false); setNewTransaction({ productId: '', quantity: '', unitPrice: '', note: '' }); }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleAdjust}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Lưu
                 </button>
               </div>
             </div>

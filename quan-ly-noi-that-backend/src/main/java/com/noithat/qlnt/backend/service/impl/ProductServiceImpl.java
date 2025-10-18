@@ -1,9 +1,16 @@
 package com.noithat.qlnt.backend.service.impl;
 
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.SanPhamRequestDto;
-import com.noithat.qlnt.backend.entity.BienTheSanPham;
+import com.noithat.qlnt.backend.dto.response.ProductDetailDto;
 import com.noithat.qlnt.backend.entity.BienTheGiamGia;
+import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.entity.BoSuuTap;
 import com.noithat.qlnt.backend.entity.DanhMuc;
 import com.noithat.qlnt.backend.entity.HinhAnhSanPham;
@@ -13,13 +20,13 @@ import com.noithat.qlnt.backend.repository.BienTheSanPhamRepository;
 import com.noithat.qlnt.backend.repository.DanhMucRepository;
 import com.noithat.qlnt.backend.repository.NhaCungCapRepository;
 import com.noithat.qlnt.backend.repository.SanPhamRepository;
+import com.noithat.qlnt.backend.repository.HinhAnhSanPhamRepository;
+import com.noithat.qlnt.backend.repository.BoSuuTapRepository;
+import com.noithat.qlnt.backend.repository.DanhGiaSanPhamRepository;
+import com.noithat.qlnt.backend.repository.BienTheGiamGiaRepository;
 import com.noithat.qlnt.backend.service.IProductService;
+
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import com.noithat.qlnt.backend.dto.response.ProductDetailDto;
-import java.util.List;
 
 @Service
 public class ProductServiceImpl implements IProductService {
@@ -32,9 +39,11 @@ public class ProductServiceImpl implements IProductService {
         @Autowired
         private BienTheSanPhamRepository bienTheRepository;
         @Autowired
-        private com.noithat.qlnt.backend.repository.HinhAnhSanPhamRepository hinhAnhSanPhamRepository;
+        private HinhAnhSanPhamRepository hinhAnhSanPhamRepository;
         @Autowired
-        private com.noithat.qlnt.backend.repository.BoSuuTapRepository boSuuTapRepository;
+        private BoSuuTapRepository boSuuTapRepository;
+        @Autowired
+        private DanhGiaSanPhamRepository danhGiaSanPhamRepository;
 
         private SanPham findProductById(Integer id) {
                 return sanPhamRepository.findById(id)
@@ -50,8 +59,7 @@ public class ProductServiceImpl implements IProductService {
                                 .map(sp -> {
                                         List<HinhAnhSanPham> images = hinhAnhSanPhamRepository
                                                         .findBySanPhamMaSanPhamOrderByThuTuAsc(sp.getMaSanPham());
-                                        return (com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto) buildSanPhamWithImagesResponse(
-                                                        sp, images);
+                                        return buildSanPhamWithImagesResponse(sp, images);
                                 })
                                 .collect(java.util.stream.Collectors.toList());
         }
@@ -468,6 +476,8 @@ public class ProductServiceImpl implements IProductService {
                                 .hinhAnhs(hinhAnhDtos)
                                 .soLuongBienThe(sanPham.getBienTheList() != null ? sanPham.getBienTheList().size() : 0)
                                 .diemThuong(sanPham.getDiemThuong())
+                                .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sanPham.getMaSanPham()))
+                                .reviewCount(danhGiaSanPhamRepository.countByProductId(sanPham.getMaSanPham()).intValue())
                                 .build();
         }
 
@@ -590,7 +600,9 @@ public class ProductServiceImpl implements IProductService {
                                         .availableVariantCount(availableVariantCount)
                                         .soLuongBienThe(variants.size())
                                         .images(imageUrls)
-                                        .discountPercent(discountPercent);
+                                        .discountPercent(discountPercent)
+                                        .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
+                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue());
 
                         // attach lowest variant info if found
                         if (lowestFinalVariantId != null) {
@@ -719,7 +731,9 @@ public class ProductServiceImpl implements IProductService {
                                         .availableVariantCount(availableVariantCount)
                                         .soLuongBienThe(variants.size())
                                         .images(imageUrls)
-                                        .discountPercent(discountPercent2);
+                                        .discountPercent(discountPercent2)
+                                        .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
+                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue());
 
                         // attach lowest variant info if found
                         if (lowestFinalVariantId2 != null) {
@@ -746,10 +760,8 @@ public class ProductServiceImpl implements IProductService {
         }
 
         @Autowired
-        private com.noithat.qlnt.backend.repository.BienTheGiamGiaRepository bienTheGiamGiaRepository;
+        private BienTheGiamGiaRepository bienTheGiamGiaRepository;
 
-        @Autowired
-        private com.noithat.qlnt.backend.repository.ChuongTrinhGiamGiaRepository chuongTrinhGiamGiaRepository;
 
         /**
          * Lấy chi tiết sản phẩm đầy đủ với biến thể, thuộc tính và giá giảm
@@ -956,8 +968,8 @@ public class ProductServiceImpl implements IProductService {
                                         .giaMin(relGiaMin)
                                         .giaMax(relGiaMax)
                                         .hinhAnh(mainImage)
-                                        .danhGia(4.5) // TODO: Tính từ đánh giá thực tế
-                                        .soLuotDanhGia(0) // TODO: Đếm từ bảng đánh giá
+                                        .danhGia(danhGiaSanPhamRepository.findAverageByProductId(relatedSp.getMaSanPham()))
+                                        .soLuotDanhGia(danhGiaSanPhamRepository.countByProductId(relatedSp.getMaSanPham()).intValue())
                                         .soLuongTon(relTongSoLuong)
                                         .build()
                         );
@@ -993,8 +1005,19 @@ public class ProductServiceImpl implements IProductService {
                                 .giaGocMin(giaGocMin)
                                 .giaGocMax(giaGocMax)
                                 .tongSoLuong(tongSoLuong)
-                                .danhGia(4.5) // TODO: Tính từ đánh giá thực tế
-                                .soLuotDanhGia(0) // TODO: Đếm từ bảng đánh giá
+                                                                .danhGia(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
+                                                                .soLuotDanhGia(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue())
+                                                                                                .danhGiaKhachHang(danhGiaSanPhamRepository.findBySanPham_MaSanPham(sp.getMaSanPham()).stream().map(dg -> {
+                                                                                                        var builder = com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ReviewDto.builder()
+                                                                                                                        .id(dg.getMaDanhGia())
+                                                                                                                        .tenKhachHang(dg.getKhachHang() != null ? dg.getKhachHang().getHoTen() : null)
+                                                                                                                        .danhGia(dg.getDiem())
+                                                                                                                        .tieuDe(dg.getTieuDe())
+                                                                                                                        .noiDung(dg.getNoiDung())
+                                                                                                                        .ngayDanhGia(dg.getNgayTao() != null ? dg.getNgayTao().toString() : null);
+                                                                                                        if (dg.getKhachHang() != null) builder.maKhachHang(dg.getKhachHang().getMaKhachHang());
+                                                                                                        return builder.build();
+                                                                                                }).collect(java.util.stream.Collectors.toList()))
                                 .thongSoKyThuat(specDtos)
                                 .sanPhamLienQuan(relatedProducts)
                                 .build();

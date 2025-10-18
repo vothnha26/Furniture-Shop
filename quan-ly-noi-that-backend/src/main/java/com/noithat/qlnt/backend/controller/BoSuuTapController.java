@@ -43,6 +43,7 @@ public class BoSuuTapController {
                     .maBoSuuTap(bst.getMaBoSuuTap())
                     .tenBoSuuTap(bst.getTenBoSuuTap())
                     .moTa(bst.getMoTa())
+                    .hinhAnh(bst.getHinhAnh())
                     .soLuongSanPham(count)
                     .build();
         }).toList();
@@ -57,9 +58,42 @@ public class BoSuuTapController {
                 .maBoSuuTap(bst.getMaBoSuuTap())
                 .tenBoSuuTap(bst.getTenBoSuuTap())
                 .moTa(bst.getMoTa())
+                .hinhAnh(bst.getHinhAnh())
                 .soLuongSanPham(count)
                 .build();
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/{id}/image")
+    public ResponseEntity<BoSuuTap> uploadImage(@PathVariable Integer id, @org.springframework.web.bind.annotation.RequestParam("image") org.springframework.web.multipart.MultipartFile image) {
+        var bst = boSuuTapRepository.findById(id).orElseThrow(() -> new RuntimeException("Collection not found: " + id));
+
+        if (image != null && !image.isEmpty()) {
+            try {
+                String uploadDir = "uploads/collections/" + id;
+                java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+                if (!java.nio.file.Files.exists(uploadPath)) {
+                    java.nio.file.Files.createDirectories(uploadPath);
+                }
+
+                String originalFilename = image.getOriginalFilename();
+                String ext = "";
+                if (originalFilename != null && originalFilename.contains(".")) {
+                    ext = originalFilename.substring(originalFilename.lastIndexOf("."));
+                }
+                String unique = java.util.UUID.randomUUID().toString() + ext;
+                java.nio.file.Path filePath = uploadPath.resolve(unique);
+                java.nio.file.Files.copy(image.getInputStream(), filePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                String imageUrl = "/" + uploadDir + "/" + unique;
+                bst.setHinhAnh(imageUrl);
+                boSuuTapRepository.save(bst);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to upload image: " + ex.getMessage(), ex);
+            }
+        }
+
+        return ResponseEntity.ok(bst);
     }
 
     @PostMapping

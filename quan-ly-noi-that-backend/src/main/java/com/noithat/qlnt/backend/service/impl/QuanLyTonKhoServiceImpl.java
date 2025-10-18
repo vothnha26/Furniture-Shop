@@ -31,7 +31,7 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
     private LichSuTonKhoRepository lichSuTonKhoRepository;
 
     @Override
-    public boolean importStock(Integer maBienThe, Integer quantity, String nguoiThucHien, String lyDo) {
+    public boolean importStock(Integer maBienThe, Integer quantity, String nguoiThucHien, String lyDo, Integer maNhaCungCap) {
         try {
             Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
             if (optionalBienThe.isEmpty()) {
@@ -44,9 +44,14 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
             bienThe.updateStock(quantity);
             bienTheSanPhamRepository.save(bienThe);
 
+            String maThamChieu = null;
+            if (maNhaCungCap != null) {
+                maThamChieu = "NCC" + maNhaCungCap; // simple reference to supplier
+            }
+
             LichSuTonKho lichSu = new LichSuTonKho(
                 bienThe, soLuongTruoc, quantity, bienThe.getSoLuongTon(),
-                "NHAP_KHO", null, lyDo, nguoiThucHien
+                "NHAP_KHO", maThamChieu, lyDo, nguoiThucHien
             );
             lichSuTonKhoRepository.save(lichSu);
 

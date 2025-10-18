@@ -9,24 +9,57 @@ const CustomerFavorites = () => {
   useEffect(() => {
     const loadFavorites = async () => {
       try {
-        const res = await api.get('/api/v1/yeu-thich');
+        const res = await api.get('/favorites');
         const data = res?.data || res;
         // Map API fields if necessary; assume API returns list of products
-        setFavorites(data.map(p => ({
-          id: p.id || p.maSanPham || p.productId,
-          name: p.ten || p.tenSanPham || p.name,
-          price: p.gia || p.giaBan || p.price,
-          originalPrice: p.giaGoc || p.originalPrice,
-          image: p.hinhAnh || p.image,
-          rating: p.danhGia || p.rating || 0,
-          reviews: p.soLuotDanhGia || p.reviews || 0,
-          category: p.danhMuc || p.category,
-          inStock: (p.tonKho || p.soLuongTonKho) > 0,
-          isNew: p.sanPhamMoi || p.isNew || false,
-          addedDate: p.ngayThem || p.addedDate || ''
-        })));
+        const mapped = (Array.isArray(data) ? data : []).map(p => {
+          const id = p.id ?? p.maSanPham ?? p.productId;
+          const name = p.ten ?? p.tenSanPham ?? p.name ?? 'Sản phẩm';
+          // defensive price parsing
+          const rawPrice = p.gia ?? p.giaBan ?? p.price ?? p.priceMin ?? p.giaMin ?? null;
+          const price = rawPrice != null ? (Number(rawPrice) || null) : null;
+          const rawOriginal = p.giaGoc ?? p.originalPrice ?? null;
+          const originalPrice = rawOriginal != null ? (Number(rawOriginal) || null) : null;
+          let imageVal = null;
+          if (p.hinhAnhs && Array.isArray(p.hinhAnhs) && p.hinhAnhs.length > 0) {
+            imageVal = p.hinhAnhs[0].duongDanHinhAnh ?? p.hinhAnhs[0];
+          } else if (p.hinhAnh) imageVal = p.hinhAnh;
+          else if (p.image) imageVal = p.image;
+
+          const image = imageVal && typeof imageVal === 'string' && imageVal.startsWith('/') ? api.buildUrl(imageVal) : imageVal;
+          const rating = p.averageRating ?? p.danhGia ?? p.rating ?? 0;
+          const reviews = p.reviewCount ?? p.soLuotDanhGia ?? p.reviews ?? 0;
+          // if stock fields not present, assume available to avoid showing "Hết hàng" erroneously
+          const inStock = (p.tonKho ?? p.soLuongTonKho ?? p.stockQuantity ?? null) != null ? ((p.tonKho ?? p.soLuongTonKho ?? p.stockQuantity) > 0) : true;
+          return {
+            id,
+            name,
+            price,
+            originalPrice,
+            image,
+            rating: Number(rating) || 0,
+            reviews: Number(reviews) || 0,
+            category: p.danhMuc || p.category || null,
+            inStock,
+            isNew: p.sanPhamMoi || p.isNew || false,
+            addedDate: p.ngayThem || p.addedDate || ''
+          };
+        });
+        setFavorites(mapped);
+        try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mapped.length } })); } catch (err) {}
       } catch (e) {
         console.debug('Favorites API not available', e);
+        // Fallback to localStorage favorites saved by shop page
+        try {
+          const raw = localStorage.getItem('favorites') || '[]';
+          const local = JSON.parse(raw);
+          const mappedLocal = local.map(p => ({
+            ...p,
+            image: p.image && typeof p.image === 'string' && p.image.startsWith('/') ? api.buildUrl(p.image) : (p.image || null)
+          }));
+          setFavorites(mappedLocal);
+          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mappedLocal.length } })); } catch (err) {}
+        } catch (le) { console.debug('local favorites load failed', le); }
       }
     };
     loadFavorites();
@@ -41,8 +74,21 @@ const CustomerFavorites = () => {
 
   const removeFromFavorites = async (id) => {
     try {
-      // Optimistic update
-      setFavorites(prev => prev.filter(item => item.id !== id));
+      // Optimistic update: compute next favorites and persist to localStorage
+      setFavorites(prev => {
+        const next = prev.filter(item => item.id !== id);
+        try {
+          const raw = localStorage.getItem('favorites') || '[]';
+          const favObjs = JSON.parse(raw);
+          const filtered = favObjs.filter(f => (f.id ?? f.maSanPham) !== id);
+          localStorage.setItem('favorites', JSON.stringify(filtered));
+          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: filtered.length } })); } catch (e) {}
+        } catch (lsErr) {
+          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: next.length } })); } catch (e) {}
+        }
+        return next;
+      });
+
       try {
         await api.delete(`/api/v1/yeu-thich/${id}`);
       } catch (e) {
@@ -134,17 +180,17 @@ const CustomerFavorites = () => {
                   {/* Rating */}
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex items-center">
-                      {renderStars(item.rating)}
+                      {renderStars(item.rating ?? 0)}
                     </div>
-                    <span className="text-sm text-gray-500">({item.reviews})</span>
+                    <span className="text-sm text-gray-500">({item.reviews ?? 0})</span>
                   </div>
 
                   {/* Price */}
                   <div className="flex items-center gap-2 mb-4">
                     <span className="text-lg font-bold text-primary">
-                      {formatPrice(item.price)}
+                      {item.price != null ? formatPrice(item.price) : 'Liên hệ'}
                     </span>
-                    {item.originalPrice > item.price && (
+                    {(item.originalPrice != null && item.price != null && item.originalPrice > item.price) && (
                       <span className="text-sm text-gray-500 line-through">
                         {formatPrice(item.originalPrice)}
                       </span>

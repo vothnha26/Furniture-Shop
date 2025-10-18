@@ -25,6 +25,10 @@ public class BoSuuTap {
     @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
+    // Optional main image path for the collection (relative URL, e.g. /uploads/collections/{id}/file.jpg)
+    @Column(name = "HinhAnh")
+    private String hinhAnh;
+
     // Quan hệ OneToMany: Một bộ sưu tập có nhiều sản phẩm (1-N)
     @OneToMany(mappedBy = "boSuuTap", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JsonIgnore // Tránh circular reference khi serialize JSON

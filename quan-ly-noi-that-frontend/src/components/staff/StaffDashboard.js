@@ -328,6 +328,20 @@ const StaffDashboard = () => {
                 <IoStorefront className="w-8 h-8 text-primary mb-2" />
                 <span className="text-sm font-medium">Quản lý sản phẩm</span>
               </button>
+              {/* Quick launch: open inventory page and auto-open import modal */}
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.setItem('openImportModal', '1');
+                  } catch (e) {}
+                  window.location.href = '/staff/inventory';
+                }}
+                className="flex flex-col items-center p-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="Mở giao diện nhập hàng"
+              >
+                <IoTrendingUp className="w-8 h-8 mb-2" />
+                <span className="text-sm font-medium">Nhập hàng</span>
+              </button>
             </div>
           </div>
         </div>

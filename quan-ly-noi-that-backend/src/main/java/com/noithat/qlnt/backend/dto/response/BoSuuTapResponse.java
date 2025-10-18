@@ -9,5 +9,6 @@ public class BoSuuTapResponse {
     private Integer maBoSuuTap;
     private String tenBoSuuTap;
     private String moTa;
+    private String hinhAnh;
     private Long soLuongSanPham; // số lượng sản phẩm thuộc bộ sưu tập
 }

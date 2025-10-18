@@ -1,9 +1,13 @@
 package com.noithat.qlnt.backend.dto.response;
 
-import lombok.*;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -36,6 +40,9 @@ public class ShopProductResponseDto {
     private Double lowestVariantDiscountAmount; // amount discounted on that variant, if any
     @Builder.Default
     private List<String> images = new ArrayList<>();
+    // Ratings
+    private Double averageRating;
+    private Integer reviewCount;
 
     @Getter
     @Setter

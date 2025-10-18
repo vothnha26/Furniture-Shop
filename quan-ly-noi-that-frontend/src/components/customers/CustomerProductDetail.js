@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
-import { IoArrowBack, IoStar, IoStarOutline, IoHeart, IoHeartOutline, IoShare, IoCart, IoEye, IoCheckmarkCircle, IoWarning } from 'react-icons/io5';
+import { IoArrowBack, IoStar, IoStarOutline, IoHeart, IoHeartOutline, IoShare, IoCart, IoEye, IoCheckmarkCircle, IoWarning, IoEllipsisVertical } from 'react-icons/io5';
 
 const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, onToggleFavorite, onToggleWishlist }) => {
   const { addToCart, isInCart, getItemQuantity } = useCart();
@@ -34,6 +35,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
   // Review modal state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 5, title: '', content: '', name: '', photos: [] });
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   const handleVariantSelect = (variant) => {
     // normalize variant fields to a predictable shape
@@ -186,30 +188,91 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
     return stars;
   };
 
-  const handleSubmitReview = () => {
-    // Logic to submit review
-    console.log('Submit review:', newReview);
-    setShowReviewModal(false);
+  const handleSubmitReview = async () => {
+    // Submit review to backend
+    try {
+      console.log('Submitting review', newReview);
+      const productId = productState?.maSanPham || params?.id;
+      if (!productId) throw new Error('Không xác định được sản phẩm');
+
+      const payload = {
+        sanPham: { maSanPham: Number(productId) },
+        diem: newReview.rating,
+        tieuDe: newReview.title,
+        noiDung: newReview.content
+      };
+
+      let resp;
+      if (newReview && newReview.id) {
+        // Editing an existing review -> use PUT
+        resp = await api.put(`/api/v1/reviews/${newReview.id}`, payload);
+      } else {
+        resp = await api.post('/api/v1/reviews', payload);
+      }
+      console.debug('Review created', resp?.data ?? resp);
+
+      // Refresh product detail so ratings / counts update immediately
+      try {
+        const refreshed = await api.get(`/api/products/${productId}/detail`);
+        setProductState(refreshed?.data ?? refreshed);
+      } catch (fetchErr) {
+        console.warn('Unable to refresh product detail after review:', fetchErr);
+      }
+
+      setShowReviewModal(false);
+      setNewReview({ rating: 5, title: '', content: '', name: '', photos: [] });
+    } catch (err) {
+      console.error('Failed to submit review', err);
+      const msg = err?.response?.data || err?.message || 'Lỗi khi gửi đánh giá';
+      alert('Không thể gửi đánh giá: ' + msg);
+    }
+  };
+
+    const toggleMenu = (id) => {
+      setOpenMenuId(prev => (prev === id ? null : id));
+    };
+
+  // Expose current user for simple ownership checks (used above) - set from AuthContext if available
+  const { user } = useAuth();
+
+  const handleEditReviewClick = (review) => {
+    // Prefill modal with review data for editing
     setNewReview({
-      rating: 5,
-      title: '',
-      content: '',
-      name: '',
-      photos: []
+      rating: review.danhGia || 5,
+      title: review.tieuDe || '',
+      content: review.noiDung || '',
+      name: review.tenKhachHang || '',
+      id: review.id ?? review.maDanhGia ?? review.ma_danh_gia
     });
+    setShowReviewModal(true);
+  };
+
+  const handleDeleteReview = async (reviewId) => {
+    if (!confirm('Bạn có chắc muốn xóa đánh giá này?')) return;
+    try {
+      const rid = typeof reviewId === 'object' ? (reviewId.id ?? reviewId.maDanhGia ?? reviewId.ma_danh_gia) : reviewId;
+      await api.del(`/api/v1/reviews/${rid}`);
+      // refresh product
+      const productId = productState?.maSanPham || params?.id;
+      const refreshed = await api.get(`/api/products/${productId}/detail`);
+      setProductState(refreshed?.data ?? refreshed);
+    } catch (err) {
+      console.error('Failed to delete review', err);
+      alert('Không thể xóa đánh giá: ' + (err?.data || err?.message || err));
+    }
   };
 
   // Resolve possibly-relative backend image paths to absolute URLs
   const resolveImageUrl = (img) => {
-    // Prefer client-hosted default assets to avoid calling backend for static files
-    if (!img) return '/default-product.jpg';
+    if (!img) return null;
     if (typeof img === 'string') {
       const s = img.trim();
+      if (s === '/default-product.jpg' || s === 'default-product.jpg' || s === '/logo192.png' || s === 'logo192.png') return null;
       if (s.startsWith('http://') || s.startsWith('https://')) return s;
       return api.buildUrl(s);
     }
     if (img.duongDanHinhAnh) return resolveImageUrl(img.duongDanHinhAnh);
-    return '/default-product.jpg';
+    return null;
   };
 
   return (
@@ -235,16 +298,20 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
         {/* Product Images */}
         <div className="space-y-4">
           <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-            <img
-              src={resolveImageUrl(
-                // prefer array present at hinhAnh or images, otherwise single image
-                Array.isArray(productState.hinhAnh) ? (productState.hinhAnh[selectedImage] || productState.hinhAnh[0]) :
-                (Array.isArray(productState.images) ? (productState.images[selectedImage] || productState.images[0]) : productState.image)
-              )}
-              alt={productState.tenSanPham}
-              className="w-full h-full object-cover"
-              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo192.png'; }}
-            />
+            {(() => {
+              const source = Array.isArray(productState.hinhAnh) ? (productState.hinhAnh[selectedImage] || productState.hinhAnh[0]) : (Array.isArray(productState.images) ? (productState.images[selectedImage] || productState.images[0]) : productState.image);
+              const src = resolveImageUrl(source);
+              if (src) {
+                return (
+                  <img src={src} alt={productState.tenSanPham} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ''; }} />
+                );
+              }
+              return (
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                  <span className="text-gray-400">No image</span>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-5 gap-2">
@@ -260,12 +327,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                   selectedImage === index ? 'border-blue-500' : 'border-gray-200'
                 }`}
               >
-                  <img
-                    src={resolveImageUrl(image)}
-                    alt={`${productState.tenSanPham} ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo192.png'; }}
-                  />
+                  {(() => { const s = resolveImageUrl(image); return s ? (<img src={s} alt={`${productState.tenSanPham} ${index + 1}`} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ''; }} />) : (<div className="w-full h-full bg-gray-100 flex items-center justify-center"><span className="text-gray-400 text-xs">No image</span></div>); })()}
               </button>
             ))}
           </div>
@@ -287,10 +349,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                 </span>
               </div>
               
-              <div className="flex items-center gap-2">
-                <IoEye className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-600">1,245 lượt xem</span>
-              </div>
+              {/* view count removed as requested */}
             </div>
 
             <div className="space-y-2 mb-6">
@@ -628,7 +687,7 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
               {/* Reviews List */}
               <div className="space-y-6">
                 {(productState.danhGiaKhachHang || []).map((review) => (
-                  <div key={review.id} className="border-b border-gray-200 pb-6">
+                  <div key={review.id} className="border-b border-gray-200 pb-6 relative">
                     <div className="flex items-start gap-4">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-600 font-semibold">
@@ -643,6 +702,30 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                             {renderStars(review.danhGia)}
                           </div>
                           <span className="text-sm text-gray-500">{review.ngayDanhGia}</span>
+                          {/* 3-dot menu: show only if current user is review owner */}
+                          { user && (user.maKhachHang || user.ma_khach_hang) && (() => {
+                              const currentId = user.maKhachHang || user.ma_khach_hang;
+                              if (review.maKhachHang && review.maKhachHang === currentId) {
+                                const rid = review.id ?? review.maDanhGia ?? review.ma_danh_gia;
+                                return (
+                                  <div className="ml-auto relative">
+                                    <>
+                                      <button onClick={(e) => { e.stopPropagation(); toggleMenu(rid); }} className="text-gray-500 hover:text-gray-800 px-2" aria-label="Actions">
+                                        <IoEllipsisVertical className="w-5 h-5" />
+                                      </button>
+                                      {openMenuId === rid && (
+                                        <div className="absolute right-0 mt-2 w-36 bg-white border rounded shadow-md z-50">
+                                          <button onClick={(e) => { e.stopPropagation(); toggleMenu(null); handleEditReviewClick(review); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Sửa</button>
+                                          <button onClick={(e) => { e.stopPropagation(); toggleMenu(null); handleDeleteReview(rid); }} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Xóa</button>
+                                        </div>
+                                      )}
+                                    </>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()
+                          }
                         </div>
                         
                         <h5 className="font-medium mb-2">{review.tieuDe}</h5>
@@ -695,15 +778,18 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                     window.location.href = `/shop/products/${relatedProduct.maSanPham}`;
                   }}
                 >
-                  <img
-                    src={relImage}
-                    alt={relatedProduct.tenSanPham}
-                    className="w-full h-48 object-cover"
-                    onError={(e) => { 
-                      e.currentTarget.onerror = null; 
-                      e.currentTarget.src = '/logo192.png'; 
-                    }}
-                  />
+                  {relImage ? (
+                    <img
+                      src={relImage}
+                      alt={relatedProduct.tenSanPham}
+                      className="w-full h-48 object-cover"
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ''; }}
+                    />
+                  ) : (
+                    <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
+                      <span className="text-gray-400">No image</span>
+                    </div>
+                  )}
                   <div className="p-4">
                     <h3 className="font-semibold mb-2 line-clamp-2 h-12">{relatedProduct.tenSanPham}</h3>
                     

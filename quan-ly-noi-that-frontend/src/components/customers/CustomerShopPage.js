@@ -263,12 +263,14 @@ const CustomerShopPage = () => {
 
   const addToFavorites = async (productId) => {
     try {
-      // Optimistic UI update
-      setCategories(prev => prev); // no-op to keep consistent signature
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, isFavorite: !p.isFavorite } : p));
+  // Accept either product object or id
+  const id = typeof productId === 'object' ? (productId.id ?? productId.maSanPham) : productId;
+  // Optimistic UI update
+  setCategories(prev => prev); // no-op to keep consistent signature
+  setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: !p.isFavorite } : p));
       // Call backend if endpoint exists (best-effort)
       try {
-        await api.post('/api/v1/yeu-thich', { san_pham_id: productId });
+  await api.post('/api/v1/yeu-thich', { san_pham_id: id });
       } catch (e) {
         // ignore if backend not ready
         console.debug('Favorites API not available', e);

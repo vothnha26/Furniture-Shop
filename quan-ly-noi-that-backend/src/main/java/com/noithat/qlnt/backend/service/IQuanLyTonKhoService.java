@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 public interface IQuanLyTonKhoService {
-    boolean importStock(Integer maBienThe, Integer quantity, String nguoiThucHien, String lyDo);
+    // maNhaCungCap is optional and may be null when supplier is not provided
+    boolean importStock(Integer maBienThe, Integer quantity, String nguoiThucHien, String lyDo, Integer maNhaCungCap);
     boolean exportStock(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien, String lyDo);
     boolean reserveProduct(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien);
     boolean releaseReservation(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien);

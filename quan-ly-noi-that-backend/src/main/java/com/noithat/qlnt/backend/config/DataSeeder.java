@@ -20,7 +20,7 @@ public class DataSeeder {
 
     @Bean
     @Transactional
-    CommandLineRunner initDatabase(
+        CommandLineRunner initDatabase(
             NhaCungCapRepository nhaCungCapRepository,
             DanhMucRepository danhMucRepository,
             BoSuuTapRepository boSuuTapRepository,
@@ -31,6 +31,9 @@ public class DataSeeder {
             ThuocTinhRepository thuocTinhRepository,
             BienTheThuocTinhRepository bienTheThuocTinhRepository,
             VaiTroRepository vaiTroRepository
+                    ,
+                    com.noithat.qlnt.backend.repository.KhachHangRepository khachHangRepository,
+                    com.noithat.qlnt.backend.repository.DanhGiaSanPhamRepository danhGiaSanPhamRepository
     ) {
         return args -> {
             // Skip if data already exists
@@ -327,6 +330,34 @@ public class DataSeeder {
             System.out.println("✓ Created variant attributes");
 
             System.out.println("=== Data Seeding Completed Successfully ===");
+
+            // 10. Seed some sample reviews if there are customers
+            try {
+                System.out.println("Seeding sample reviews...");
+                java.util.List<com.noithat.qlnt.backend.entity.KhachHang> customers = khachHangRepository.findAll();
+                if (!customers.isEmpty() && !products.isEmpty()) {
+                    com.noithat.qlnt.backend.entity.KhachHang kh = customers.get(0);
+                    // Review for product 1
+                    com.noithat.qlnt.backend.entity.DanhGiaSanPham r1 = new com.noithat.qlnt.backend.entity.DanhGiaSanPham();
+                    r1.setSanPham(products.get(0));
+                    r1.setKhachHang(kh);
+                    r1.setDiem(5);
+                    r1.setTieuDe("Tốt");
+                    r1.setNoiDung("Sản phẩm đẹp, giao nhanh.");
+                    danhGiaSanPhamRepository.save(r1);
+
+                    // Review for product 2
+                    com.noithat.qlnt.backend.entity.DanhGiaSanPham r2 = new com.noithat.qlnt.backend.entity.DanhGiaSanPham();
+                    r2.setSanPham(products.size() > 1 ? products.get(1) : products.get(0));
+                    r2.setKhachHang(kh);
+                    r2.setDiem(4);
+                    r2.setTieuDe("Tốt");
+                    r2.setNoiDung("Chất lượng ổn.");
+                    danhGiaSanPhamRepository.save(r2);
+                }
+            } catch (Exception ex) {
+                System.err.println("Failed to seed sample reviews: " + ex.getMessage());
+            }
         };
     }
 

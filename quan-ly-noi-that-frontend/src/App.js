@@ -38,9 +38,12 @@ import CustomerCheckout from './components/customers/CustomerCheckout';
 import CustomerProductDetail from './components/customers/CustomerProductDetail';
 import CustomerShop from './components/customers/CustomerShop';
 import CustomerShopPage from './components/customers/CustomerShopPage';
+import CustomerCollections from './components/customers/CustomerCollections';
+import CustomerCollectionDetail from './components/customers/CustomerCollectionDetail';
 
 // Import staff components
 import InventoryAlerts from './components/staff/inventory/InventoryAlerts';
+import InventoryManagement from './components/staff/inventory/InventoryManagement';
 import OrderManagement from './components/staff/orders/OrderManagement';
 import SalesManagement from './components/staff/orders/SalesManagement';
 import StaffLayoutBase from './components/staff/StaffLayout';
@@ -230,6 +233,8 @@ const App = () => {
             <Route index element={<CustomerShop />} />
             <Route path="products" element={<CustomerShopPage />} />
             <Route path="products/:id" element={<CustomerProductDetail />} />
+            <Route path="collections" element={<CustomerCollections />} />
+            <Route path="collections/:id" element={<CustomerCollectionDetail />} />
           </Route>
           <Route path="/products" element={<Navigate to="/shop/products" replace />} />
           <Route path="/products/:id" element={<Navigate to="/shop/products/:id" replace />} />
@@ -447,9 +452,9 @@ const App = () => {
           <Route path="/staff/payments/:id" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
 
           {/* Staff Inventory */}
-          <Route path="/staff/inventory" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
+          <Route path="/staff/inventory" element={<StaffLayout><InventoryManagement /></StaffLayout>} />
           <Route path="/staff/inventory/alerts" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
-          <Route path="/staff/inventory/check" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
+          <Route path="/staff/inventory/check" element={<StaffLayout><InventoryManagement /></StaffLayout>} />
 
 
           {/* ============================================

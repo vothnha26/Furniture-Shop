@@ -38,6 +38,9 @@ public class ProductDetailWithVariantsDto {
     private Double danhGia;
     private Integer soLuotDanhGia;
 
+    @Builder.Default
+    private java.util.List<ReviewDto> danhGiaKhachHang = new java.util.ArrayList<>();
+
     // Thông số kỹ thuật (tổng hợp từ các thuộc tính của biến thể)
     @Builder.Default
     private List<SpecificationDto> thongSoKyThuat = new ArrayList<>();
@@ -186,5 +189,23 @@ public class ProductDetailWithVariantsDto {
         private Double danhGia;
         private Integer soLuotDanhGia;
         private Integer soLuongTon;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ReviewDto {
+        private Integer id;
+        private String tenKhachHang;
+        private Integer danhGia; // diem
+        private String tieuDe;
+        private String noiDung;
+        private String ngayDanhGia;
+        private String bienThe; // optional
+        private Integer maKhachHang;
+        @Builder.Default
+        private java.util.List<String> hinhAnh = new java.util.ArrayList<>();
     }
 }

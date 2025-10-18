@@ -41,7 +41,8 @@ public class QuanLyTonKhoController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            boolean success = stockManagementService.importStock(maBienThe, quantity, nguoiThucHien, lyDo);
+            Integer maNhaCungCap = request.get("maNhaCungCap") != null ? (Integer) request.get("maNhaCungCap") : null;
+            boolean success = stockManagementService.importStock(maBienThe, quantity, nguoiThucHien, lyDo, maNhaCungCap);
 
             if (success) {
                 response.put("success", true);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { IoSearch, IoCart, IoHeart, IoStar, IoGrid, IoList, IoEye } from 'react-icons/io5';
 import CustomerProductDetail from './CustomerProductDetail';
 import api from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CustomerShop = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -10,6 +11,7 @@ const CustomerShop = () => {
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState('grid');
   const [favorites, setFavorites] = useState([]);
+  const { user } = useAuth();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [, setCart] = useState([]);
@@ -27,7 +29,7 @@ const CustomerShop = () => {
     // - a string url in product.hinhAnh / product.image
     // - an array of image objects in product.hinhAnhs or product.danh_sach_hinh_anh
     // - an object with field duongDanHinhAnh
-    let rawImage = '/default-product.jpg';
+  let rawImage = null;
     if (product) {
       if (product.hinhAnhs && Array.isArray(product.hinhAnhs) && product.hinhAnhs.length > 0) {
         const first = product.hinhAnhs[0];
@@ -119,10 +121,11 @@ const CustomerShop = () => {
   discount: Number(product.phanTramGiamGia ?? product.giam_gia ?? 0) || 0,
   discountPercent: discountPercent > 0 ? discountPercent : null,
   discountAmount,
-      rating: Number(product.danhGia ?? product.rating) || 0,
-      reviews: Number(product.soLuongDanhGia ?? product.reviews) || 0,
+  // Support multiple possible backend field names for rating/review count
+  rating: Number(product.averageRating ?? product.danhGia ?? product.rating ?? product.review ?? product.reviews ?? 0) || 0,
+  reviews: Number(product.reviewCount ?? product.soLuotDanhGia ?? product.soLuongDanhGia ?? product.reviews ?? product.review ?? 0) || 0,
       // store the raw image value; the rendering layer will convert it to absolute URL
-      image: rawImage || '/default-product.jpg',
+          image: rawImage || null,
   // Prefer explicit stockQuantity when available, fall back to older fields
   inStock: Number(product.stockQuantity ?? product.tonKho ?? product.soLuongTonKho ?? 0) > 0,
   stockCount: Number(product.stockQuantity ?? product.tonKho ?? product.soLuongTonKho ?? 0) || 0,
@@ -153,16 +156,18 @@ const CustomerShop = () => {
 
   // Convert possibly-relative backend image path to absolute URL using api.buildUrl.
   const resolveImageUrl = (img) => {
-    if (!img) return api.buildUrl('/default-product.jpg');
+    if (!img) return null;
     if (typeof img === 'string') {
       const s = img.trim();
+      // reject known frontend placeholders so we don't show default-product.png
+      if (s === '/default-product.jpg' || s === 'default-product.jpg' || s === '/logo192.png' || s === 'logo192.png') return null;
       if (s.startsWith('http://') || s.startsWith('https://')) return s;
       // relative path like /uploads/products/1/abc.png -> build absolute URL to backend
       return api.buildUrl(s);
     }
     // If it's an object with duongDanHinhAnh field
     if (img.duongDanHinhAnh) return resolveImageUrl(img.duongDanHinhAnh);
-    return api.buildUrl('/default-product.jpg');
+    return null;
   };
 
   // Fetch public products for shop
@@ -199,7 +204,7 @@ const CustomerShop = () => {
             : { min: Number(it.giaBan ?? it.price ?? priceMin) || 0, max: Number(it.giaBan ?? it.price ?? priceMax) || 0 };
 
           // images
-          let imageRaw = '/default-product.jpg';
+          let imageRaw = null;
           if (Array.isArray(it.hinhAnhs) && it.hinhAnhs.length > 0) {
             const first = it.hinhAnhs[0];
             imageRaw = first?.duongDanHinhAnh ?? first ?? imageRaw;
@@ -288,8 +293,9 @@ const CustomerShop = () => {
             // prefer backend-provided discountPercent if available; fall back to computed dtoDiscountPercent
             discount: Number(it.discountPercent ?? it.phanTramGiamGia ?? it.giam_gia ?? dtoDiscountPercent ?? 0) || 0,
             discountAmount: dtoDiscountAmount,
-            rating: Number(it.danhGia ?? it.rating) || 0,
-            reviews: Number(it.soLuongDanhGia ?? it.reviews) || 0,
+            // Support multiple possible backend field names for rating/review count
+            rating: Number(it.averageRating ?? it.danhGia ?? it.rating ?? it.review ?? it.reviews ?? 0) || 0,
+            reviews: Number(it.reviewCount ?? it.soLuotDanhGia ?? it.soLuongDanhGia ?? it.reviews ?? it.review ?? 0) || 0,
             image: imageRaw,
             // Prefer API's explicit stockQuantity if present
             inStock: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? it.soLuongTon ?? it.stockCount ?? 0) > 0,
@@ -311,6 +317,16 @@ const CustomerShop = () => {
   });
 
         setProducts(mapped);
+        try {
+          // expose for debugging in browser console: window.__DEBUG__products
+          // and print a compact sample showing id/category fields to help diagnose filtering
+          // (safe-guard in case window is not available in some environments)
+          if (typeof window !== 'undefined') {
+            window.__DEBUG__products = mapped;
+            // eslint-disable-next-line no-console
+            console.log('CustomerShop: loaded products sample (id,categoryId,category): ' + JSON.stringify(mapped.slice(0,3).map(p => ({ id: p.id, categoryId: p.categoryId, category: p.category })), null, 2));
+          }
+        } catch (e) {}
       } catch (err) {
         console.error('Fetch products error', err);
         setError(err);
@@ -320,6 +336,45 @@ const CustomerShop = () => {
     };
     fetchProducts();
   }, []);
+
+  // Load favorites (server-backed when authenticated, otherwise localStorage)
+  useEffect(() => {
+    let mounted = true;
+    const loadFavorites = async () => {
+        if (user) {
+        try {
+          const resp = await api.get('/favorites');
+          const data = resp?.data ?? resp;
+          if (!Array.isArray(data)) {
+            if (mounted) setFavorites([]);
+            return;
+          }
+          const ids = data.map(p => p.maSanPham ?? p.id ?? p.productId ?? p.productId ?? p.id).filter(Boolean);
+          if (mounted) {
+            setFavorites(ids);
+            try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: ids.length } })); } catch (e) {}
+          }
+          return;
+        } catch (e) {
+          console.debug('Favorites API not available on load', e);
+          // fallthrough to localStorage
+        }
+      }
+      try {
+        const raw = localStorage.getItem('favorites') || '[]';
+        const arr = JSON.parse(raw);
+        const ids = Array.isArray(arr) ? arr.map(f => f.id ?? f.maSanPham).filter(Boolean) : [];
+        if (mounted) {
+          setFavorites(ids);
+          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: ids.length } })); } catch (e) {}
+        }
+      } catch (e) {
+        if (mounted) setFavorites([]);
+      }
+    };
+    loadFavorites();
+    return () => { mounted = false; };
+  }, [user]);
 
   // Fetch categories
   useEffect(() => {
@@ -400,11 +455,126 @@ const CustomerShop = () => {
   }, [products, apiCategories]);
   const navigate = useNavigate();
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // If products don't include category info (categoryId/category empty for all items),
+  // fall back to asking the backend for products of the selected category.
+  useEffect(() => {
+    const shouldProductsProvideCategory = products && products.length > 0 && products.some(p => (p.categoryId || '').toString().trim() !== '' || (p.category || '').toString().trim() !== '');
+    if (shouldProductsProvideCategory) return; // client-side filtering is fine
+
+    // If no products yet, nothing to do
+    if (!products || products.length === 0) return;
+
+    // When category is 'all', refetch the full shop list
+    const fetchForCategory = async (cat) => {
+      try {
+        // Try several common query param names the backend might support
+        const candidates = [
+          `/api/products/shop?categoryId=${encodeURIComponent(cat)}`,
+          `/api/products/shop?maDanhMuc=${encodeURIComponent(cat)}`,
+          `/api/products?categoryId=${encodeURIComponent(cat)}`,
+          `/api/products?maDanhMuc=${encodeURIComponent(cat)}`,
+          `/api/products/shop?category=${encodeURIComponent(cat)}`
+        ];
+
+        for (const url of candidates) {
+          try {
+            const resp = await api.get(url);
+            const data = resp?.data ?? resp;
+            let items = [];
+            if (Array.isArray(data)) items = data;
+            else if (Array.isArray(data.content)) items = data.content;
+            else if (Array.isArray(data.items)) items = data.items;
+            if (items && items.length > 0) {
+              // Map similarly to initial fetch: prefer mapProductFromApi when item looks like full product
+              const mapped = items.map(it => (it && (it.giaBan != null || it.gia != null || it.price != null)) ? mapProductFromApi(it) : {
+                id: it.maSanPham ?? it.id ?? it.productId,
+                name: it.tenSanPham ?? it.ten ?? it.name ?? 'Sản phẩm',
+                categoryId: it.maDanhMuc ?? it.danhMuc?.maDanhMuc ?? null,
+                category: it.tenDanhMuc ?? it.danhMuc?.tenDanhMuc ?? '',
+                price: Number(it.giaBan ?? it.price ?? 0) || 0,
+                image: (it.hinhAnhs && it.hinhAnhs[0]) ? (it.hinhAnhs[0].duongDanHinhAnh ?? it.hinhAnhs[0]) : (it.hinhAnh ?? null),
+                inStock: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? 0) > 0,
+                stockCount: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? 0) || 0,
+                description: it.moTa ?? it.description ?? '',
+                variants: []
+              });
+              setProducts(mapped);
+              return;
+            }
+          } catch (e) {
+            // try next candidate
+          }
+        }
+        // If none returned items, leave existing products as-is (no matches)
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    if (selectedCategory && selectedCategory !== 'all') {
+      fetchForCategory(selectedCategory);
+    } else if (selectedCategory === 'all') {
+      // reload full list
+      (async () => {
+        try {
+          const resp = await api.get('/api/products/shop');
+          const data = resp?.data ?? resp;
+          let items = [];
+          if (Array.isArray(data)) items = data;
+          else if (Array.isArray(data.content)) items = data.content;
+          else if (Array.isArray(data.items)) items = data.items;
+          const mapped = items.map(it => (it && (it.giaBan != null || it.gia != null || it.price != null)) ? mapProductFromApi(it) : ({ id: it.maSanPham ?? it.id ?? it.productId, name: it.tenSanPham ?? it.ten ?? it.name ?? 'Sản phẩm', categoryId: it.maDanhMuc ?? it.danhMuc?.maDanhMuc ?? null, category: it.tenDanhMuc ?? it.danhMuc?.tenDanhMuc ?? '', price: Number(it.giaBan ?? it.price ?? 0) || 0, image: (it.hinhAnhs && it.hinhAnhs[0]) ? (it.hinhAnhs[0].duongDanHinhAnh ?? it.hinhAnhs[0]) : (it.hinhAnh ?? null), inStock: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? 0) > 0, stockCount: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? 0) || 0, description: it.moTa ?? it.description ?? '', variants: [] }));
+          setProducts(mapped);
+        } catch (e) {}
+      })();
+    }
+  }, [selectedCategory, products]);
+
+  // Filter by search term and category, then sort according to sortBy
+  const filteredProducts = (() => {
+    const term = (searchTerm || '').toString().toLowerCase();
+    const list = products.filter(product => {
+      const name = (product.name || '').toString().toLowerCase();
+      const matchesSearch = term === '' || name.includes(term);
+
+      // Category matching: selectedCategory is category.id when available, otherwise category name.
+      const cat = (selectedCategory || '').toString().toLowerCase();
+      let matchesCategory = false;
+      if (cat === 'all') {
+        matchesCategory = true;
+      } else {
+        const prodCatId = (product.categoryId ?? '').toString().toLowerCase();
+        const prodCatName = (product.category ?? '').toString().toLowerCase();
+        // direct id match or direct name match or name contains selected (fallback)
+        matchesCategory = (prodCatId && prodCatId === cat) || (prodCatName && prodCatName === cat) || (prodCatName && prodCatName.includes(cat));
+      }
+
+      return matchesSearch && matchesCategory;
+    });
+
+    // Sorting
+    const by = sortBy;
+    const getPrice = (p) => Number(p.lowestVariantFinalPrice ?? p.price ?? (p.priceRange && p.priceRange.min) ?? 0) || 0;
+
+    if (by === 'name') {
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (by === 'price-low') {
+      list.sort((a, b) => getPrice(a) - getPrice(b));
+    } else if (by === 'price-high') {
+      list.sort((a, b) => getPrice(b) - getPrice(a));
+    } else if (by === 'rating') {
+      list.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+    } else if (by === 'newest') {
+      // best-effort: if products have createdAt or addedDate, sort by that; otherwise leave as-is
+      list.sort((a, b) => {
+        const ta = new Date(a.createdAt || a.addedDate || 0).getTime() || 0;
+        const tb = new Date(b.createdAt || b.addedDate || 0).getTime() || 0;
+        return tb - ta;
+      });
+    }
+
+    return list;
+  })();
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -413,12 +583,75 @@ const CustomerShop = () => {
     }).format(price);
   };
 
-  const toggleFavorite = (productId) => {
-    setFavorites(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
+  // Debug helper: when selectedCategory or products change, log matching stats to help tune filters
+  useEffect(() => {
+    try {
+      const cat = (selectedCategory || '').toString().toLowerCase();
+      const total = products.length;
+      const exactId = products.filter(p => (p.categoryId ?? '').toString().toLowerCase() === cat).length;
+      const exactName = products.filter(p => (p.category ?? '').toString().toLowerCase() === cat).length;
+      const includesName = products.filter(p => (p.category ?? '').toString().toLowerCase().includes(cat)).length;
+  // eslint-disable-next-line no-console
+  console.log('CustomerShop: category debug ' + JSON.stringify({ selectedCategory: cat, total, exactId, exactName, includesName, shown: filteredProducts.length }, null, 2));
+    } catch (e) {
+      // ignore
+    }
+  }, [selectedCategory, products, filteredProducts]);
+
+  const toggleFavorite = async (productOrId) => {
+    try {
+      // accept either product object or id
+      let product = null;
+      if (typeof productOrId === 'object') product = productOrId;
+      else product = products.find(p => p.id === productOrId || p.maSanPham === productOrId) || null;
+      const id = product ? (product.id ?? product.maSanPham) : productOrId;
+      const existing = favorites.includes(id);
+
+      // Update local state
+      setFavorites(prev => existing ? prev.filter(x => x !== id) : [...prev, id]);
+
+      // Maintain a localStorage copy of favorite product objects for offline display
+      try {
+        const raw = localStorage.getItem('favorites') || '[]';
+        const favObjs = JSON.parse(raw);
+        if (existing) {
+          const filtered = favObjs.filter(f => (f.id ?? f.maSanPham) !== id);
+          localStorage.setItem('favorites', JSON.stringify(filtered));
+          // notify layout
+          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: filtered.length } })); } catch (e) {}
+        } else {
+          const toStore = {
+            id,
+            name: product ? (product.name ?? product.tenSanPham ?? product.ten) : '',
+            price: product ? (product.price ?? product.gia ?? product.giaBan) : 0,
+            originalPrice: product ? (product.originalPrice ?? product.giaGoc ?? product.gia_goc) : 0,
+            image: product ? (product.image ?? (product.hinhAnhs && product.hinhAnhs.length > 0 ? (product.hinhAnhs[0].duongDanHinhAnh ?? product.hinhAnhs[0]) : (product.hinhAnh ?? product.image))) : '',
+            rating: product ? (product.rating ?? product.danhGia ?? 0) : 0,
+            reviews: product ? (product.reviews ?? product.soLuotDanhGia ?? 0) : 0,
+            addedDate: new Date().toISOString()
+          };
+          favObjs.push(toStore);
+          localStorage.setItem('favorites', JSON.stringify(favObjs));
+          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: favObjs.length } })); } catch (e) {}
+        }
+      } catch (e) { console.debug('localStorage favorites error', e); }
+
+      // Call backend (server-backed only when authenticated) — payload uses { productId }
+      try {
+        if (user) {
+          if (!existing) {
+            await api.post('/api/v1/yeu-thich', { productId: id });
+                  try { navigate('/favorites', { replace: false }); } catch (e) {}
+          } else {
+            await api.delete(`/api/v1/yeu-thich/${id}`);
+          }
+        }
+      } catch (e) {
+        console.debug('Favorites API error (best-effort)', e);
+      }
+    } catch (err) {
+      console.error('toggleFavorite error', err);
+    }
   };
 
   // Navigate to product page route
@@ -468,14 +701,11 @@ const CustomerShop = () => {
   };
 
   const renderStars = (rating) => {
+    const rounded = Math.round(rating || 0);
     return Array.from({ length: 5 }, (_, i) => (
-      <IoStar
-        key={i}
-        className={`w-4 h-4 ${i < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`}
-      />
+      <IoStar key={i} className={`w-4 h-4 ${i < rounded ? 'text-yellow-400' : 'text-gray-300'}`} />
     ));
   };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -509,11 +739,12 @@ const CustomerShop = () => {
             <div className="lg:w-64">
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                onChange={(e) => setSelectedCategory(String(e.target.value))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 {categories.map(category => (
-                  <option key={category.id} value={category.id}>
+                  // prefer stable id when present, otherwise fall back to name
+                  <option key={String(category.id ?? category.name)} value={String(category.id ?? category.name)}>
                     {category.name} ({category.count})
                   </option>
                 ))}
@@ -570,22 +801,30 @@ const CustomerShop = () => {
             >
               {/* Product Image */}
               <div className="relative">
-                <img
-                  src={resolveImageUrl(product.image)}
-                  title={resolveImageUrl(product.image)}
-                  alt={product.name}
-                  className="w-full h-48 object-cover"
-                  loading="lazy"
-                  onError={(e) => { 
-                    // Log failing URL for easier debugging in browser console
-                    // eslint-disable-next-line no-console
-                    console.error('Image load failed for', e.currentTarget.src);
-                    // Prevent infinite loop by clearing onerror before changing src
-                    e.currentTarget.onerror = null;
-                    // Use a frontend-hosted fallback asset (served from public/) instead of calling backend
-                    e.currentTarget.src = '/logo192.png'; 
-                  }}
-                />
+                {(() => {
+                  const imgSrc = resolveImageUrl(product.image);
+                  if (imgSrc) {
+                    return (
+                      <img
+                        src={imgSrc}
+                        title={imgSrc}
+                        alt={product.name}
+                        className="w-full h-48 object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = '';
+                        }}
+                      />
+                    );
+                  }
+                  // No real image available — render neutral placeholder box (no default image file)
+                  return (
+                    <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
+                      <span className="text-gray-400">No image</span>
+                    </div>
+                  );
+                })()}
                 {product.isNew && (
                   <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium">
                     Mới
@@ -615,8 +854,9 @@ const CustomerShop = () => {
                   </div>
                 )}
                 <button 
-                  onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }}
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(product); }}
                   className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50"
+                  aria-label="Thêm yêu thích"
                 >
                   <IoHeart className={`w-5 h-5 ${favorites.includes(product.id) ? 'text-red-500' : 'text-gray-400'}`} />
                 </button>
@@ -761,7 +1001,7 @@ const CustomerShop = () => {
       )}
     </div>
   );
+
 };
 
 export default CustomerShop;
-

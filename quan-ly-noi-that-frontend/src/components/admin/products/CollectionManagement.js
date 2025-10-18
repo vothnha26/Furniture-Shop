@@ -14,6 +14,7 @@ const CollectionManagement = () => {
     maBoSuuTap: collection.maBoSuuTap || collection.id,
     tenBoSuuTap: collection.tenBoSuuTap || collection.name,
     moTa: collection.moTa || collection.description || '',
+    hinhAnh: collection.hinhAnh || collection.image || null,
     soLuongSanPham: collection.soLuongSanPham || collection.productCount || 0,
     ngayTao: collection.ngayTao || collection.createdAt || '',
     trangThai: collection.trangThai || collection.active || true
@@ -60,6 +61,9 @@ const CollectionManagement = () => {
     moTa: ''
   });
 
+  // File selected for upload (image)
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+
   // Manage products modal state
   const [showManageProductsModal, setShowManageProductsModal] = useState(false);
   const [managingCollection, setManagingCollection] = useState(null);
@@ -103,9 +107,22 @@ const CollectionManagement = () => {
       try {
         if (editingCollection) {
           await api.put(`/api/collections/${editingCollection.maBoSuuTap}`, { body: mapCollectionToApi(formData) });
+          // If image selected, upload it with FormData to /api/collections/{id}/image
+          if (selectedImageFile) {
+            const fd = new FormData();
+            fd.append('image', selectedImageFile);
+            await api.post(`/api/collections/${editingCollection.maBoSuuTap}/image`, fd);
+          }
           showToast('Cập nhật bộ sưu tập thành công');
         } else {
-          await api.post('/api/collections', { body: mapCollectionToApi(formData) });
+          const created = await api.post('/api/collections', { body: mapCollectionToApi(formData) });
+          // created is the new collection entity with maBoSuuTap
+          const newId = created.maBoSuuTap || created.id;
+          if (selectedImageFile && newId) {
+            const fd = new FormData();
+            fd.append('image', selectedImageFile);
+            await api.post(`/api/collections/${newId}/image`, fd);
+          }
           showToast('Thêm bộ sưu tập thành công');
         }
         await fetchCollections();
@@ -125,6 +142,7 @@ const CollectionManagement = () => {
       tenBoSuuTap: collection ? collection.tenBoSuuTap : '',
       moTa: collection ? collection.moTa : ''
     });
+    setSelectedImageFile(null);
     setShowModal(true);
   };
 
@@ -132,6 +150,7 @@ const CollectionManagement = () => {
     setShowModal(false);
     setEditingCollection(null);
     setFormData({ tenBoSuuTap: '', moTa: '' });
+    setSelectedImageFile(null);
   };
 
   const handleDelete = (id) => {
@@ -399,6 +418,27 @@ const CollectionManagement = () => {
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ảnh đại diện (tùy chọn)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setSelectedImageFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)}
+              className="w-full"
+            />
+            {selectedImageFile && (
+              <div className="mt-2">
+                <img src={URL.createObjectURL(selectedImageFile)} alt="preview" className="w-32 h-32 object-cover rounded" />
+              </div>
+            )}
+            {/* show existing image for editing */}
+            {!selectedImageFile && editingCollection && editingCollection.hinhAnh && (
+              <div className="mt-2">
+                <img src={api.buildUrl(editingCollection.hinhAnh)} alt="current" className="w-32 h-32 object-cover rounded" />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

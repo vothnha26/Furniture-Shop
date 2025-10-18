@@ -1,10 +1,14 @@
 package com.noithat.qlnt.backend.dto.response;
 
-import lombok.*;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * DTO response cho sản phẩm kèm danh sách hình ảnh
@@ -37,6 +41,9 @@ public class SanPhamWithImagesResponseDto {
 
     // Diem thuong (bonus points)
     private Integer diemThuong;
+    // Ratings
+    private Double averageRating;
+    private Integer reviewCount;
 
     @Getter
     @Setter

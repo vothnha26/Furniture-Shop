@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { useOutlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useOutlet, useLocation, useNavigate } from 'react-router-dom';
+import api from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 import { IoCart, IoPerson, IoSearch, IoMenu, IoClose, IoHeart, IoNotifications, IoStorefront, IoReceipt } from 'react-icons/io5';
 import CustomerShop from './CustomerShop';
 import CustomerCart from './CustomerCart';
@@ -14,8 +16,59 @@ const CustomerLayout = ({ children }) => {
   const [currentView, setCurrentView] = useState('shop');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cartCount] = useState(3); // Simulate cart count
-  const [favoritesCount] = useState(5); // Simulate favorites count
+  const [favoritesCount, setFavoritesCount] = useState(0);
   const [notificationsCount] = useState(3); // Simulate notifications count
+  const { user } = useAuth();
+
+  // Load favorites count from backend (if authenticated) or from localStorage
+  useEffect(() => {
+    let mounted = true;
+    const loadCount = async () => {
+      try {
+        if (user) {
+          try {
+            const resp = await api.get('/favorites');
+            const data = resp?.data ?? resp;
+            const len = Array.isArray(data) ? data.length : (data?.items?.length ?? 0);
+            if (mounted) setFavoritesCount(len);
+            return;
+          } catch (e) {
+            // fallback to localStorage below
+          }
+        }
+        try {
+          const raw = localStorage.getItem('favorites') || '[]';
+          const arr = JSON.parse(raw);
+          if (mounted) setFavoritesCount(Array.isArray(arr) ? arr.length : 0);
+        } catch (e) {
+          if (mounted) setFavoritesCount(0);
+        }
+      } catch (e) {
+        if (mounted) setFavoritesCount(0);
+      }
+    };
+    loadCount();
+    return () => { mounted = false; };
+  }, [user]);
+
+  // Listen for favorite-changed events dispatched by other components
+  useEffect(() => {
+    const handler = (e) => {
+      if (e?.detail && typeof e.detail.count === 'number') {
+        setFavoritesCount(e.detail.count);
+        return;
+      }
+      try {
+        const raw = localStorage.getItem('favorites') || '[]';
+        const arr = JSON.parse(raw);
+        setFavoritesCount(Array.isArray(arr) ? arr.length : 0);
+      } catch (err) {
+        setFavoritesCount(0);
+      }
+    };
+    window.addEventListener('favorites:changed', handler);
+    return () => window.removeEventListener('favorites:changed', handler);
+  }, []);
 
   const views = [
     { id: 'shop', name: 'Cửa hàng', icon: IoStorefront, component: CustomerShop },
@@ -29,6 +82,18 @@ const CustomerLayout = ({ children }) => {
 
   // If this layout is used as a parent route, `useOutlet()` returns the nested element.
   const outlet = useOutlet();
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // If URL contains ?view=favorites allow external navigation to switch tabs
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const view = params.get('view');
+      if (view) setCurrentView(view);
+    } catch (e) { /* ignore */ }
+  }, [location.search]);
 
   const renderCurrentView = () => {
     // If a nested route element is present, render it instead of the internal tab view
@@ -100,7 +165,10 @@ const CustomerLayout = ({ children }) => {
 
               {/* Favorites */}
               <button 
-                onClick={() => setCurrentView('favorites')}
+                onClick={() => {
+                  setCurrentView('favorites');
+                  try { navigate(`${location.pathname}?view=favorites`); } catch (e) { /* ignore */ }
+                }}
                 className="relative p-2 text-gray-600 hover:text-gray-900"
               >
                 <IoHeart className="w-6 h-6" />

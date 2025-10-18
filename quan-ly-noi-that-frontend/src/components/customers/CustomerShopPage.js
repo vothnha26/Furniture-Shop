@@ -133,6 +133,54 @@ const CustomerShopPage = () => {
           const images = rawImages.map(img => (typeof img === 'string' && img.startsWith('/') ? api.buildUrl(img) : img));
           const image = images.length > 0 ? images[0] : '';
 
+          // determine dto-level discount info without relying on min/max price range
+          let dtoOriginalPrice = Number(p.originalPrice ?? p.giaGoc ?? 0) || 0;
+          let dtoDiscountPercent = p.discountPercent ?? p.phanTramGiamGia ?? null;
+          dtoDiscountPercent = dtoDiscountPercent != null ? Number(dtoDiscountPercent) || 0 : null;
+          let dtoDiscountAmount = 0;
+
+          // find variant-level discounted variant (if any)
+          let dtoLowestVariantOverall = null;
+          let dtoLowestVariantDiscounted = null;
+          try {
+            const rawVariants = p.bienTheList ?? p.bienThe ?? p.variants ?? p.variantDtos ?? [];
+            if (Array.isArray(rawVariants) && rawVariants.length > 0) {
+              rawVariants.forEach(v => {
+                const vPrice = Number(v.giaBan ?? v.gia ?? v.price ?? v.priceAfterDiscount ?? price) || 0;
+                const vOriginal = Number(v.giaGoc ?? v.gia_goc ?? v.originalPrice ?? dtoOriginalPrice) || 0;
+                let vDiscountPercent = v.phanTramGiamGia ?? v.discountPercent ?? null;
+                vDiscountPercent = vDiscountPercent != null ? Number(vDiscountPercent) || 0 : 0;
+                if ((!v.phanTramGiamGia && !v.discountPercent) && vOriginal > 0 && vPrice < vOriginal) {
+                  vDiscountPercent = Math.round(((vOriginal - vPrice) / vOriginal) * 100);
+                }
+                const vDiscountAmount = vOriginal > 0 && vPrice < vOriginal ? (vOriginal - vPrice) : 0;
+                const finalPrice = vPrice;
+
+                if (!dtoLowestVariantOverall || finalPrice < dtoLowestVariantOverall.finalPrice) {
+                  dtoLowestVariantOverall = { id: v.maBienThe ?? v.id ?? v.variantId, price: vPrice, originalPrice: vOriginal, discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null, discountAmount: vDiscountAmount, finalPrice };
+                }
+                const hasDiscount = vDiscountAmount > 0 || (vDiscountPercent && vDiscountPercent > 0) || Boolean(v.priceAfterDiscount) || (vPrice < vOriginal && vOriginal > 0);
+                if (hasDiscount) {
+                  if (!dtoLowestVariantDiscounted || finalPrice < dtoLowestVariantDiscounted.finalPrice) {
+                    dtoLowestVariantDiscounted = { id: v.maBienThe ?? v.id ?? v.variantId, price: vPrice, originalPrice: vOriginal, discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null, discountAmount: vDiscountAmount, finalPrice };
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            dtoLowestVariantOverall = null;
+            dtoLowestVariantDiscounted = null;
+          }
+
+          // final dto discount priority: explicit dto discountPercent > variant-level discounted variant
+          const finalDtoDiscountPercent = dtoDiscountPercent ?? dtoLowestVariantDiscounted?.discountPercent ?? null;
+          if (dtoLowestVariantDiscounted) {
+            dtoDiscountAmount = dtoLowestVariantDiscounted.discountAmount ?? 0;
+          } else if (finalDtoDiscountPercent != null && finalDtoDiscountPercent > 0 && dtoOriginalPrice > 0) {
+            dtoDiscountAmount = Math.round((finalDtoDiscountPercent / 100) * dtoOriginalPrice);
+          }
+          dtoDiscountPercent = finalDtoDiscountPercent;
+
           return {
             id: p.maSanPham ?? p.id ?? p.ma_san_pham,
             name: p.tenSanPham ?? p.name ?? p.ten ?? 'Sản phẩm',
@@ -149,13 +197,15 @@ const CustomerShopPage = () => {
             reviewCount: Number(p.reviewCount ?? p.so_luot_danh_gia) || 0,
             isInStock: stock > 0,
             stockQuantity: stock,
-            discount: originalPrice > 0 ? (originalPrice - price) : 0,
+            // discount amount (prefer explicit/variant-derived values) — do not derive from min/max price
+            discount: dtoDiscountAmount,
             isNew: Boolean(p.isNew ?? p.san_pham_moi),
             isFeatured: Boolean(p.isFeatured ?? p.noi_bat),
             variants: Number(p.availableVariantCount ?? p.soLuongBienThe ?? p.available_variant_count ?? p.so_luong_bien_the ?? p.soLuongBienThe ?? p.so_luong_bien_the ?? p.variants ?? 0) || 0,
             tags: p.tags || p.nhan || [],
             attributes: p.attributes || p.thuoc_tinh || [],
-            isOnSale: originalPrice > 0 && price < originalPrice
+            // mark on sale only when there is an explicit dto-level discount or a variant with a discount
+            isOnSale: Boolean(dtoLowestVariantDiscounted) || (dtoDiscountPercent != null && dtoDiscountPercent > 0)
           };
         }
 
@@ -296,11 +346,6 @@ const CustomerShopPage = () => {
     }).format(price);
   };
 
-  const calculateDiscountPercent = (originalPrice, currentPrice) => {
-    if (!originalPrice) return 0;
-    return Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
-  };
-
   const ProductCard = ({ product }) => (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
       <div className="relative">
@@ -313,11 +358,11 @@ const CustomerShopPage = () => {
 
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
-          {product.isOnSale && (
+          { (product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
             <span className="bg-red-500 text-white px-2 py-1 rounded text-xs font-medium">
-              -{calculateDiscountPercent(product.originalPrice, product.price)}%
+              -{product.discountPercent != null && product.discountPercent > 0 ? product.discountPercent : Math.round(((product.discount || 0) / (product.originalPrice || 1)) * 100)}%
             </span>
-          )}
+          ) : null }
         </div>
 
         {/* Favorite Button */}
@@ -359,14 +404,14 @@ const CustomerShopPage = () => {
             <span className="font-bold text-lg text-gray-900">
               {product.price > 0 ? formatPrice(product.price) : 'Liên hệ'}
             </span>
-            {/* show discount percent badge (already shown on image) - kept for clarity */}
-            {product.isOnSale && (
+            {/* show discount percent badge (prefer explicit discountPercent or computed from discount amount) */}
+            { (product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
               <span className="text-sm text-red-600 font-medium">-
-                {calculateDiscountPercent(product.originalPrice, product.price)}%</span>
-            )}
+                {product.discountPercent != null && product.discountPercent > 0 ? product.discountPercent : Math.round(((product.discount || 0) / (product.originalPrice || 1)) * 100)}%</span>
+            ) : null }
           </div>
-          {product.isOnSale && product.originalPrice > 0 && (
-            <div className="text-xs text-gray-500">Tiết kiệm: {formatPrice(product.originalPrice - product.price)}</div>
+          {(product.discount && product.discount > 0) && (
+            <div className="text-xs text-gray-500">Tiết kiệm: {formatPrice(product.discount)}</div>
           )}
         </div>
 
@@ -395,11 +440,11 @@ const CustomerShopPage = () => {
         />
 
         {/* Badges */}
-        {product.isOnSale && (
+        {(product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
           <span className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded text-xs font-medium">
-            -{calculateDiscountPercent(product.originalPrice, product.price)}%
+            -{product.discountPercent != null && product.discountPercent > 0 ? product.discountPercent : Math.round(((product.discount || 0) / (product.originalPrice || 1)) * 100)}%
           </span>
-        )}
+        ) : null}
       </div>
 
       <div className="flex-1 p-6">
@@ -436,11 +481,11 @@ const CustomerShopPage = () => {
 
             <div className="mb-4">
               <div className="font-bold text-xl text-gray-900">
-                {product.price > 0 ? formatPrice(product.price) : 'Liên hệ'}
-              </div>
-              {product.isOnSale && product.originalPrice > 0 && (
-                <div className="text-sm text-gray-500">Tiết kiệm: {formatPrice(product.originalPrice - product.price)}</div>
-              )}
+                  {product.price > 0 ? formatPrice(product.price) : 'Liên hệ'}
+                </div>
+                {(product.discount && product.discount > 0) && (
+                  <div className="text-sm text-gray-500">Tiết kiệm: {formatPrice(product.discount)}</div>
+                )}
             </div>
 
             <button onClick={() => addToCart(product.id, 1)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors">

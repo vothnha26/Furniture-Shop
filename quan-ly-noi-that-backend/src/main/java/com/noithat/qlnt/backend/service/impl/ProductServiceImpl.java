@@ -565,10 +565,13 @@ public class ProductServiceImpl implements IProductService {
                                         }
                                 }
                         }
-                        // compute discount percent from max -> min
+                        // Determine discount percent: prefer a real variant-level discount (giaSauGiam) if present.
+                        // Do NOT infer discount from max/min price range.
                         int discountPercent = 0;
-                        if (max > 0.0 && max > min) {
-                                discountPercent = (int) Math.round(((max - min) / max) * 100.0);
+                        if (lowestFinalVariantDiscountPercent != null) {
+                                discountPercent = lowestFinalVariantDiscountPercent;
+                        } else {
+                                discountPercent = 0;
                         }
 
                         // Map to frontend-friendly fields: price=min, originalPrice=max, stockQuantity=totalStock
@@ -692,10 +695,13 @@ public class ProductServiceImpl implements IProductService {
                                 }
                         }
 
-                        // compute discount percent from max -> min
+                        // Determine discount percent: prefer variant-level discounted percent when available.
+                        // Avoid inferring discount from min/max price range.
                         int discountPercent2 = 0;
-                        if (max > 0.0 && max > min) {
-                                discountPercent2 = (int) Math.round(((max - min) / max) * 100.0);
+                        if (lowestFinalVariantDiscountPercent2 != null) {
+                                discountPercent2 = lowestFinalVariantDiscountPercent2;
+                        } else {
+                                discountPercent2 = 0;
                         }
 
                         com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder2 = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()

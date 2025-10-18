@@ -42,16 +42,18 @@ const CustomerShop = () => {
       }
     }
 
-    // compute discount percent/amount in a few fallback ways so UI can render reliably
-    let rawDiscountPercent = product.phanTramGiamGia ?? product.discountPercent ?? null;
-    let discountPercent = rawDiscountPercent != null ? Number(rawDiscountPercent) || 0 : 0;
-    if ((!rawDiscountPercent || rawDiscountPercent === null) && originalPrice > 0 && price < originalPrice) {
-      discountPercent = Math.round(((originalPrice - price) / originalPrice) * 100);
-    }
-    const discountAmount = originalPrice > 0 && price < originalPrice ? (originalPrice - price) : 0;
+    // Prefer explicit product-level discount fields only. Do NOT derive discount from price<original (min/max) here.
+    const rawDiscountPercent = product.phanTramGiamGia ?? product.discountPercent ?? null;
+    const explicitDiscountPercent = rawDiscountPercent != null ? Number(rawDiscountPercent) || 0 : null;
+    // We'll compute final discount percent/amount after evaluating variants (prefer variant-level discounted variant when present)
+    let discountPercent = explicitDiscountPercent ?? null;
+    let discountAmount = 0;
 
-    // If variants exist, compute the variant with the lowest final price (consider variant price and any variant-level discount fields)
-    let lowestVariant = null;
+    // If variants exist, compute:
+    // - lowestVariantOverall: the variant with the lowest final price (used for price display)
+    // - lowestVariantDiscounted: the variant with the lowest final price among only variants that have a discount
+    let lowestVariantOverall = null;
+    let lowestVariantDiscounted = null;
     try {
       const rawVariants = product.bienTheList ?? product.bienThe ?? product.variants ?? [];
       if (Array.isArray(rawVariants) && rawVariants.length > 0) {
@@ -68,8 +70,9 @@ const CustomerShop = () => {
 
           const finalPrice = vPrice; // assume provided price already reflects any variant-level applied discounts
 
-          if (!lowestVariant || finalPrice < lowestVariant.finalPrice) {
-            lowestVariant = {
+          // track overall lowest (for display of price range)
+          if (!lowestVariantOverall || finalPrice < lowestVariantOverall.finalPrice) {
+            lowestVariantOverall = {
               id: v.maBienThe ?? v.id ?? v.variantId,
               name: v.tenBienThe ?? v.ten ?? v.name ?? null,
               price: vPrice,
@@ -79,12 +82,29 @@ const CustomerShop = () => {
               finalPrice
             };
           }
+
+          // Only consider this variant for discount-derived fields if it actually has a discount
+          const hasVariantDiscount = vDiscountAmount > 0 || (vDiscountPercent && vDiscountPercent > 0) || Boolean(v.priceAfterDiscount) || (vPrice < vOriginal && vOriginal > 0);
+          if (hasVariantDiscount) {
+            if (!lowestVariantDiscounted || finalPrice < lowestVariantDiscounted.finalPrice) {
+              lowestVariantDiscounted = {
+                id: v.maBienThe ?? v.id ?? v.variantId,
+                name: v.tenBienThe ?? v.ten ?? v.name ?? null,
+                price: vPrice,
+                originalPrice: vOriginal,
+                discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null,
+                discountAmount: vDiscountAmount,
+                finalPrice
+              };
+            }
+          }
         });
       }
     } catch (e) {
       // ignore any variant parsing errors
       console.warn('Variant parsing error', e);
-      lowestVariant = null;
+      lowestVariantOverall = null;
+      lowestVariantDiscounted = null;
     }
 
     return {
@@ -114,14 +134,20 @@ const CustomerShop = () => {
         inStock: Number(variant.tonKho ?? variant.soLuong ?? 0) > 0
       })),
       // expose lowest variant pricing so the shop list can show the best (lowest) variant price and discount
-      lowestVariantId: lowestVariant?.id ?? null,
-      lowestVariantName: lowestVariant?.name ?? null,
-      lowestVariantPrice: lowestVariant?.price ?? null,
-      lowestVariantOriginalPrice: lowestVariant?.originalPrice ?? null,
-      lowestVariantDiscountPercent: lowestVariant?.discountPercent ?? null,
-      lowestVariantDiscountAmount: lowestVariant?.discountAmount ?? 0,
-      lowestVariantFinalPrice: lowestVariant?.finalPrice ?? null,
-      isOnSale: originalPrice > 0 && price < originalPrice
+      // price display uses the overall lowest final price, but discount fields come only from discounted variants
+      lowestVariantId: lowestVariantOverall?.id ?? null,
+      lowestVariantName: lowestVariantOverall?.name ?? null,
+      lowestVariantPrice: lowestVariantOverall?.price ?? null,
+      lowestVariantOriginalPrice: lowestVariantOverall?.originalPrice ?? null,
+      lowestVariantDiscountPercent: lowestVariantDiscounted?.discountPercent ?? null,
+      lowestVariantDiscountAmount: lowestVariantDiscounted?.discountAmount ?? 0,
+      lowestVariantFinalPrice: lowestVariantDiscounted?.finalPrice ?? null,
+      // derive final product-level discount values: prefer explicit product discount, otherwise the discounted variant
+      discount: Number(explicitDiscountPercent ?? lowestVariantDiscounted?.discountPercent ?? 0) || 0,
+      discountPercent: (explicitDiscountPercent ?? lowestVariantDiscounted?.discountPercent) > 0 ? (explicitDiscountPercent ?? lowestVariantDiscounted?.discountPercent) : null,
+      discountAmount: lowestVariantDiscounted ? (lowestVariantDiscounted.discountAmount ?? 0) : (explicitDiscountPercent && explicitDiscountPercent > 0 && originalPrice > 0 ? Math.round((explicitDiscountPercent / 100) * originalPrice) : 0),
+      // mark on sale only when there is an explicit product-level discount or a discounted variant
+      isOnSale: Boolean(lowestVariantDiscounted) || (explicitDiscountPercent != null && explicitDiscountPercent > 0)
     };
   };
 
@@ -181,20 +207,18 @@ const CustomerShop = () => {
             imageRaw = it.hinhAnh;
           }
 
-          // derive discount info and lowest variant price if variants included in the shop DTO
+          // derive discount info; do NOT compute discount from price range (min/max)
+          // prefer explicit dto-level discountPercent or variant-level discounted variant
           let dtoOriginalPrice = Number(it.giaGoc ?? it.originalPrice ?? 0) || 0;
           let dtoDiscountPercent = it.discountPercent ?? it.phanTramGiamGia ?? null;
           dtoDiscountPercent = dtoDiscountPercent != null ? Number(dtoDiscountPercent) || 0 : null;
           let dtoDiscountAmount = 0;
-          if ((dtoDiscountPercent == null || dtoDiscountPercent === 0) && dtoOriginalPrice > 0 && displayPrice.min < dtoOriginalPrice) {
-            dtoDiscountAmount = dtoOriginalPrice - displayPrice.min;
-            dtoDiscountPercent = Math.round(((dtoOriginalPrice - displayPrice.min) / dtoOriginalPrice) * 100);
-          } else if (dtoDiscountPercent != null && dtoDiscountPercent > 0 && dtoOriginalPrice > 0) {
-            dtoDiscountAmount = Math.round((dtoDiscountPercent / 100) * dtoOriginalPrice);
-          }
 
-          // compute lowest variant in shop DTO if present
-          let dtoLowestVariant = null;
+          // compute two things from DTO variants:
+          // - dtoLowestVariantOverall: lowest final price (for price display)
+          // - dtoLowestVariantDiscounted: lowest final price among only variants that have discounts
+          let dtoLowestVariantOverall = null;
+          let dtoLowestVariantDiscounted = null;
           try {
             const rawVariants = it.bienTheList ?? it.bienThe ?? it.variants ?? it.variantDtos ?? [];
             if (Array.isArray(rawVariants) && rawVariants.length > 0) {
@@ -208,8 +232,9 @@ const CustomerShop = () => {
                 }
                 const vDiscountAmount = vOriginal > 0 && vPrice < vOriginal ? (vOriginal - vPrice) : 0;
                 const finalPrice = vPrice;
-                if (!dtoLowestVariant || finalPrice < dtoLowestVariant.finalPrice) {
-                  dtoLowestVariant = {
+
+                if (!dtoLowestVariantOverall || finalPrice < dtoLowestVariantOverall.finalPrice) {
+                  dtoLowestVariantOverall = {
                     id: v.maBienThe ?? v.id ?? v.variantId,
                     name: v.tenBienThe ?? v.ten ?? v.name ?? null,
                     price: vPrice,
@@ -219,11 +244,37 @@ const CustomerShop = () => {
                     finalPrice
                   };
                 }
+
+                const hasDiscount = vDiscountAmount > 0 || (vDiscountPercent && vDiscountPercent > 0) || Boolean(v.priceAfterDiscount) || (vPrice < vOriginal && vOriginal > 0);
+                if (hasDiscount) {
+                  if (!dtoLowestVariantDiscounted || finalPrice < dtoLowestVariantDiscounted.finalPrice) {
+                    dtoLowestVariantDiscounted = {
+                      id: v.maBienThe ?? v.id ?? v.variantId,
+                      name: v.tenBienThe ?? v.ten ?? v.name ?? null,
+                      price: vPrice,
+                      originalPrice: vOriginal,
+                      discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null,
+                      discountAmount: vDiscountAmount,
+                      finalPrice
+                    };
+                  }
+                }
               });
             }
           } catch (e) {
-            dtoLowestVariant = null;
+            dtoLowestVariantOverall = null;
+            dtoLowestVariantDiscounted = null;
           }
+
+          // After examining variants, derive final dto-level discount values but DO NOT use displayPrice.min/max
+          // Priority: explicit dto discountPercent > variant-level discounted info > no discount
+          const finalDtoDiscountPercent = dtoDiscountPercent ?? dtoLowestVariantDiscounted?.discountPercent ?? null;
+          if (dtoLowestVariantDiscounted) {
+            dtoDiscountAmount = dtoLowestVariantDiscounted.discountAmount ?? 0;
+          } else if (finalDtoDiscountPercent != null && finalDtoDiscountPercent > 0 && dtoOriginalPrice > 0) {
+            dtoDiscountAmount = Math.round((finalDtoDiscountPercent / 100) * dtoOriginalPrice);
+          }
+          dtoDiscountPercent = finalDtoDiscountPercent;
 
           return {
             id: it.maSanPham ?? it.id ?? it.productId,
@@ -245,16 +296,17 @@ const CustomerShop = () => {
             stockCount: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? it.soLuongTon ?? it.stockCount ?? 0) || 0,
             description: it.moTa ?? it.description ?? '',
             variants: [], // the shop DTO intentionally does not include full variants; keep empty here
-            isOnSale: (it.giaGoc ?? it.originalPrice ?? 0) > 0 && (displayPrice.min < (it.giaGoc ?? it.originalPrice ?? Number.POSITIVE_INFINITY)),
+            // mark on sale only when there is an explicit dto-level discount or a variant with a discount
+            isOnSale: Boolean(dtoLowestVariantDiscounted) || (dtoDiscountPercent != null && dtoDiscountPercent > 0),
             discountPercent: dtoDiscountPercent != null && dtoDiscountPercent > 0 ? dtoDiscountPercent : (it.discountPercent != null ? it.discountPercent : null),
-            // expose dto-level lowest variant if computed
-            lowestVariantId: dtoLowestVariant?.id ?? null,
-            lowestVariantName: dtoLowestVariant?.name ?? null,
-            lowestVariantPrice: dtoLowestVariant?.price ?? null,
-            lowestVariantOriginalPrice: dtoLowestVariant?.originalPrice ?? null,
-            lowestVariantDiscountPercent: dtoLowestVariant?.discountPercent ?? null,
-            lowestVariantDiscountAmount: dtoLowestVariant?.discountAmount ?? 0,
-            lowestVariantFinalPrice: dtoLowestVariant?.finalPrice ?? null
+            // expose dto-level lowest overall for price, but discount fields only from discounted variants
+            lowestVariantId: dtoLowestVariantOverall?.id ?? null,
+            lowestVariantName: dtoLowestVariantOverall?.name ?? null,
+            lowestVariantPrice: dtoLowestVariantOverall?.price ?? null,
+            lowestVariantOriginalPrice: dtoLowestVariantOverall?.originalPrice ?? null,
+            lowestVariantDiscountPercent: dtoLowestVariantDiscounted?.discountPercent ?? null,
+            lowestVariantDiscountAmount: dtoLowestVariantDiscounted?.discountAmount ?? 0,
+            lowestVariantFinalPrice: dtoLowestVariantDiscounted?.finalPrice ?? null
           };
   });
 

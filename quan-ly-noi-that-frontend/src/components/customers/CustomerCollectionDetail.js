@@ -45,7 +45,8 @@ const CustomerCollectionDetail = () => {
         try { products = await api.get(`/api/collections/${id}/products`); } catch (e) { products = []; }
         if (mounted) setCollection({ ...data, products });
       } catch (err) {
-        if (mounted) setCollection(mockCollections[id]);
+        // If fetching fails, don't reference local mocks (may not exist) — fall back to null
+        if (mounted) setCollection(null);
       } finally {
         if (mounted) setLoading(false);
       }

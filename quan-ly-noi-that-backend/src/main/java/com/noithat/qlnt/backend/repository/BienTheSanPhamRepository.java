@@ -13,6 +13,10 @@ import java.util.Optional;
 public interface BienTheSanPhamRepository extends JpaRepository<BienTheSanPham, Integer> {
     List<BienTheSanPham> findBySanPham_MaSanPham(Integer maSanPham);
 
+    // Fetch variants with their attribute join-table eagerly to avoid N+1 and ensure attributes are available
+    @Query("SELECT DISTINCT b FROM BienTheSanPham b LEFT JOIN FETCH b.bienTheThuocTinhs bt LEFT JOIN FETCH bt.thuocTinh WHERE b.sanPham.maSanPham = :maSanPham")
+    List<BienTheSanPham> findBySanPham_MaSanPhamWithAttributes(@Param("maSanPham") Integer maSanPham);
+
     boolean existsBySku(String sku);
 
     Optional<BienTheSanPham> findBySku(String sku);

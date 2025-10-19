@@ -3,6 +3,7 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.SanPhamRequestDto;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
+import com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse;
 import com.noithat.qlnt.backend.entity.SanPham;
 import com.noithat.qlnt.backend.service.IProductService;
 import jakarta.validation.Valid;
@@ -19,6 +20,8 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
     @Autowired
     private IProductService productService;
+    @Autowired
+    private com.noithat.qlnt.backend.repository.BienTheGiamGiaRepository bienTheGiamGiaRepository;
 
     // ===== CRUD cho Sản phẩm (Sản phẩm gốc) =====
     @GetMapping
@@ -53,7 +56,8 @@ public class ProductController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getProductById(@PathVariable Integer id) {
         try {
-            var dto = productService.getProductWithImagesById(id);
+            // Return the detailed product with variants (includes variant attributes)
+            var dto = productService.getProductDetailWithVariants(id);
             return ResponseEntity.ok(dto);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(java.util.Map.of("error", e.getMessage()));
@@ -155,8 +159,65 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}/variants")
-    public ResponseEntity<List<BienTheSanPham>> getVariantsByProductId(@PathVariable Integer productId) {
+    public ResponseEntity<List<? extends Object>> getVariantsByProductId(@PathVariable Integer productId) {
         List<BienTheSanPham> variants = productService.getVariantsByProductId(productId);
-        return ResponseEntity.ok(variants);
+        // Map to DTO that includes attribute list and current discounts
+        List<BienTheSanPhamDetailResponse> out = variants.stream().map(bt -> {
+            BienTheSanPhamDetailResponse resp = BienTheSanPhamDetailResponse.builder()
+                    .maBienThe(bt.getMaBienThe())
+                    .sku(bt.getSku())
+                    .giaBan(bt.getGiaBan())
+                    .soLuongTon(bt.getSoLuongTon())
+                    .maSanPham(bt.getSanPham() != null ? bt.getSanPham().getMaSanPham() : null)
+                    .tenSanPham(bt.getSanPham() != null ? bt.getSanPham().getTenSanPham() : null)
+                    .build();
+
+        // map attributes: ensure at most one value per attribute (group by attribute id and pick first)
+        if (bt.getBienTheThuocTinhs() != null) {
+        java.util.Map<Object, java.util.List<com.noithat.qlnt.backend.entity.BienTheThuocTinh>> grouped = bt.getBienTheThuocTinhs().stream()
+            .filter(btt -> btt != null)
+            .collect(java.util.stream.Collectors.groupingBy(btt -> {
+                if (btt.getThuocTinh() != null) return btt.getThuocTinh().getMaThuocTinh();
+                // fallback grouping key when ThuocTinh is null: use the giaTri string
+                return btt.getGiaTri() != null ? btt.getGiaTri() : java.util.UUID.randomUUID().toString();
+            }));
+
+        List<BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse> attrs = grouped.values().stream()
+            .map(list -> list.get(0)) // pick first entry for each attribute
+            .map(btt -> BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse.builder()
+                .maThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getMaThuocTinh() : null)
+                .tenThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getTenThuocTinh() : null)
+                .maGiaTriThuocTinh(null)
+                .giaTriThuocTinh(btt.getGiaTri())
+                .build())
+            .collect(java.util.stream.Collectors.toList());
+
+        resp.setThuocTinhs(attrs);
+        }
+
+            // map current discounts if any (reuse repository via service layer would be better but keep simple)
+            // Attempt to include best available discount info
+            // fetch any BienTheGiamGia mappings for this variant
+            try {
+                List<com.noithat.qlnt.backend.entity.BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+                if (discounts != null && !discounts.isEmpty()) {
+                    List<BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse> gd = discounts.stream().map(d ->
+                            BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse.builder()
+                                    .maChuongTrinhGiamGia(d.getChuongTrinhGiamGia() != null ? d.getChuongTrinhGiamGia().getMaChuongTrinhGiamGia() : null)
+                                    .tenChuongTrinh(d.getChuongTrinhGiamGia() != null ? d.getChuongTrinhGiamGia().getTenChuongTrinh() : null)
+                                    .giaSauGiam(d.getGiaSauGiam())
+                                    .phanTramGiam(null)
+                                    .build()
+                    ).collect(java.util.stream.Collectors.toList());
+                    resp.setGiamGias(gd);
+                }
+            } catch (Exception ex) {
+                // ignore
+            }
+
+            return resp;
+        }).collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok().body(null != out ? java.util.List.copyOf(out) : java.util.Collections.emptyList());
     }
 }

@@ -172,6 +172,9 @@ public class BienTheSanPhamServiceImpl implements IBienTheSanPhamService {
         existing.setGiaMua(request.giaMua());
         existing.setGiaBan(request.giaBan());
         existing.setSoLuongTon(request.soLuongTon());
+        if (request.trangThaiKho() != null) {
+            existing.setTrangThaiKho(request.trangThaiKho());
+        }
         existing.setNgayCapNhatKho(LocalDateTime.now());
 
         // handle textual attribute mappings: delete existing attribute links and

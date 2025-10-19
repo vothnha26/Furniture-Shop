@@ -3,7 +3,173 @@ import { useParams } from 'react-router-dom';
 import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
-import { IoArrowBack, IoStar, IoStarOutline, IoHeart, IoHeartOutline, IoShare, IoCart, IoEye, IoCheckmarkCircle, IoWarning, IoEllipsisVertical } from 'react-icons/io5';
+import { IoArrowBack, IoStar, IoStarOutline, IoHeart, IoHeartOutline, IoShare, IoCart, IoCheckmarkCircle, IoWarning, IoEllipsisVertical } from 'react-icons/io5';
+
+// AttributeConfigurator component (placed before main component)
+const AttributeConfigurator = ({ variants, attributeGroups, selectedVariant, setSelectedVariant, normalizeVariant, findMatchingVariant, handleVariantSelect, formatCurrency }) => {
+  const [selectedAttrs, setSelectedAttrs] = React.useState(() => {
+    const init = {};
+    Object.keys(attributeGroups || {}).forEach(k => init[k] = '');
+    return init;
+  });
+
+  useEffect(() => {
+    // Re-evaluate matching variant when selected attributes change.
+    // Keep dependencies minimal: selectedAttrs, variants (stable from parent), and helpers.
+    const matched = findMatchingVariant(selectedAttrs);
+    if (matched) {
+      setSelectedVariant(matched);
+      return;
+    }
+    if (selectedVariant) {
+      const matches = variants.some(vr => normalizeVariant(vr).id === selectedVariant.id && Object.keys(selectedAttrs).every(k => {
+        const val = selectedAttrs[k];
+        if (!val) return true;
+        const attrs = (normalizeVariant(vr).attributes || []).reduce((acc, a) => { acc[((a.tenThuocTinh ?? a.name ?? a.label ?? a.ten ?? a.attributeName) || '')] = String(a.giaTri ?? a.value ?? a.val ?? a.gia_tri ?? a.attributeValue ?? a.valueLabel); return acc; }, {});
+        return String(attrs[k] || '') === String(val);
+      }));
+      if (!matches) setSelectedVariant(null);
+    }
+  // intentionally include helpers/refs used here; these are stable in practice
+  }, [selectedAttrs, variants, findMatchingVariant, normalizeVariant, selectedVariant, setSelectedVariant]);
+
+  const onChoose = (groupName, value) => {
+    setSelectedAttrs(prev => ({ ...prev, [groupName]: prev[groupName] === value ? '' : value }));
+  };
+
+  const isValueAvailable = (groupName, value) => {
+    const sel = { ...selectedAttrs, [groupName]: value };
+    return variants.some(vr => {
+      const v = normalizeVariant(vr);
+      const map = (v.attributes || []).reduce((acc, a) => { acc[((a.tenThuocTinh ?? a.name ?? a.label ?? a.ten ?? a.attributeName) || '')] = String(a.giaTri ?? a.value ?? a.val ?? a.gia_tri ?? a.attributeValue ?? a.valueLabel); return acc; }, {});
+      for (const [k, val] of Object.entries(sel)) {
+        if (!val) continue;
+        if (!map[k]) return false;
+        if (String(map[k]) !== String(val)) return false;
+      }
+      return true;
+    });
+  };
+
+  // Helper: build an array of "name: value" strings for a variant's attributes from many possible backend shapes
+  const buildAttributeList = (variant) => {
+    if (!variant) return [];
+    const out = [];
+    const candidates = [variant.bienTheThuocTinhs, variant.thuocTinh, variant.attributes, variant.attrs, variant.thuocTinhs];
+    for (const src of candidates) {
+      if (!src) continue;
+      if (Array.isArray(src) && src.length > 0) {
+        for (const item of src) {
+          try {
+            const name = (item.tenThuocTinh ?? (item.thuocTinh && (item.thuocTinh.tenThuocTinh ?? item.thuocTinh.name)) ?? item.name ?? item.attributeName ?? item.label ?? '') || '';
+            const value = (item.giaTri ?? item.giaTriThuocTinh ?? item.gia_tri ?? item.value ?? item.val ?? item.attributeValue ?? item.valueLabel ?? item.valLabel ?? '') || '';
+            const n = String(name).trim();
+            const v = String(value).trim();
+            if (n || v) out.push((n ? (n + ': ') : '') + v);
+          } catch (e) {
+            // ignore malformed entries
+          }
+        }
+        if (out.length > 0) return out;
+      }
+    }
+    // fallback: try variant-level simple properties
+    if (variant.color || variant.mauSac || variant.kichThuoc || variant.size) {
+      const parts = [];
+      if (variant.color || variant.mauSac) parts.push(`Màu: ${variant.color ?? variant.mauSac}`);
+      if (variant.kichThuoc || variant.size) parts.push(`Kích thước: ${variant.kichThuoc ?? variant.size}`);
+      if (parts.length) return parts;
+    }
+    return out;
+  };
+
+  // Fallback SKU cards for small variant counts
+  if ((variants || []).length <= 4) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Chọn phiên bản:</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {variants.map((vr) => {
+            const v = normalizeVariant(vr);
+            const isSelected = selectedVariant && selectedVariant.id === v.id;
+            const attrList = buildAttributeList(v);
+            return (
+              <button key={v.id} onClick={() => handleVariantSelect(vr)} className={`p-4 border rounded-lg text-left ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex justify-between">
+                  <div>
+                    <div className="font-medium">{v.name}</div>
+                    <div className="text-sm text-gray-600">{attrList.length > 0 ? attrList.join(' • ') : 'Không có thuộc tính'}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-red-600">{formatCurrency(v.price)}</div>
+                    {v.originalPrice > v.price && <div className="text-sm text-gray-500 line-through">{formatCurrency(v.originalPrice)}</div>}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold">Cấu hình sản phẩm</h3>
+      <div className="space-y-4">
+        {Object.keys(attributeGroups).map((groupName) => (
+          <div key={groupName}>
+            <div className="text-sm text-gray-600 mb-2 font-medium">{groupName}</div>
+            <div className="flex flex-wrap gap-2">
+              {attributeGroups[groupName].map((val) => {
+                const available = isValueAvailable(groupName, val);
+                const isActive = selectedAttrs[groupName] === val;
+                return (
+                  <button
+                    key={val}
+                    onClick={() => onChoose(groupName, val)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChoose(groupName, val); } }}
+                    /* role implicit for button element */
+                    aria-pressed={isActive}
+                    className={`relative px-3 py-1 rounded-md border ${isActive ? 'bg-white text-red-600 border-red-500 shadow-sm' : available ? 'border-gray-300 text-gray-700 hover:bg-gray-100' : 'border-gray-200 text-gray-300 cursor-not-allowed'}`}
+                    disabled={!available}
+                  >
+                    {val}
+                    {isActive && (
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-xs shadow">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        <div className="p-4 border rounded-lg bg-gray-50">
+          {selectedVariant ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-600">Phiên bản đã chọn</div>
+                <div className="text-lg font-semibold text-red-600">{formatCurrency(selectedVariant.price)}</div>
+                {selectedVariant.originalPrice > selectedVariant.price && (
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-gray-500 line-through">{formatCurrency(selectedVariant.originalPrice)}</div>
+                    <div className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">-{selectedVariant.discountPercent}%</div>
+                  </div>
+                )}
+              </div>
+              <div className="text-right text-sm text-gray-600">Còn {selectedVariant.stock} sản phẩm</div>
+            </div>
+          ) : (
+            <div className="text-gray-600">Vui lòng chọn đầy đủ thuộc tính để xem giá và tồn kho.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, onToggleFavorite, onToggleWishlist }) => {
   const { addToCart, isInCart, getItemQuantity } = useCart();
@@ -20,14 +186,29 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
   const params = useParams();
   useEffect(() => {
     const id = params?.id;
-    if (id && (!initialProduct || (!initialProduct.id && !initialProduct.maSanPham))) {
+    const needFetchForInitial = initialProduct && !(Array.isArray(initialProduct.bienThe) ? initialProduct.bienThe.length > 0 : (Array.isArray(initialProduct.variants) ? initialProduct.variants.length > 0 : false));
+    if (id) {
       (async () => {
         try {
-          // Gọi API mới để lấy chi tiết đầy đủ với biến thể và giảm giá
+          // Gọi API mới để lấy chi tiết đầy đủ với biến thể và giảm giá khi mounted via route
           const res = await api.get(`/api/products/${id}/detail`);
           setProductState(res?.data ?? res);
         } catch (err) {
           console.error('Failed to fetch product detail', err);
+        }
+      })();
+    } else if (needFetchForInitial) {
+      // If component was mounted with an initial product (from list) but it lacks full variant details,
+      // fetch the full detail by maSanPham so configurator has variants/attributes to render.
+      (async () => {
+        try {
+          const pid = initialProduct.maSanPham ?? initialProduct.id ?? initialProduct.maSanPham;
+          if (pid) {
+            const res = await api.get(`/api/products/${pid}/detail`);
+            setProductState(res?.data ?? res);
+          }
+        } catch (err) {
+          console.error('Failed to fetch product detail for initial product', err);
         }
       })();
     }
@@ -36,6 +217,10 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 5, title: '', content: '', name: '', photos: [] });
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [availableVouchers, setAvailableVouchers] = useState([]);
+
+  // Stable product id used by several hooks to avoid complex expressions in deps
+  const productIdForHooks = productState?.maSanPham ?? productState?.id ?? null;
 
   const handleVariantSelect = (variant) => {
     // normalize variant fields to a predictable shape
@@ -101,6 +286,70 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
       }
     }
   }, [productState]);
+
+  // Save 'recently viewed products' to localStorage whenever productState loads
+  useEffect(() => {
+    try {
+      const pid = productState?.maSanPham ?? productState?.id;
+      if (!pid) return;
+      const storageKey = 'recentlyViewedProducts';
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      // prepare a lightweight preview object
+      const preview = {
+        id: pid,
+        name: productState.tenSanPham ?? productState.name,
+        image: Array.isArray(productState.hinhAnh) ? productState.hinhAnh[0] : (Array.isArray(productState.images) ? productState.images[0] : productState.image),
+        price: productState.giaBan ?? productState.gia ?? productState.price ?? null,
+        priceAfterDiscount: productState.giaSauGiam ?? null,
+        ts: Date.now()
+      };
+      // remove existing entry if present
+      const filtered = existing.filter(e => String(e.id) !== String(preview.id));
+      filtered.unshift(preview);
+      const cap = 12;
+      const out = filtered.slice(0, cap);
+      localStorage.setItem(storageKey, JSON.stringify(out));
+    } catch (e) {
+      console.debug('Failed to persist recently viewed', e);
+    }
+  }, [
+    productIdForHooks,
+    // include these product fields so the effect re-runs when the product preview values change
+    productState?.maSanPham,
+    productState?.id,
+    productState?.tenSanPham,
+  productState?.name,
+    productState?.hinhAnh,
+    productState?.images,
+    productState?.image,
+    productState?.gia,
+    productState?.price,
+    productState?.giaBan,
+    productState?.giaSauGiam
+  ]);
+
+  // Fetch applicable vouchers for the product (fallback to global vouchers)
+  useEffect(() => {
+    const pid = productState?.maSanPham ?? productState?.id;
+    (async () => {
+      try {
+        if (pid) {
+          try {
+            const resp = await api.get(`/api/vouchers/for-product?productId=${pid}`);
+            setAvailableVouchers(resp || []);
+            return;
+          } catch (e) {
+            console.debug('No product-specific vouchers endpoint or none found, falling back', e);
+          }
+        }
+        // fallback to all vouchers
+        const all = await api.get('/api/vouchers');
+        setAvailableVouchers(all || []);
+      } catch (err) {
+        console.error('Failed to fetch vouchers', err);
+      }
+    })();
+  }, [productIdForHooks, productState?.id, productState?.maSanPham]);
 
   const handleAddToCart = () => {
     // Check if variant is selected
@@ -248,6 +497,8 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
   };
 
   const handleDeleteReview = async (reviewId) => {
+    // Using native confirm is acceptable here; disable ESLint rule for this line
+    // eslint-disable-next-line no-restricted-globals
     if (!confirm('Bạn có chắc muốn xóa đánh giá này?')) return;
     try {
       const rid = typeof reviewId === 'object' ? (reviewId.id ?? reviewId.maDanhGia ?? reviewId.ma_danh_gia) : reviewId;
@@ -368,6 +619,20 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                   </>
                 )}
               </div>
+              {/* Vouchers available */}
+              {availableVouchers && availableVouchers.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-sm text-gray-600">Voucher áp dụng</div>
+                  <div className="flex flex-wrap gap-2">
+                    {availableVouchers.map((v) => (
+                      <div key={v.id ?? v.maVoucher ?? v.code} className="px-3 py-1 border rounded-md bg-white text-sm text-gray-800">
+                        <div className="font-medium">{v.ten || v.title || v.code}</div>
+                        {v.giaTri && <div className="text-xs text-gray-500">Giảm: {v.giaTri} {v.kieuTien ? v.kieuTien : 'VND'}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div className="flex items-center gap-2">
                 {activeStock > 0 ? (
@@ -385,72 +650,91 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
             </div>
           </div>
 
-          {/* Variants Selection */}
-          {((productState.bienThe || productState.variants) || []).length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Chọn phiên bản:</h3>
-              <div className="space-y-3">
-                {(productState.bienThe || productState.variants || []).map((variantRaw) => {
-                  const v = normalizeVariant(variantRaw);
-                  const isSelected = selectedVariant && (selectedVariant.id === v.id || selectedVariant.maBienThe === v.id);
-                  return (
-                    <div
-                      key={v.id ?? JSON.stringify(v)}
-                      onClick={() => handleVariantSelect(variantRaw)}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">{v.name}</div>
-                          {/* Hiển thị thuộc tính của biến thể */}
-                          {v.attributes && v.attributes.length > 0 && (
-                            <div className="text-sm text-gray-600 mt-1">
-                              {v.attributes.map((attr, idx) => (
-                                <span key={idx}>
-                                  {attr.tenThuocTinh}: <span className="font-medium">{attr.giaTri}</span>
-                                  {idx < v.attributes.length - 1 ? ' • ' : ''}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {/* Fallback: show old format if no attributes array */}
-                          {(!v.attributes || v.attributes.length === 0) && variantRaw.mauSac && (
-                            <div className="text-sm text-gray-600">{variantRaw.mauSac}{variantRaw.kichThuoc ? ' • ' + variantRaw.kichThuoc : ''}</div>
-                          )}
-                          {/* Hiển thị giảm giá nếu có */}
-                          {v.discount && (
-                            <div className="text-xs text-green-600 mt-1">
-                              🎉 {v.discount.tenChuongTrinh}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="flex flex-col items-end gap-1">
-                            <div className="font-semibold text-red-600">
-                              {formatCurrency(v.price)}
-                            </div>
-                            {v.originalPrice > v.price && (
-                              <>
-                                <div className="text-sm text-gray-500 line-through">
-                                  {formatCurrency(v.originalPrice)}
-                                </div>
-                                <div className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">
-                                  -{v.discountPercent}%
-                                </div>
-                              </>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1">Còn {v.stock} sản phẩm</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* Variants Selection: Configurator (attribute groups) */}
+          {((productState.bienThe || productState.variants) || []).length > 0 && (() => {
+            const variantsArr = productState.bienThe || productState.variants || [];
+
+            // Build attribute groups from variants: { attributeName: Set(values) }
+            const buildAttributeGroups = (variants) => {
+              const groups = {};
+              variants.forEach(raw => {
+                const v = normalizeVariant(raw);
+                const attrs = v.attributes || [];
+                attrs.forEach((a) => {
+                  // Normalize attribute object shape
+                  const name = a.tenThuocTinh ?? a.name ?? a.label ?? a.ten ?? a.attributeName;
+                  const value = a.giaTri ?? a.value ?? a.val ?? a.gia_tri ?? a.attributeValue ?? a.valueLabel;
+                  if (!name) return;
+                  if (!groups[name]) groups[name] = new Set();
+                  groups[name].add(String(value ?? '').trim());
+                });
+              });
+              return groups;
+            };
+
+            // Convert set groups to arrays for rendering
+            const attributeGroups = (() => {
+              const g = buildAttributeGroups(variantsArr);
+              const out = {};
+              Object.keys(g).forEach(k => { out[k] = Array.from(g[k]).filter(Boolean); });
+              return out;
+            })();
+
+            // Build a map for variant attribute lookup
+            const variantMatchesAttributes = (variantRaw, selectedAttrs) => {
+              const v = normalizeVariant(variantRaw);
+              const attrs = (v.attributes || []).map(a => ({
+                name: ((a.tenThuocTinh ?? a.name ?? a.label ?? a.ten ?? a.attributeName) || '').trim(),
+                value: String(a.giaTri ?? a.value ?? a.val ?? a.gia_tri ?? a.attributeValue ?? a.valueLabel ?? '').trim()
+              }));
+              const map = {};
+              attrs.forEach(a => { if (a.name) map[a.name] = a.value; });
+
+              // Every selected attribute must match variant's attribute value
+              for (const [k, vSel] of Object.entries(selectedAttrs)) {
+                if (!vSel) return false; // not selected yet, don't match
+                if (!map.hasOwnProperty(k)) return false;
+                if (String(map[k]) !== String(vSel)) return false;
+              }
+              return true;
+            };
+
+            // Helper to find a variant that exactly matches all selected attributes (when all groups selected)
+            const findMatchingVariant = (selectedAttrs) => {
+              // If no groups, return null
+              const groupKeys = Object.keys(attributeGroups);
+              if (groupKeys.length === 0) return null;
+
+              // If not all selected, try find a unique match for partial selection if possible
+              const matches = variantsArr.filter(vr => variantMatchesAttributes(vr, selectedAttrs));
+              if (matches.length === 1) return normalizeVariant(matches[0]);
+
+              // If all groups selected, require exact match
+              const allSelected = groupKeys.every(k => selectedAttrs[k]);
+              if (allSelected && matches.length > 0) return normalizeVariant(matches[0]);
+              return null;
+            };
+
+            // Local state for selected attribute values (object) - lift to component state
+            // We'll use a temporary ref-like pattern by reading from selectedAttributes state defined below
+            return (
+              <>
+                <AttributeConfigurator
+                  variants={variantsArr}
+                  attributeGroups={attributeGroups}
+                  selectedVariant={selectedVariant}
+                  setSelectedVariant={setSelectedVariant}
+                  normalizeVariant={normalizeVariant}
+                  variantMatchesAttributes={variantMatchesAttributes}
+                  findMatchingVariant={findMatchingVariant}
+                  handleVariantSelect={handleVariantSelect}
+                  formatCurrency={formatCurrency}
+                />
+
+                {/* Full variant list removed - UI now relies on AttributeConfigurator and SKU fallback */}
+              </>
+            );
+          })()}
 
           {/* Quantity & Actions */}
           <div className="space-y-4">
@@ -464,8 +748,8 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
                     Đã có {getItemQuantity(selectedVariant.id)} trong giỏ
                   </span>
                 )}
-              </div>
-              <div className="flex items-center gap-3">
+        </div>
+        <div className="flex items-center gap-3">
                 <div className="flex items-center border rounded-lg">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -602,6 +886,71 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
 
           {activeTab === 'specifications' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Variant attributes: prefer selectedVariant attributes, otherwise aggregate from all variants */}
+              {(() => {
+                const variantsArr = Array.isArray(productState.bienThe) ? productState.bienThe : (Array.isArray(productState.variants) ? productState.variants : []);
+                // helper to extract name/value from attribute object (defensive: avoid mixing ?? and ||)
+                const extract = (a) => {
+                  const rawName = (a.tenThuocTinh ?? a.name ?? a.label ?? a.ten ?? a.attributeName ?? '');
+                  const name = (rawName == null) ? '' : String(rawName);
+                  const value = String(a.giaTri ?? a.value ?? a.val ?? a.gia_tri ?? a.attributeValue ?? a.valueLabel ?? '');
+                  return { name, value };
+                };
+                // If selectedVariant, show its attributes directly
+                if (selectedVariant && selectedVariant.attributes && selectedVariant.attributes.length > 0) {
+                  return (
+                    <div className="col-span-2">
+                      <h4 className="text-lg font-semibold mb-3">Thuộc tính phiên bản đang chọn</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {selectedVariant.attributes.map((a, i) => {
+                          const ex = extract(a);
+                          return (
+                            <div key={`sel-attr-${i}`} className="flex py-2 border-b border-gray-200">
+                              <div className="w-1/2 text-gray-600 font-medium">{ex.name}:</div>
+                              <div className="w-1/2 text-gray-900">{ex.value}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // No selected variant -> aggregate values for each attribute name across variants
+                if (variantsArr.length > 0) {
+                  const map = {};
+                  variantsArr.forEach(raw => {
+                    const v = normalizeVariant(raw);
+                    (v.attributes || []).forEach(a => {
+                      const rawName = (a.tenThuocTinh ?? a.name ?? a.label ?? a.ten ?? a.attributeName);
+                      const name = rawName == null ? '' : String(rawName);
+                      const value = String(a.giaTri ?? a.value ?? a.val ?? a.gia_tri ?? a.attributeValue ?? a.valueLabel ?? '');
+                      if (!name) return;
+                      if (!map[name]) map[name] = new Set();
+                      if (value) map[name].add(value);
+                    });
+                  });
+                  const entries = Object.keys(map).map(k => ({ name: k, values: Array.from(map[k]) }));
+                  if (entries.length > 0) {
+                    return (
+                      <div className="col-span-2">
+                        <h4 className="text-lg font-semibold mb-3">Thuộc tính các biến thể</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {entries.map((e) => (
+                            <div key={`agg-${e.name}`} className="flex py-2 border-b border-gray-200">
+                              <div className="w-1/2 text-gray-600 font-medium">{e.name}:</div>
+                              <div className="w-1/2 text-gray-900">{e.values.join(', ')}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                }
+
+                return null;
+              })()}
+
               {productState.thongSoKyThuat && Array.isArray(productState.thongSoKyThuat) ? (
                 // New format: array of {tenThuocTinh, giaTriList}
                 productState.thongSoKyThuat.map((spec, index) => (
@@ -840,6 +1189,37 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
             Không có sản phẩm liên quan
           </div>
         )}
+      </div>
+
+      {/* Recently Viewed Products */}
+      <div className="border-t pt-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Sản phẩm đã xem</h2>
+        {(() => {
+          try {
+            const raw = JSON.parse(localStorage.getItem('recentlyViewedProducts') || '[]');
+            const arr = Array.isArray(raw) ? raw.filter(r => r && (r.id || r.maSanPham) && String(r.id) !== String(productState.maSanPham ?? productState.id)) : [];
+            if (!arr || arr.length === 0) return (<div className="text-center text-gray-500 py-8">Bạn chưa xem sản phẩm nào.</div>);
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {arr.map(item => (
+                  <div key={item.id} className="bg-white border rounded-lg overflow-hidden cursor-pointer" onClick={() => { window.location.href = `/shop/products/${item.id}`; }}>
+                    {(() => {
+                      const src = resolveImageUrl(item.image);
+                      if (src) return (<img src={src} alt={item.name} className="w-full h-40 object-cover" />);
+                      return (<div className="w-full h-40 bg-gray-100 flex items-center justify-center"><span className="text-gray-400">No image</span></div>);
+                    })()}
+                    <div className="p-3">
+                      <div className="font-medium text-sm line-clamp-2 h-10">{item.name}</div>
+                      <div className="text-red-600 font-semibold mt-2">{item.priceAfterDiscount ? formatCurrency(item.priceAfterDiscount) : (item.price ? formatCurrency(item.price) : '')}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          } catch (e) {
+            return (<div className="text-center text-gray-500 py-8">Bạn chưa xem sản phẩm nào.</div>);
+          }
+        })()}
       </div>
 
       {/* Review Modal */}

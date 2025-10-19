@@ -484,7 +484,8 @@ public class ProductServiceImpl implements IProductService {
         @Override
         public List<BienTheSanPham> getVariantsByProductId(Integer productId) {
                 SanPham sp = findProductById(productId);
-                return bienTheRepository.findBySanPham_MaSanPham(sp.getMaSanPham());
+                // Use the fetch-join repository method so BienTheThuocTinhs (and their ThuocTinh) are loaded
+                return bienTheRepository.findBySanPham_MaSanPhamWithAttributes(sp.getMaSanPham());
         }
 
         @Override

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IoSearch, IoCart, IoHeart, IoStar, IoGrid, IoList, IoEye } from 'react-icons/io5';
 import CustomerProductDetail from './CustomerProductDetail';
@@ -117,10 +117,8 @@ const CustomerShop = () => {
       category: product.danhMuc?.tenDanhMuc ?? product.category ?? '',
       price,
       originalPrice,
-  // percentage value (if available or computed) and absolute amount
-  discount: Number(product.phanTramGiamGia ?? product.giam_gia ?? 0) || 0,
-  discountPercent: discountPercent > 0 ? discountPercent : null,
-  discountAmount,
+  // percentage value (if available or computed) and absolute amount —
+  // (derived later below to prefer variant-level discounts)
   // Support multiple possible backend field names for rating/review count
   rating: Number(product.averageRating ?? product.danhGia ?? product.rating ?? product.review ?? product.reviews ?? 0) || 0,
   reviews: Number(product.reviewCount ?? product.soLuotDanhGia ?? product.soLuongDanhGia ?? product.reviews ?? product.review ?? 0) || 0,
@@ -407,6 +405,10 @@ const CustomerShop = () => {
   const [products, setProducts] = useState([
     // start empty and rely on API fetch
   ]);
+  // keep a ref to products so some effects can read the latest value
+  // without re-subscribing to products changes (prevents repeated fetches)
+  const productsRef = useRef(products);
+  useEffect(() => { productsRef.current = products; }, [products]);
   // Keep API categories in a separate state so we can merge product counts into them
   const [apiCategories, setApiCategories] = useState([]);
 
@@ -458,13 +460,19 @@ const CustomerShop = () => {
   // If products don't include category info (categoryId/category empty for all items),
   // fall back to asking the backend for products of the selected category.
   useEffect(() => {
-    const shouldProductsProvideCategory = products && products.length > 0 && products.some(p => (p.categoryId || '').toString().trim() !== '' || (p.category || '').toString().trim() !== '');
-    if (shouldProductsProvideCategory) return; // client-side filtering is fine
+    // If products already include usable category info, we don't need to hit the backend each time the products state updates.
+    // Only run this effect when the selectedCategory changes (see dependency array below).
+  const currentProducts = productsRef.current;
+  const shouldProductsProvideCategory = currentProducts && currentProducts.length > 0 && currentProducts.some(p => (p.categoryId || '').toString().trim() !== '' || (p.category || '').toString().trim() !== '');
+  if (shouldProductsProvideCategory) return; // client-side filtering is fine
 
-    // If no products yet, nothing to do
-    if (!products || products.length === 0) return;
+  // If no products yet, nothing to do here — initial fetch runs on mount in a separate effect.
+  if (!currentProducts || currentProducts.length === 0) return;
 
-    // When category is 'all', refetch the full shop list
+  // Avoid unnecessary reload when selecting 'all' if we already have a non-empty products list
+  if (selectedCategory === 'all' && currentProducts && currentProducts.length > 0) return;
+
+    // When category is 'all' or a specific category is selected, refetch the list scoped to that category
     const fetchForCategory = async (cat) => {
       try {
         // Try several common query param names the backend might support
@@ -528,7 +536,7 @@ const CustomerShop = () => {
         } catch (e) {}
       })();
     }
-  }, [selectedCategory, products]);
+  }, [selectedCategory]);
 
   // Filter by search term and category, then sort according to sortBy
   const filteredProducts = (() => {
@@ -583,20 +591,34 @@ const CustomerShop = () => {
     }).format(price);
   };
 
-  // Debug helper: when selectedCategory or products change, log matching stats to help tune filters
+  // Debug helper: when selectedCategory, products or searchTerm change, log matching stats to help tune filters
   useEffect(() => {
     try {
       const cat = (selectedCategory || '').toString().toLowerCase();
-      const total = products.length;
-      const exactId = products.filter(p => (p.categoryId ?? '').toString().toLowerCase() === cat).length;
-      const exactName = products.filter(p => (p.category ?? '').toString().toLowerCase() === cat).length;
-      const includesName = products.filter(p => (p.category ?? '').toString().toLowerCase().includes(cat)).length;
-  // eslint-disable-next-line no-console
-  console.log('CustomerShop: category debug ' + JSON.stringify({ selectedCategory: cat, total, exactId, exactName, includesName, shown: filteredProducts.length }, null, 2));
+  const currentProducts = productsRef.current || [];
+  const total = currentProducts.length;
+  const exactId = currentProducts.filter(p => (p.categoryId ?? '').toString().toLowerCase() === cat).length;
+  const exactName = currentProducts.filter(p => (p.category ?? '').toString().toLowerCase() === cat).length;
+  const includesName = currentProducts.filter(p => (p.category ?? '').toString().toLowerCase().includes(cat)).length;
+
+      // compute shown (apply same category + searchTerm filtering used by filteredProducts)
+      const term = (searchTerm || '').toString().toLowerCase();
+  const shown = currentProducts.filter(product => {
+        const name = (product.name || '').toString().toLowerCase();
+        const matchesSearch = term === '' || name.includes(term);
+        if (cat === 'all') return matchesSearch;
+        const prodCatId = (product.categoryId ?? '').toString().toLowerCase();
+        const prodCatName = (product.category ?? '').toString().toLowerCase();
+        const matchesCategory = (prodCatId && prodCatId === cat) || (prodCatName && prodCatName === cat) || (prodCatName && prodCatName.includes(cat));
+        return matchesSearch && matchesCategory;
+      }).length;
+
+      // eslint-disable-next-line no-console
+      console.log('CustomerShop: category debug ' + JSON.stringify({ selectedCategory: cat, total, exactId, exactName, includesName, shown }, null, 2));
     } catch (e) {
       // ignore
     }
-  }, [selectedCategory, products, filteredProducts]);
+  }, [selectedCategory, searchTerm]);
 
   const toggleFavorite = async (productOrId) => {
     try {

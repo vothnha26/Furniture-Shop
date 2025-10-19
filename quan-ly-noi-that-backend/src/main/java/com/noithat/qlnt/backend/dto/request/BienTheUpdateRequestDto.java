@@ -20,7 +20,9 @@ public record BienTheUpdateRequestDto(
     
     @NotNull(message = "Số lượng tồn không được để trống")
     @Min(value = 0, message = "Số lượng tồn không được âm")
-    Integer soLuongTon
-    ,
+    Integer soLuongTon,
+    
+    String trangThaiKho,
+    
     List<ThuocTinhGiaTriTuDoDto> thuocTinhGiaTriTuDo
 ) {}

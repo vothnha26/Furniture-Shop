@@ -13,13 +13,13 @@ import CustomerManagement from './components/admin/customers/CustomerManagement'
 import Dashboard from './components/admin/system/Dashboard';
 import DiscountManagement from './components/admin/products/DiscountManagement';
 import Notifications from './components/admin/system/Notifications';
+import EmailCampaign from './components/admin/system/EmailCampaign';
 import ProductManagement from './components/admin/products/ProductManagement';
 import ProductVariantManagement from './components/admin/products/ProductVariantManagement';
 import ImageManagement from './components/admin/products/ImageManagement';
 // PromotionManagement replaced by DiscountManagement (canonical UI)
 import ReportsAnalytics from './components/admin/system/ReportsAnalytics';
 import Settings from './components/admin/system/Settings';
-import VIPManagement from './components/admin/customers/VIPManagement';
 import VoucherManagement from './components/admin/products/VoucherManagement';
 
 // Import customer components (folder is `customers`)
@@ -47,6 +47,7 @@ import InventoryManagement from './components/staff/inventory/InventoryManagemen
 import OrderManagement from './components/staff/orders/OrderManagement';
 import SalesManagement from './components/staff/orders/SalesManagement';
 import StaffLayoutBase from './components/staff/StaffLayout';
+import StaffDashboard from './components/staff/StaffDashboard';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import InvoiceManagement from './components/staff/orders/InvoiceManagement';
 import OrderDetailManagement from './components/staff/orders/OrderDetailManagement';
@@ -189,6 +190,7 @@ const AdminLayoutBase = ({ children }) => {
                     <NavLink to="/admin/attributes" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Thuộc tính</NavLink>
                     <NavLink to="/admin/categories" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Danh mục</NavLink>
                     <NavLink to="/admin/collections" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Collections</NavLink>
+                    <NavLink to="/admin/inventory" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Kho</NavLink>
                   </div>
                 </div>
               </div>
@@ -222,7 +224,8 @@ const AdminLayoutBase = ({ children }) => {
                 <div className={`${openGroups.customers ? 'block' : 'hidden'} bg-white`}>
                   <div className="pl-12 pr-4 py-2 space-y-1">
                     <NavLink to="/admin/customers" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Danh sách khách</NavLink>
-                    <NavLink to="/admin/customers/vip" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>VIP</NavLink>
+                    {/* VIP used to point to /admin/customers/vip - now route to membership tiers (membership management) */}
+                    <NavLink to="/admin/membership/tiers" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>VIP</NavLink>
                   </div>
                 </div>
               </div>
@@ -239,6 +242,7 @@ const AdminLayoutBase = ({ children }) => {
                 <div className={`${openGroups.system ? 'block' : 'hidden'} bg-white`}>
                   <div className="pl-12 pr-4 py-2 space-y-1">
                     <NavLink to="/admin/notifications" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Thông báo</NavLink>
+                    <NavLink to="/admin/emails" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Gửi email</NavLink>
                     <NavLink to="/admin/account" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Tài khoản</NavLink>
                     <NavLink to="/admin/settings" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Cài đặt</NavLink>
                     <NavLink to="/admin/reports" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Báo cáo</NavLink>
@@ -482,13 +486,18 @@ const App = () => {
             <Route path="customers/:id/orders" element={<CustomerManagement />} />
             <Route path="customers/:id/points" element={<CustomerManagement />} />
 
-            {/* VIP & Membership */}
-            <Route path="vip" element={<VIPManagement />} />
-            <Route path="vip/levels" element={<VIPManagement />} />
-            <Route path="vip/levels/add" element={<VIPManagement />} />
-            <Route path="vip/levels/:id" element={<VIPManagement />} />
-            <Route path="vip/customers" element={<VIPManagement />} />
-            <Route path="membership" element={<Navigate to="/admin/vip" replace />} />
+            {/* VIP & Membership (membership management moved to /admin/membership/tiers) */}
+            <Route path="vip" element={<Navigate to="/admin/membership/tiers" replace />} />
+            <Route path="vip/levels" element={<Navigate to="/admin/membership/tiers" replace />} />
+            <Route path="vip/levels/add" element={<Navigate to="/admin/membership/tiers/add" replace />} />
+            <Route path="vip/levels/:id" element={<Navigate to="/admin/membership/tiers/:id" replace />} />
+            <Route path="vip/customers" element={<Navigate to="/admin/membership/tiers" replace />} />
+            <Route path="membership/*" element={<Navigate to="/admin/membership/tiers" replace />} />
+
+            {/* Membership tiers management */}
+            <Route path="membership/tiers" element={<MembershipTierManagement />} />
+            <Route path="membership/tiers/add" element={<MembershipTierManagement />} />
+            <Route path="membership/tiers/:id" element={<MembershipTierManagement />} />
 
             {/* Orders */}
             <Route path="orders" element={<OrderManagement />} />
@@ -570,6 +579,7 @@ const App = () => {
 
             {/* Notifications */}
             <Route path="notifications" element={<Notifications />} />
+            <Route path="emails" element={<EmailCampaign />} />
             <Route path="notifications/send" element={<Notifications />} />
 
             {/* Backend explorer */}
@@ -579,36 +589,46 @@ const App = () => {
 
 
           {/* ============================================
-            STAFF ROUTES - Nhân viên
+            STAFF ROUTES - Nhân viên (nested under /staff/*)
+            These routes are wrapped by <StaffLayout /> which includes a ProtectedRoute
+            so role checks are applied consistently for all nested staff pages.
         ============================================ */}
 
-          {/* Staff Dashboard */}
-          <Route path="/staff" element={<StaffLayout />} />
-          <Route path="/staff/dashboard" element={<StaffLayout />} />
+          <Route path="/staff/*" element={<StaffLayout />}>
+            {/* index -> /staff or /staff/ */}
+            <Route index element={<StaffDashboard />} />
+            <Route path="dashboard" element={<StaffDashboard />} />
 
-          {/* Staff Order Management */}
-          <Route path="/staff/orders" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-          <Route path="/staff/orders/:id" element={<StaffLayout><OrderDetailManagement /></StaffLayout>} />
-          <Route path="/staff/orders/pending" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-          <Route path="/staff/orders/processing" element={<StaffLayout><OrderManagement /></StaffLayout>} />
-          <Route path="/staff/orders/completed" element={<StaffLayout><OrderManagement /></StaffLayout>} />
+            {/* Staff Order Management - use Sales UI under /staff/sales; keep old /staff/orders routes redirecting */}
+            <Route path="orders" element={<Navigate to="/staff/sales" replace />} />
+            <Route path="orders/:id" element={<OrderDetailManagement />} />
+            <Route path="orders/pending" element={<Navigate to="/staff/sales" replace />} />
+            <Route path="orders/processing" element={<Navigate to="/staff/sales" replace />} />
+            <Route path="orders/completed" element={<Navigate to="/staff/sales" replace />} />
 
-          {/* Staff Sales */}
-          <Route path="/staff/sales" element={<StaffLayout><SalesManagement /></StaffLayout>} />
-          <Route path="/staff/sales/pos" element={<StaffLayout><SalesManagement /></StaffLayout>} />
+            {/* Staff Sales */}
+            <Route path="sales" element={<SalesManagement />} />
+            <Route path="sales/pos" element={<SalesManagement />} />
+            <Route path="sales/statistics" element={<SalesManagement />} />
 
-          {/* Staff Invoices */}
-          <Route path="/staff/invoices" element={<StaffLayout><InvoiceManagement /></StaffLayout>} />
-          <Route path="/staff/invoices/:id" element={<StaffLayout><InvoiceManagement /></StaffLayout>} />
+            {/* Staff Invoices */}
+            <Route path="invoices" element={<InvoiceManagement />} />
+            <Route path="invoices/:id" element={<InvoiceManagement />} />
 
-          {/* Staff Payments */}
-          <Route path="/staff/payments" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
-          <Route path="/staff/payments/:id" element={<StaffLayout><PaymentTransactionManagement /></StaffLayout>} />
+            {/* Staff Payments */}
+            <Route path="payments" element={<PaymentTransactionManagement />} />
+            <Route path="payments/:id" element={<PaymentTransactionManagement />} />
 
-          {/* Staff Inventory */}
-          <Route path="/staff/inventory" element={<StaffLayout><InventoryManagement /></StaffLayout>} />
-          <Route path="/staff/inventory/alerts" element={<StaffLayout><InventoryAlerts /></StaffLayout>} />
-          <Route path="/staff/inventory/check" element={<StaffLayout><InventoryManagement /></StaffLayout>} />
+            {/* Staff Inventory */}
+            <Route path="inventory" element={<InventoryManagement />} />
+            <Route path="inventory/alerts" element={<InventoryAlerts />} />
+            <Route path="inventory/check" element={<InventoryManagement />} />
+          </Route>
+
+          {/* Redirect legacy/public sales routes to /staff/sales so protection applies */}
+          <Route path="/sales" element={<Navigate to="/staff/sales" replace />} />
+          <Route path="/sales/pos" element={<Navigate to="/staff/sales/pos" replace />} />
+          <Route path="/sales/statistics" element={<Navigate to="/staff/sales/statistics" replace />} />
 
 
           {/* ============================================

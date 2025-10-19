@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Outlet } from 'react-router-dom';
 import { IoLogOut, IoMenu, IoClose, IoNotifications } from 'react-icons/io5';
 import StaffDashboard from './StaffDashboard';
 import WarehouseDashboard from '../shared/WarehouseDashboard';
 import CustomerManagement from '../admin/customers/CustomerManagement';
 import OrderManagement from './orders/OrderManagement';
-import ProductManagement from '../admin/products/ProductManagement';
 import InventoryManagement from './inventory/InventoryManagement';
 import CustomerSupport from './support/CustomerSupport';
 import LiveChat from '../shared/LiveChat';
 // PromotionManagement replaced by DiscountManagement in menus
-import VIPManagement from '../admin/customers/VIPManagement';
 import SalesManagement from './orders/SalesManagement';
-import ReportsAnalytics from '../admin/system/ReportsAnalytics';
 import InventoryAlerts from './inventory/InventoryAlerts';
 import SupplierManagement from '../shared/SupplierManagement';
 import ShippingTracking from './orders/ShippingTracking';
@@ -35,8 +33,7 @@ import '../../animations.css';
 const StaffLayout = ({ userRole = 'staff', children }) => {
   const [currentView, setCurrentView] = useState('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  // category dropdown removed — state variables not required
   // Persist which child is active and which groups are open
   const [activeItem, setActiveItem] = useState(() => {
     try {
@@ -60,13 +57,13 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     'Quản lý': [
       { id: 'customers', name: '👤 Khách hàng', component: CustomerManagement },
       { id: 'orders', name: '📋 Đơn hàng', component: OrderManagement },
-      { id: 'products', name: '📦 Sản phẩm', component: ProductManagement },
-      { id: 'vip', name: '💎 VIP', component: VIPManagement }
+    ],
+    'Kho': [
+      { id: 'inventory', name: '📦 Kho', component: InventoryManagement },
+      { id: 'alerts', name: '⚠️ Cảnh báo', component: InventoryAlerts }
     ],
     'Bán hàng': [
       { id: 'sales', name: '💰 Bán hàng', component: SalesManagement },
-      { id: 'promotions', name: '🎁 Khuyến mãi', component: require('../admin/products/DiscountManagement').default },
-      { id: 'reports', name: '📈 Báo cáo', component: ReportsAnalytics }
     ],
     'Hỗ trợ': [
       { id: 'support', name: '🎧 Hỗ trợ', component: CustomerSupport },
@@ -78,7 +75,7 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     'Kho hàng': [
       { id: 'inventory', name: '📊 Tồn kho', component: InventoryManagement },
       { id: 'alerts', name: '⚠️ Cảnh báo', component: InventoryAlerts },
-      { id: 'products', name: '📦 Sản phẩm', component: ProductManagement }
+    // products management is admin-only
     ],
     'Vận chuyển': [
       { id: 'orders', name: '📋 Đơn hàng', component: OrderManagement },
@@ -100,16 +97,7 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     ...Object.values(categories).flat()
   ];
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showCategoryDropdown && !event.target.closest('.category-dropdown')) {
-        setShowCategoryDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showCategoryDropdown]);
+  // (category dropdown removed)
 
   // Keep currentView in sync with activeItem when activeItem changes
   useEffect(() => {
@@ -132,11 +120,7 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     }
   };
 
-  const toggleGroup = (category) => {
-    const next = { ...openGroups, [category]: !openGroups[category] };
-    setOpenGroups(next);
-    persistOpenGroups(next);
-  };
+  // group toggling handled via selectView / openGroups persisted when selecting views
 
   const selectView = (id, category) => {
     setActiveItem(id);
@@ -152,9 +136,42 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     if (isMobileMenuOpen) setIsMobileMenuOpen(false);
   };
 
+  const navigate = useNavigate();
+
+  // map known view ids to routes under /staff
+  const idToRoute = (id) => {
+    const map = {
+      customers: '/staff',
+      orders: '/staff/sales',
+      products: '/staff',
+      vip: '/staff',
+      sales: '/staff/sales',
+      promotions: '/staff',
+      reports: '/staff',
+      support: '/staff/support',
+      livechat: '/staff/livechat',
+      inventory: '/staff/inventory',
+      alerts: '/staff/inventory/alerts',
+      shipping: '/staff/orders',
+      suppliers: '/staff/suppliers'
+    };
+    return map[id] || '/staff';
+  };
+
+  const navTo = (id, category) => {
+    const path = idToRoute(id);
+    selectView(id, category);
+    try { navigate(path); } catch (e) { /* ignore during SSR/test */ }
+  };
+
   const renderCurrentView = () => {
-    // If a routed child component was passed (e.g. <StaffLayout><InventoryManagement/></StaffLayout>), render it.
+    // If a routed child component was passed as prop (e.g. <StaffLayout><InventoryManagement/></StaffLayout>), render it.
     if (children) return children;
+    // If this component is used as a parent route (nested routes) render the Outlet so nested elements display.
+    // React Router will render matching child routes (e.g. /staff/dashboard) inside the Outlet.
+    // We only render the Outlet when there are no explicit `children` props provided.
+    if (!children) return <Outlet />;
+
     // Handle home page
     if (currentView === 'home') {
       return (
@@ -212,93 +229,19 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
               </div>
             </div>
 
-            {/* System Navigation */}
-            <div className="hidden md:flex gap-2">
-              {systemViews.map((view) => (
-                <button
-                  key={view.id}
-                  onClick={() => setCurrentView(view.id)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                    currentView === view.id
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  {view.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Category Dropdown */}
-            <div className="hidden md:block">
-              <div className="relative category-dropdown">
-                <button
-                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className="w-64 px-4 py-2 border border-gray-300 rounded-lg bg-white text-left focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {selectedCategory ? `📁 ${selectedCategory}` : '📁 Chọn danh mục...'}
-                </button>
-                
-                {showCategoryDropdown && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                    {Object.keys(categories).map((category) => (
-                          <div key={category}>
-                            <button
-                              onClick={() => {
-                                setSelectedCategory(category);
-                                setShowCategoryDropdown(false);
-                              }}
-                              className={`w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-900 border-b border-gray-200 ${
-                                openGroups[category] ? 'bg-gray-100' : ''
-                              }`}
-                            >
-                              📁 {category}
-                            </button>
-                            {selectedCategory === category && (
-                              <div className="bg-gray-50 p-2 space-y-1">
-                                {categories[category].map((view) => (
-                                  <button
-                                    key={view.id}
-                                    onClick={() => selectView(view.id, category)}
-                                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                                      activeItem === view.id
-                                        ? 'bg-primary text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-100'
-                                    }`}
-                                  >
-                                    {view.name}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                  </div>
-                )}
-                
-                {/* Show selected category's functions */}
-                {selectedCategory && (
-                  <div className="mt-2">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">
-                      Chức năng của {selectedCategory}:
-                    </h4>
-                    <div className="grid grid-cols-1 gap-2">
-                      {categories[selectedCategory].map((view) => (
-                        <button
-                          key={view.id}
-                          onClick={() => selectView(view.id, selectedCategory)}
-                          className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                            activeItem === view.id
-                              ? 'bg-primary text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {view.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* Compact title instead of system navigation */}
+            <div className="flex-1 flex items-center justify-center">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">{(function(){
+                  const sv = systemViews.find(v=>v.id===currentView);
+                  if(sv) return sv.name;
+                  for(const g in categories){
+                    const found = categories[g].find(x=>x.id===currentView);
+                    if(found) return found.name;
+                  }
+                  return 'Trang nhân viên';
+                })()}</h2>
+                <p className="text-sm text-gray-500">Quản lý nhanh các công việc nội bộ</p>
               </div>
             </div>
 
@@ -362,10 +305,39 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
         )}
       </header>
 
-      {/* Main Content */}
-      <main>
-        {renderCurrentView()}
-      </main>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+          {/* Left Sidebar for desktop */}
+          <aside className="hidden md:block md:col-span-1">
+            <div className="sticky top-20 bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+              <div className="text-sm font-semibold text-gray-700">Menu</div>
+              {Object.keys(categories).map((group) => (
+                <div key={group} className="">
+                  <div className="text-xs font-medium text-gray-500 mt-2 mb-1">{group}</div>
+                  <div className="space-y-1">
+                    {categories[group].map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => navTo(item.id, group)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                          activeItem === item.id ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* Main Content */}
+          <main className="md:col-span-5">
+            {renderCurrentView()}
+          </main>
+        </div>
+      </div>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white">

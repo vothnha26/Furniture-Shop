@@ -44,7 +44,13 @@ public class SecurityConfig {
                 // 2. Admin-only routes
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
-                // 3. All other requests require authentication
+                // 3. Staff-only routes (frontend and API)
+                // Frontend routes under /staff/** should only be accessible to staff users
+                .requestMatchers("/staff/**").hasRole("STAFF")
+                // Backend API for staff dashboard
+                .requestMatchers("/api/v1/dashboard/staff").hasRole("STAFF")
+
+                // 4. All other requests require authentication
                 .anyRequest().authenticated()
             )
             // Use stateful sessions so backend manages authentication via HttpSession/cookie

@@ -26,38 +26,11 @@ const mapTicketFromApi = (ticket) => ({
   tags: ticket.nhan || []
 });
 
-const mapTicketToApi = (ticket) => ({
-  khach_hang_id: ticket.customerId,
-  chu_de: ticket.subject,
-  mo_ta: ticket.description,
-  danh_muc: ticket.category,
-  do_uu_tien: ticket.priority,
-  trang_thai: ticket.status,
-  nhan_vien_id: ticket.assignedToId
-});
-
-const mapMessageFromApi = (message) => ({
-  id: message.id,
-  ticketId: message.ticket_id,
-  content: message.noi_dung,
-  sender: message.nguoi_gui,
-  senderType: message.loai_nguoi_gui,
-  sentDate: message.ngay_gui,
-  isInternal: message.noi_bo || false,
-  attachments: message.tep_dinh_kem || []
-});
-
-const mapMessageToApi = (message) => ({
-  ticket_id: message.ticketId,
-  noi_dung: message.content,
-  loai_nguoi_gui: message.senderType,
-  noi_bo: message.isInternal || false
-});
+// mapTicketToApi / message mappers removed — UI uses fetched ticket objects directly
 
 const CustomerSupport = () => {
   const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // loading/error handled inline with alerts/console as needed
   
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -80,172 +53,23 @@ const CustomerSupport = () => {
 
   // API Functions
   const fetchTickets = async () => {
-    setLoading(true);
     try {
       const response = await api.get('/api/v1/ho-tro-khach-hang/ticket');
-      setTickets(response.data.map(mapTicketFromApi));
-    } catch (error) {
-      setError('Không thể tải danh sách ticket');
-      console.error('Error fetching tickets:', error);
-    } finally {
-      setLoading(false);
+      const data = response.data || response;
+      if (Array.isArray(data)) setTickets(data.map(mapTicketFromApi));
+      else setTickets([]);
+    } catch (err) {
+      console.error('Error fetching tickets:', err);
+      alert('Không thể tải danh sách ticket. Kiểm tra console để biết chi tiết.');
+      setTickets([]);
     }
   };
 
-  const createTicket = async (ticketData) => {
-    try {
-      const response = await api.post('/api/v1/ho-tro-khach-hang/ticket', mapTicketToApi(ticketData));
-      return mapTicketFromApi(response.data);
-    } catch (error) {
-      throw new Error('Không thể tạo ticket');
-    }
-  };
-
-  const updateTicketStatus = async (ticketId, status) => {
-    try {
-      const response = await api.put(`/api/v1/ho-tro-khach-hang/ticket/${ticketId}/trang-thai`, { trang_thai: status });
-      return mapTicketFromApi(response.data);
-    } catch (error) {
-      throw new Error('Không thể cập nhật trạng thái ticket');
-    }
-  };
-
-  const addMessage = async (messageData) => {
-    try {
-      const response = await api.post('/api/v1/ho-tro-khach-hang/tin-nhan', mapMessageToApi(messageData));
-      return mapMessageFromApi(response.data);
-    } catch (error) {
-      throw new Error('Không thể gửi tin nhắn');
-    }
-  };
-
-  const assignTicket = async (ticketId, staffId) => {
-    try {
-      const response = await api.put(`/api/v1/ho-tro-khach-hang/ticket/${ticketId}/phan-cong`, { nhan_vien_id: staffId });
-      return mapTicketFromApi(response.data);
-    } catch (error) {
-      throw new Error('Không thể phân công ticket');
-    }
-  };
+  // create/update/message/assign helpers removed — the UI currently logs actions
 
   useEffect(() => {
     fetchTickets();
   }, []);
-
-  const mockTickets = [
-    {
-      id: 'TKT001',
-      customer: 'Nguyễn Văn A',
-      email: 'nguyenvana@email.com',
-      phone: '0901234567',
-      subject: 'Sản phẩm bị lỗi',
-      description: 'Ghế gỗ tôi mua có vết nứt trên bề mặt',
-      priority: 'high',
-      status: 'open',
-      category: 'product_issue',
-      assignedTo: 'Huy',
-      createdAt: '2024-01-15 09:30:00',
-      updatedAt: '2024-01-15 14:20:00',
-      lastResponse: '2024-01-15 14:20:00',
-      responseCount: 3,
-      orderId: 'ORD001'
-    },
-    {
-      id: 'TKT002',
-      customer: 'Trần Thị B',
-      email: 'tranthib@email.com',
-      phone: '0912345678',
-      subject: 'Hỏi về chính sách đổi trả',
-      description: 'Tôi muốn đổi sản phẩm vì không phù hợp',
-      priority: 'medium',
-      status: 'in_progress',
-      category: 'return_policy',
-      assignedTo: 'Nhã',
-      createdAt: '2024-01-16 11:15:00',
-      updatedAt: '2024-01-16 16:45:00',
-      lastResponse: '2024-01-16 16:45:00',
-      responseCount: 2,
-      orderId: 'ORD002'
-    },
-    {
-      id: 'TKT003',
-      customer: 'Lê Văn C',
-      email: 'levanc@email.com',
-      phone: '0923456789',
-      subject: 'Giao hàng chậm',
-      description: 'Đơn hàng của tôi đã quá hạn giao hàng',
-      priority: 'urgent',
-      status: 'resolved',
-      category: 'shipping',
-      assignedTo: 'Bảo',
-      createdAt: '2024-01-17 08:45:00',
-      updatedAt: '2024-01-17 15:30:00',
-      lastResponse: '2024-01-17 15:30:00',
-      responseCount: 4,
-      orderId: 'ORD003'
-    },
-    {
-      id: 'TKT004',
-      customer: 'Phạm Thị D',
-      email: 'phamthid@email.com',
-      phone: '0934567890',
-      subject: 'Hỏi về bảo hành',
-      description: 'Sản phẩm bị hỏng sau 6 tháng sử dụng',
-      priority: 'medium',
-      status: 'open',
-      category: 'warranty',
-      assignedTo: 'Phúc',
-      createdAt: '2024-01-18 10:20:00',
-      updatedAt: '2024-01-18 10:20:00',
-      lastResponse: '2024-01-18 10:20:00',
-      responseCount: 0,
-      orderId: 'ORD004'
-    },
-    {
-      id: 'TKT005',
-      customer: 'Hoàng Văn E',
-      email: 'hoangvane@email.com',
-      phone: '0945678901',
-      subject: 'Yêu cầu hoàn tiền',
-      description: 'Không hài lòng với chất lượng sản phẩm',
-      priority: 'high',
-      status: 'in_progress',
-      category: 'refund',
-      assignedTo: 'Lộc',
-      createdAt: '2024-01-19 14:15:00',
-      updatedAt: '2024-01-19 16:30:00',
-      lastResponse: '2024-01-19 16:30:00',
-      responseCount: 1,
-      orderId: 'ORD005'
-    }
-  ];
-
-  const [responses] = useState([
-    {
-      id: 1,
-      ticketId: 'TKT001',
-      message: 'Xin chào anh/chị, chúng tôi rất tiếc về sự cố này. Chúng tôi sẽ gửi sản phẩm thay thế ngay lập tức.',
-      sender: 'Nhã',
-      senderType: 'staff',
-      sentAt: '2024-01-15 10:00:00'
-    },
-    {
-      id: 2,
-      ticketId: 'TKT001',
-      message: 'Cảm ơn bạn đã phản hồi. Tôi sẽ chờ sản phẩm mới.',
-      sender: 'Nguyễn Văn A',
-      senderType: 'customer',
-      sentAt: '2024-01-15 11:30:00'
-    },
-    {
-      id: 3,
-      ticketId: 'TKT001',
-      message: 'Sản phẩm thay thế đã được gửi đi. Mã vận đơn: VN123456789. Dự kiến giao trong 2-3 ngày.',
-      sender: 'Nhã',
-      senderType: 'staff',
-      sentAt: '2024-01-15 14:20:00'
-    }
-  ]);
 
   const statusConfig = {
     open: { color: 'text-blue-600', bg: 'bg-blue-100', icon: IoTime, label: 'Mở' },
@@ -286,9 +110,7 @@ const CustomerSupport = () => {
     setShowTicketModal(true);
   };
 
-  const handleCreateTicket = () => {
-    setShowCreateTicketModal(true);
-  };
+  // directly use setShowCreateTicketModal(true) where needed
 
   const handleSaveTicket = () => {
     console.log('Creating new ticket:', newTicket);
@@ -338,7 +160,8 @@ const CustomerSupport = () => {
   };
 
   const getTicketResponses = (ticketId) => {
-    return responses.filter(response => response.ticketId === ticketId);
+    const t = tickets.find(t => (t.id || t.ticketNumber) === ticketId || (t.id && t.id.toString() === ticketId?.toString()));
+    return t?.messages || [];
   };
 
   return (

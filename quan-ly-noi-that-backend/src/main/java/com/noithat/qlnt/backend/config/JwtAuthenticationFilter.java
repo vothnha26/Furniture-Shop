@@ -41,7 +41,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        jwt = authHeader.substring(7);
+        jwt = authHeader.substring(7).trim();
+
+        // Quick guard: if token looks like a template placeholder or is obviously invalid, skip
+        if (jwt.startsWith("{{") && jwt.endsWith("}}")) {
+            System.out.println("[JwtFilter] Authorization contains template placeholder - skipping JWT parsing");
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // Basic structural check: JWT must contain exactly two periods separating header.payload.signature
+        int dotCount = 0;
+        for (char c : jwt.toCharArray()) if (c == '.') dotCount++;
+        if (dotCount != 2) {
+            System.err.println("[JwtFilter] Malformed JWT (incorrect number of segments): found " + dotCount + " - skipping authentication");
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         username = jwtService.extractUsername(jwt);
         System.out.println("[JwtFilter] Extracted username from JWT: " + username);
         

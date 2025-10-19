@@ -44,22 +44,14 @@ const mapInvoiceFromApi = (invoice) => ({
   }))
 });
 
-const mapInvoiceToApi = (invoice) => ({
-  ma_don_hang: invoice.maDonHang,
-  so_hoa_don: invoice.soHoaDon,
-  ngay_xuat: invoice.ngayXuat,
-  ma_nhan_vien_xuat: invoice.maNhanVienXuat,
-  tong_tien_thanh_toan: invoice.tongTienThanhToan,
-  ghi_chu: invoice.ghiChu
-});
+// mapInvoiceToApi removed — UI currently works with invoices fetched from backend
 
 const InvoiceManagement = () => {
   const [invoices, setInvoices] = useState([]);
   const [filteredInvoices, setFilteredInvoices] = useState([]);
   const [orders, setOrders] = useState([]);
   const [staff, setStaff] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // loading/error are handled inline where needed
   
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -85,129 +77,58 @@ const InvoiceManagement = () => {
 
   // API Functions
   const fetchInvoices = async () => {
-    setLoading(true);
     try {
       const response = await api.get('/api/v1/hoa-don');
-      setInvoices(response.data.map(mapInvoiceFromApi));
-    } catch (error) {
-      setError('Không thể tải danh sách hóa đơn');
-      console.error('Error fetching invoices:', error);
-    } finally {
-      setLoading(false);
+      const data = response.data || response;
+      if (Array.isArray(data)) setInvoices(data.map(mapInvoiceFromApi));
+      else setInvoices([]);
+    } catch (err) {
+      console.error('Error fetching invoices:', err);
+      alert('Không thể tải danh sách hóa đơn. Kiểm tra console để biết chi tiết.');
+      setInvoices([]);
     }
   };
 
-  const createInvoice = async (invoiceData) => {
-    try {
-      const response = await api.post('/api/v1/hoa-don', mapInvoiceToApi(invoiceData));
-      return mapInvoiceFromApi(response.data);
-    } catch (error) {
-      throw new Error('Không thể tạo hóa đơn');
-    }
-  };
-
-  const updateInvoice = async (id, invoiceData) => {
-    try {
-      const response = await api.put(`/api/v1/hoa-don/${id}`, mapInvoiceToApi(invoiceData));
-      return mapInvoiceFromApi(response.data);
-    } catch (error) {
-      throw new Error('Không thể cập nhật hóa đơn');
-    }
-  };
-
-  const deleteInvoice = async (id) => {
-    try {
-      await api.delete(`/api/v1/hoa-don/${id}`);
-    } catch (error) {
-      throw new Error('Không thể xóa hóa đơn');
-    }
-  };
-
-  const generateInvoicePDF = async (invoiceId) => {
-    try {
-      const response = await api.get(`/api/v1/hoa-don/${invoiceId}/pdf`, { responseType: 'blob' });
-      return response.data;
-    } catch (error) {
-      throw new Error('Không thể tạo file PDF');
-    }
-  };
+  // helper functions for create/update/delete/pdf were removed because
+  // the UI currently relies on the fetchInvoices list and server-side
+  // operations can be added later when needed.
 
   useEffect(() => {
     fetchInvoices();
   }, []);
 
-  // Mock data initialization
+  // Attempt to fetch staff and orders for the invoice UI; if backend doesn't provide them, fall back to empty arrays
   useEffect(() => {
-    const mockStaff = [
-      { id: 1, hoTen: 'Nguyễn Văn An', chucVu: 'Nhân viên bán hàng' },
-      { id: 2, hoTen: 'Trần Thị Bình', chucVu: 'Kế toán' },
-      { id: 3, hoTen: 'Lê Văn Cường', chucVu: 'Quản lý' }
-    ];
+    const fetchSupportingData = async () => {
+      try {
+        const [staffRes, ordersRes] = await Promise.allSettled([
+          api.get('/api/nhan-vien'), // adjust if your backend has a different endpoint
+          api.get('/api/banhang/donhang')
+        ]);
 
-    const mockOrders = [
-      { 
-        id: 1, 
-        maDonHang: 'DH001', 
-        khachHang: 'Nguyễn Văn A', 
-        ngayDat: '2024-10-01', 
-        tongTien: 15000000,
-        trangThai: 'completed'
-      },
-      { 
-        id: 2, 
-        maDonHang: 'DH002', 
-        khachHang: 'Trần Thị B', 
-        ngayDat: '2024-10-02', 
-        tongTien: 8500000,
-        trangThai: 'completed'
-      },
-      { 
-        id: 3, 
-        maDonHang: 'DH003', 
-        khachHang: 'Lê Văn C', 
-        ngayDat: '2024-10-03', 
-        tongTien: 12000000,
-        trangThai: 'pending'
+        if (staffRes.status === 'fulfilled') {
+          const sData = staffRes.value.data || staffRes.value;
+          setStaff(Array.isArray(sData) ? sData : []);
+        } else {
+          console.debug('No staff endpoint or error', staffRes.reason);
+          setStaff([]);
+        }
+
+        if (ordersRes.status === 'fulfilled') {
+          const oData = ordersRes.value.data || ordersRes.value;
+          setOrders(Array.isArray(oData) ? oData : []);
+        } else {
+          console.debug('No orders endpoint or error', ordersRes.reason);
+          setOrders([]);
+        }
+      } catch (err) {
+        console.error('Error fetching supporting invoice data', err);
+        setStaff([]);
+        setOrders([]);
       }
-    ];
+    };
 
-    const mockInvoices = [
-      {
-        id: 1,
-        maHoaDon: 1,
-        soHoaDon: 'HD2024001',
-        donHang: mockOrders[0],
-        ngayXuat: '2024-10-01T14:30:00',
-        nhanVienXuat: mockStaff[0],
-        tongTienThanhToan: 15000000,
-        trangThai: 'paid'
-      },
-      {
-        id: 2,
-        maHoaDon: 2,
-        soHoaDon: 'HD2024002',
-        donHang: mockOrders[1],
-        ngayXuat: '2024-10-02T10:15:00',
-        nhanVienXuat: mockStaff[1],
-        tongTienThanhToan: 8500000,
-        trangThai: 'paid'
-      },
-      {
-        id: 3,
-        maHoaDon: 3,
-        soHoaDon: 'HD2024003',
-        donHang: mockOrders[2],
-        ngayXuat: '2024-10-03T16:45:00',
-        nhanVienXuat: mockStaff[0],
-        tongTienThanhToan: 12000000,
-        trangThai: 'pending'
-      }
-    ];
-
-    setStaff(mockStaff);
-    setOrders(mockOrders);
-    setInvoices(mockInvoices);
-    setFilteredInvoices(mockInvoices);
+    fetchSupportingData();
   }, []);
 
   // Filter and search functionality

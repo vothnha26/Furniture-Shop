@@ -2,6 +2,7 @@ package com.noithat.qlnt.backend.service;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -29,6 +30,7 @@ public class JwtService {
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
+        if (claims == null) return null;
         return claimsResolver.apply(claims);
     }
 
@@ -60,11 +62,19 @@ public class JwtService {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        if (username == null) return false;
+        try {
+            return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
+        } catch (Exception ex) {
+            System.err.println("[JwtService] Error during token validation: " + ex.getMessage());
+            return false;
+        }
     }
 
     private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        Date exp = extractExpiration(token);
+        if (exp == null) return true;
+        return exp.before(new Date());
     }
 
     private Date extractExpiration(String token) {
@@ -72,12 +82,17 @@ public class JwtService {
     }
 
     private Claims extractAllClaims(String token) {
-        return Jwts
-                .parserBuilder()
-                .setSigningKey(getSignInKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        try {
+            return Jwts
+                    .parserBuilder()
+                    .setSigningKey(getSignInKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (JwtException ex) {
+            System.err.println("[JwtService] Failed to parse JWT: " + ex.getMessage());
+            return null;
+        }
     }
 
     private Key getSignInKey() {

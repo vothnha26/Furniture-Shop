@@ -6,7 +6,8 @@
 .productSlider .swiper-button-next {
   background: #23262f;
   box-shadow: 0px 4px 10px rgba(15, 27, 51, 0.1);
-  top: 97%;
+  top: 50%;
+  transform: translateY(-50%);
   width: 50px;
   height: 50px;
   border-radius: 50%;
@@ -22,10 +23,10 @@
 }
 
 .productSlider .swiper-button-prev {
-  left: 40%;
+  left: 8%;
 }
 .productSlider .swiper-button-next {
-  right: 40%;
+  right: 8%;
 }
 
 .productSlider .swiper-button-prev:after,
@@ -44,7 +45,8 @@
 .testimonialSlider .swiper-button-next {
   background: #23262f;
   box-shadow: 0px 4px 10px rgba(15, 27, 51, 0.1);
-  top: 85%;
+  top: 50%;
+  transform: translateY(-50%);
   width: 50px;
   height: 50px;
   border-radius: 50%;
@@ -52,11 +54,21 @@
 }
 
 .testimonialSlider .swiper-button-prev {
-  left: 0;
+  left: 4%;
 }
 
 .testimonialSlider .swiper-button-next {
-  left: 12%;
+  right: 4%;
+}
+
+/* Prevent swiper internals from causing horizontal overflow */
+.swiper {
+  overflow: hidden;
+}
+
+.swiper-wrapper, .swiper-slide {
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 @media (max-width: 768px) {

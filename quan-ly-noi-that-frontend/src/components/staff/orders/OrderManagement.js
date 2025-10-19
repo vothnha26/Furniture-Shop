@@ -2,13 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IoSearch, IoEye, IoCreate, IoTrash, IoReceipt, IoTime, IoCheckmark, IoClose, IoPrint, IoDownload } from 'react-icons/io5';
 import api from '../../../api';
 
-// Định nghĩa một item mẫu để thêm vào đơn hàng mới (vì thiếu UI chọn sản phẩm)
-const MOCK_ORDER_ITEM = {
-    variantId: 'VAR001', // Cần thiết cho mapOrderToApi
-    name: 'Sản phẩm mẫu A',
-    quantity: 1,
-    price: 1000000
-};
+// We'll fetch real product variants from the backend when needed
 
 // Move mapping functions outside component to avoid re-creation
 const mapOrderStatus = (status) => {
@@ -56,22 +50,26 @@ const OrderManagement = () => {
     const [orders, setOrders] = useState([]); 
     const [showAddModal, setShowAddModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
     const [newOrder, setNewOrder] = useState({
         customerName: '',
         customerPhone: '',
         customerEmail: '',
-        // Khởi tạo với 1 item mock để tổng tiền không bị 0
-        items: [{ ...MOCK_ORDER_ITEM }], 
-        subtotal: MOCK_ORDER_ITEM.price * MOCK_ORDER_ITEM.quantity,
+        // start with empty items and compute totals as items are added
+        items: [],
+        subtotal: 0,
         discount: 0,
-        total: MOCK_ORDER_ITEM.price * MOCK_ORDER_ITEM.quantity,
+        total: 0,
         status: 'pending',
         paymentMethod: 'cash',
         paymentStatus: 'unpaid',
         shippingAddress: '',
         notes: ''
     });
+
+    // Variants for add-order UI
+    const [variants, setVariants] = useState([]);
+    const [selectedVariantId, setSelectedVariantId] = useState('');
+    const [selectedQuantity, setSelectedQuantity] = useState(1);
 
     const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
     const [showStatusModal, setShowStatusModal] = useState(false);
@@ -85,14 +83,14 @@ const OrderManagement = () => {
 
     const mapOrderToApi = (order) => ({
         // Giả định bạn đã có logic lấy maKhachHang, nếu không, bạn cần thêm nó vào UI
-        maKhachHang: order.customerId || 'MOCK_CUSTOMER_ID', 
+    maKhachHang: order.customerId || undefined,
         phuongThucThanhToan: order.paymentMethod,
         trangThai: order.status,
         ghiChu: order.notes,
         diaChiGiaoHang: order.shippingAddress,
         chiTietDonHangList: order.items.map(item => ({
             // Giả định bạn đã có logic lấy maBienThe, nếu không, bạn cần thêm nó vào UI
-            maBienThe: item.variantId || 'MOCK_VARIANT_ID', 
+            maBienThe: item.variantId || undefined,
             soLuong: item.quantity,
             donGia: item.price
         })),
@@ -108,7 +106,8 @@ const OrderManagement = () => {
     useEffect(() => {
         const fetchOrders = async () => {
             setIsLoading(true);
-            setError(null);
+            // clear previous errors by logging (UI shows loading state)
+            console.debug('Fetching orders...');
             try {
                 // Giả định api.get('/api/banhang/donhang') trả về một object có property 'data' hoặc trực tiếp là mảng
                 const response = await api.get('/api/banhang/donhang');
@@ -122,13 +121,31 @@ const OrderManagement = () => {
                 }
             } catch (err) {
                 console.error('Fetch orders error', err);
-                setError(new Error('Không thể tải danh sách đơn hàng.'));
+                alert('Không thể tải danh sách đơn hàng. Kiểm tra console để biết chi tiết.');
             } finally {
                 setIsLoading(false);
             }
         };
         fetchOrders();
     }, []);
+
+    // Fetch variants when add modal opens so staff can pick real products
+    useEffect(() => {
+        if (!showAddModal) return;
+        const fetchVariants = async () => {
+            try {
+                // try a sensible endpoint; adapt if your backend uses a different path
+                const res = await api.get('/api/bien-the-san-pham');
+                const data = res.data || res;
+                if (Array.isArray(data)) setVariants(data);
+                else setVariants([]);
+            } catch (err) {
+                console.error('Fetch variants error', err);
+                setVariants([]);
+            }
+        };
+        fetchVariants();
+    }, [showAddModal]);
 
     // --- HANDLERS ---
 
@@ -151,20 +168,22 @@ const OrderManagement = () => {
                 customerName: '',
                 customerPhone: '',
                 customerEmail: '',
-                items: [{ ...MOCK_ORDER_ITEM }], // Reset với item mock
-                subtotal: MOCK_ORDER_ITEM.price * MOCK_ORDER_ITEM.quantity,
+                items: [],
+                subtotal: 0,
                 discount: 0,
-                total: MOCK_ORDER_ITEM.price * MOCK_ORDER_ITEM.quantity,
+                total: 0,
                 status: 'pending',
                 paymentMethod: 'cash',
                 paymentStatus: 'unpaid',
                 shippingAddress: '',
                 notes: ''
             });
+            setSelectedVariantId('');
+            setSelectedQuantity(1);
             setShowAddModal(false);
         } catch (err) {
             console.error('Create order error', err);
-            setError(new Error('Lỗi khi tạo đơn hàng. Vui lòng kiểm tra dữ liệu và thử lại.'));
+            alert('Lỗi khi tạo đơn hàng. Kiểm tra console để biết chi tiết.');
         } finally {
             setIsLoading(false);
         }
@@ -179,7 +198,7 @@ const OrderManagement = () => {
                 setOrders(orders.filter(order => order.id !== id));
             } catch (err) {
                 console.error('Delete order error', err);
-                setError(new Error('Lỗi khi xóa đơn hàng.'));
+                alert('Lỗi khi xóa đơn hàng. Kiểm tra console để biết chi tiết.');
             }
         }
     };
@@ -202,7 +221,7 @@ const OrderManagement = () => {
             setSelectedOrder(null);
         } catch (err) {
             console.error('Update order status error', err);
-            setError(new Error('Lỗi khi cập nhật trạng thái đơn hàng.'));
+            alert('Lỗi khi cập nhật trạng thái đơn hàng. Kiểm tra console để biết chi tiết.');
         }
     };
 
@@ -810,10 +829,85 @@ const OrderManagement = () => {
                                         </div>
 
                                         {/* Simplified Product Section for Demo */}
-                                        <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-3 rounded-lg">
-                                            <p className="font-semibold mb-1">Sản phẩm (MOCK DATA)</p>
-                                            <p className="text-sm">Hiện tại đang sử dụng sản phẩm mẫu. Cần thêm UI để thêm/bỏ sản phẩm thực tế và tính lại Tổng tiền.</p>
-                                        </div>
+                                                                <div className="space-y-3">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <select
+                                                                            value={selectedVariantId}
+                                                                            onChange={(e) => setSelectedVariantId(e.target.value)}
+                                                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                                        >
+                                                                            <option value="">-- Chọn sản phẩm --</option>
+                                                                            {variants.map(v => (
+                                                                                <option key={v.id || v.maBienThe} value={v.id || v.maBienThe}>
+                                                                                    {v.tenSanPham || v.ten || v.tenBienThe || v.maBienThe}
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            value={selectedQuantity}
+                                                                            onChange={(e) => setSelectedQuantity(Math.max(1, Number(e.target.value) || 1))}
+                                                                            className="w-24 px-3 py-2 border border-gray-300 rounded-lg"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                if (!selectedVariantId) return alert('Vui lòng chọn sản phẩm.');
+                                                                                const variant = variants.find(v => (v.id || v.maBienThe) === selectedVariantId);
+                                                                                if (!variant) return alert('Sản phẩm không tồn tại.');
+                                                                                const price = variant.giaBan || variant.gia || variant.price || 0;
+                                                                                const name = variant.tenSanPham || variant.ten || variant.tenBienThe || variant.maBienThe;
+                                                                                const newItems = [
+                                                                                    ...newOrder.items,
+                                                                                    {
+                                                                                        variantId: selectedVariantId,
+                                                                                        name,
+                                                                                        quantity: selectedQuantity,
+                                                                                        price
+                                                                                    }
+                                                                                ];
+                                                                                const subtotal = newItems.reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
+                                                                                setNewOrder({ ...newOrder, items: newItems, subtotal, total: subtotal - (newOrder.discount || 0) });
+                                                                                setSelectedVariantId('');
+                                                                                setSelectedQuantity(1);
+                                                                            }}
+                                                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                                        >
+                                                                            Thêm
+                                                                        </button>
+                                                                    </div>
+
+                                                                    {/* Selected items list */}
+                                                                    <div className="space-y-2">
+                                                                        {newOrder.items.length === 0 ? (
+                                                                            <div className="text-sm text-gray-500">Chưa có sản phẩm trong đơn hàng.</div>
+                                                                        ) : (
+                                                                            newOrder.items.map((it, idx) => (
+                                                                                <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border">
+                                                                                    <div>
+                                                                                        <div className="font-medium">{it.name}</div>
+                                                                                        <div className="text-xs text-gray-500">SL: {it.quantity} × {it.price?.toLocaleString?.('vi-VN') || it.price}đ</div>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <div className="font-semibold">{((it.price||0) * (it.quantity||0)).toLocaleString('vi-VN')}đ</div>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => {
+                                                                                                const remaining = newOrder.items.filter((_, i) => i !== idx);
+                                                                                                const subtotal = remaining.reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
+                                                                                                setNewOrder({ ...newOrder, items: remaining, subtotal, total: subtotal - (newOrder.discount || 0) });
+                                                                                            }}
+                                                                                            className="text-red-600 hover:text-red-800"
+                                                                                        >
+                                                                                            <IoTrash className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))
+                                                                        )}
+                                                                    </div>
+                                                                </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>

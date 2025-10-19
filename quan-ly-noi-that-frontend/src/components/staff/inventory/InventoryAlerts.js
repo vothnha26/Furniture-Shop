@@ -9,41 +9,80 @@ const InventoryAlerts = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Map alert data from API
-  const mapAlertFromApi = (alert) => ({
-    id: alert.maCanhBao || alert.id,
-    product: alert.bienTheSanPham?.sanPham?.tenSanPham || alert.product || '',
-    variant: alert.bienTheSanPham?.tenBienThe || alert.variant || '',
-    currentStock: alert.soLuongHienTai || alert.currentStock || 0,
-    minStock: alert.soLuongToiThieu || alert.minStock || 0,
-    maxStock: alert.soLuongToiDa || alert.maxStock || 0,
-    priority: mapPriority(alert.mucDoUuTien || alert.priority),
-    category: alert.danhMuc?.tenDanhMuc || alert.category || '',
-    supplier: alert.nhaCungCap?.tenNhaCungCap || alert.supplier || '',
-    status: alert.trangThai || alert.status || 'active',
-    createdAt: alert.ngayTao || alert.createdAt || '',
-    notes: alert.ghiChu || alert.notes || ''
-  });
+  // Note: API responses are normalized in the fetch routine below;
+  // the older mapAlertFromApi helper was removed to avoid unused symbol warnings.
 
-  const mapPriority = (priority) => {
-    const priorityMap = {
-      'Thấp': 'low',
-      'Trung bình': 'medium', 
-      'Cao': 'high',
-      'Khẩn cấp': 'critical'
-    };
-    return priorityMap[priority] || priority;
-  };
+  // priority mapping handled inline during normalization; helper removed.
 
-  // Fetch inventory alerts
+  // Fetch inventory alerts (try multiple backend endpoints and normalize results)
   useEffect(() => {
     const fetchAlerts = async () => {
       setIsLoading(true);
       try {
-        const data = await api.get('/api/v1/quan-ly-ton-kho/canh-bao');
-        if (Array.isArray(data)) {
-          setAlerts(data.map(mapAlertFromApi));
+        const tryUrls = [
+          '/api/v1/quan-ly-ton-kho/canh-bao',
+          '/api/v1/bao-cao-thong-ke/canh-bao-ton-kho',
+          '/api/v1/quan-ly-ton-kho/san-pham-sap-het',
+          '/api/v1/quan-ly-ton-kho/san-pham-het-hang'
+        ];
+
+        let fetched = null;
+        for (const u of tryUrls) {
+          try {
+            const res = await api.get(u);
+            if (res) { fetched = { url: u, body: res }; break; }
+          } catch (e) {
+            // try next
+          }
         }
+
+        if (!fetched) {
+          setAlerts([]);
+          setError(null);
+          return;
+        }
+
+        const { body } = fetched;
+        let list = [];
+        if (Array.isArray(body)) list = body;
+        else if (body?.data && Array.isArray(body.data)) list = body.data;
+        else if (body?.data && typeof body.data === 'object') {
+          const d = body.data;
+          const a = Array.isArray(d.sanPhamSapHet) ? d.sanPhamSapHet : [];
+          const b = Array.isArray(d.sanPhamHetHang) ? d.sanPhamHetHang : [];
+          list = [...a, ...b];
+        } else if (body?.sanPhamSapHet || body?.sanPhamHetHang) {
+          const a = Array.isArray(body.sanPhamSapHet) ? body.sanPhamSapHet : [];
+          const b = Array.isArray(body.sanPhamHetHang) ? body.sanPhamHetHang : [];
+          list = [...a, ...b];
+        }
+
+        const mapped = list.map(item => {
+          const currentStock = item.soLuongTon ?? item.currentStock ?? item.soLuong ?? 0;
+          const minStock = item.mucTonToiThieu ?? item.minStock ?? item.soLuongToiThieu ?? 0;
+          const status = currentStock === 0 ? 'out_of_stock' : (currentStock <= (minStock || 5) ? 'low_stock' : 'normal');
+          const priority = status === 'out_of_stock' ? 'urgent' : (status === 'low_stock' ? 'high' : 'low');
+          return {
+            id: item.maBienThe ?? item.id ?? item.maCanhBao ?? Math.random(),
+            product: item.sanPham?.tenSanPham ?? item.productName ?? item.product ?? '',
+            sku: item.sku ?? item.maBienThe ?? item.id ?? '',
+            currentStock,
+            minStock,
+            maxStock: item.tonKhoToiDa ?? item.maxStock ?? 0,
+            status,
+            priority,
+            category: item.sanPham?.danhMuc?.tenDanhMuc ?? item.category ?? '',
+            supplier: item.nhaCungCap?.tenNhaCungCap ?? item.supplier ?? '',
+            lastRestock: item.lastRestock ?? item.ngayNhap ?? '',
+            nextRestock: item.nextRestock ?? '',
+            createdBy: item.createdBy ?? item.nguoiTao ?? '',
+            createdAt: item.ngayTao ?? item.createdAt ?? '',
+            isActive: item.trangThai !== 'inactive'
+          };
+        });
+
+        setAlerts(mapped);
+        setError(null);
       } catch (err) {
         console.error('Fetch alerts error', err);
         setError(err);
@@ -236,6 +275,16 @@ const InventoryAlerts = () => {
         </div>
 
         {/* Summary Cards */}
+        {isLoading && (
+          <div className="mb-6">
+            <div className="bg-white rounded-lg shadow-sm p-4 text-center">Đang tải dữ liệu tồn kho...</div>
+          </div>
+        )}
+        {error && (
+          <div className="mb-6">
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4">Lỗi khi tải dữ liệu cảnh báo: {String(error)}</div>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center">
@@ -244,7 +293,7 @@ const InventoryAlerts = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Cảnh báo khẩn cấp</p>
-                <p className="text-2xl font-bold text-gray-900">2</p>
+                <p className="text-2xl font-bold text-gray-900">{alerts.filter(a => a.priority === 'urgent').length}</p>
               </div>
             </div>
           </div>
@@ -255,7 +304,7 @@ const InventoryAlerts = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Tồn kho thấp</p>
-                <p className="text-2xl font-bold text-gray-900">1</p>
+                <p className="text-2xl font-bold text-gray-900">{alerts.filter(a => a.status === 'low_stock').length}</p>
               </div>
             </div>
           </div>
@@ -266,7 +315,7 @@ const InventoryAlerts = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Bình thường</p>
-                <p className="text-2xl font-bold text-gray-900">1</p>
+                <p className="text-2xl font-bold text-gray-900">{alerts.filter(a => a.status === 'normal').length}</p>
               </div>
             </div>
           </div>
@@ -277,7 +326,7 @@ const InventoryAlerts = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Tổng cảnh báo</p>
-                <p className="text-2xl font-bold text-gray-900">4</p>
+                <p className="text-2xl font-bold text-gray-900">{alerts.length}</p>
               </div>
             </div>
           </div>

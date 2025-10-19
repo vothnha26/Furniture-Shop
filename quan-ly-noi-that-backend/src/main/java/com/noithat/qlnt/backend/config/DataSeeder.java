@@ -20,7 +20,7 @@ public class DataSeeder {
 
     @Bean
     @Transactional
-        CommandLineRunner initDatabase(
+    CommandLineRunner initDatabase(
             NhaCungCapRepository nhaCungCapRepository,
             DanhMucRepository danhMucRepository,
             BoSuuTapRepository boSuuTapRepository,
@@ -30,11 +30,12 @@ public class DataSeeder {
             BienTheSanPhamRepository bienTheSanPhamRepository,
             ThuocTinhRepository thuocTinhRepository,
             BienTheThuocTinhRepository bienTheThuocTinhRepository,
-            VaiTroRepository vaiTroRepository
-                    ,
-                    com.noithat.qlnt.backend.repository.KhachHangRepository khachHangRepository,
-                    com.noithat.qlnt.backend.repository.DanhGiaSanPhamRepository danhGiaSanPhamRepository
-    ) {
+            VaiTroRepository vaiTroRepository,
+            com.noithat.qlnt.backend.repository.KhachHangRepository khachHangRepository,
+            com.noithat.qlnt.backend.repository.DanhGiaSanPhamRepository danhGiaSanPhamRepository,
+            com.noithat.qlnt.backend.repository.ThongBaoRepository thongBaoRepository,
+            com.noithat.qlnt.backend.repository.TaiKhoanRepository taiKhoanRepository,
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         return args -> {
             // Skip if data already exists
             if (vaiTroRepository.count() > 0) {
@@ -200,7 +201,7 @@ public class DataSeeder {
 
             // 6. Seed Sản Phẩm (Products)
             System.out.println("Seeding Sản Phẩm...");
-            
+
             // Sản phẩm 1: Bàn làm việc
             SanPham sp1 = new SanPham();
             sp1.setTenSanPham("Bàn làm việc hiện đại");
@@ -265,32 +266,37 @@ public class DataSeeder {
 
             // 8. Seed Biến Thể Sản Phẩm (Product Variants)
             System.out.println("Seeding Biến Thể Sản Phẩm...");
-            
+
             // Biến thể cho Bàn làm việc
-            BienTheSanPham bt1 = createVariant(sp1, "BTB-001", new BigDecimal("2500000"), new BigDecimal("3000000"), 50);
-            BienTheSanPham bt2 = createVariant(sp1, "BTB-002", new BigDecimal("2300000"), new BigDecimal("2800000"), 30);
+            BienTheSanPham bt1 = createVariant(sp1, "BTB-001", new BigDecimal("2500000"), new BigDecimal("3000000"),
+                    50);
+            BienTheSanPham bt2 = createVariant(sp1, "BTB-002", new BigDecimal("2300000"), new BigDecimal("2800000"),
+                    30);
 
             // Biến thể cho Ghế văn phòng
-            BienTheSanPham bt3 = createVariant(sp2, "GVP-001", new BigDecimal("1200000"), new BigDecimal("1500000"), 100);
-            BienTheSanPham bt4 = createVariant(sp2, "GVP-002", new BigDecimal("1000000"), new BigDecimal("1300000"), 80);
+            BienTheSanPham bt3 = createVariant(sp2, "GVP-001", new BigDecimal("1200000"), new BigDecimal("1500000"),
+                    100);
+            BienTheSanPham bt4 = createVariant(sp2, "GVP-002", new BigDecimal("1000000"), new BigDecimal("1300000"),
+                    80);
 
             // Biến thể cho Tủ quần áo
-            BienTheSanPham bt5 = createVariant(sp3, "TQA-001", new BigDecimal("4000000"), new BigDecimal("5000000"), 20);
+            BienTheSanPham bt5 = createVariant(sp3, "TQA-001", new BigDecimal("4000000"), new BigDecimal("5000000"),
+                    20);
 
             // Biến thể cho Giường ngủ
             BienTheSanPham bt6 = createVariant(sp4, "GN-001", new BigDecimal("6000000"), new BigDecimal("7500000"), 15);
 
             // Biến thể cho Sofa
-            BienTheSanPham bt7 = createVariant(sp5, "SF-001", new BigDecimal("8000000"), new BigDecimal("10000000"), 10);
+            BienTheSanPham bt7 = createVariant(sp5, "SF-001", new BigDecimal("8000000"), new BigDecimal("10000000"),
+                    10);
 
             List<BienTheSanPham> variants = bienTheSanPhamRepository.saveAll(
-                    Arrays.asList(bt1, bt2, bt3, bt4, bt5, bt6, bt7)
-            );
+                    Arrays.asList(bt1, bt2, bt3, bt4, bt5, bt6, bt7));
             System.out.println("✓ Created " + variants.size() + " product variants");
 
             // 9. Seed Thuộc Tính của Biến Thể
             System.out.println("Seeding Thuộc Tính Biến Thể...");
-            
+
             // Thuộc tính cho biến thể 1
             createVariantAttribute(bt1, tt1, "Nâu gỗ");
             createVariantAttribute(bt1, tt2, "120x60cm");
@@ -331,6 +337,139 @@ public class DataSeeder {
 
             System.out.println("=== Data Seeding Completed Successfully ===");
 
+            // 11. Seed some sample customers (Khách hàng) with Vietnamese names
+            try {
+                System.out.println("Seeding sample customers...");
+                com.noithat.qlnt.backend.entity.KhachHang kh1 = new com.noithat.qlnt.backend.entity.KhachHang();
+                kh1.setHoTen("Nguyễn Văn A");
+                kh1.setEmail("nguyenvana@example.com");
+                kh1.setSoDienThoai("0912345678");
+                kh1.setDiaChi("123 Đường Lê Lợi, Quận 1, TP.HCM");
+                kh1.setNgayThamGia(java.time.LocalDate.now());
+                kh1.setNgaySinh(java.time.LocalDate.of(1990, 1, 15));
+                kh1.setGioiTinh("Nam");
+                kh1.setDiemThuong(150);
+                kh1.setHangThanhVien(tiers.get(0));
+
+                com.noithat.qlnt.backend.entity.KhachHang kh2 = new com.noithat.qlnt.backend.entity.KhachHang();
+                kh2.setHoTen("Trần Thị B");
+                kh2.setEmail("tranthib@example.com");
+                kh2.setSoDienThoai("0987654321");
+                kh2.setDiaChi("456 Phố Huế, Hà Nội");
+                kh2.setNgayThamGia(java.time.LocalDate.now());
+                kh2.setNgaySinh(java.time.LocalDate.of(1995, 5, 20));
+                kh2.setGioiTinh("Nữ");
+                kh2.setDiemThuong(300);
+                kh2.setHangThanhVien(tiers.get(1));
+
+                List<com.noithat.qlnt.backend.entity.KhachHang> customersCreated = khachHangRepository
+                        .saveAll(Arrays.asList(kh1, kh2));
+                System.out.println("✓ Created " + customersCreated.size() + " sample customers");
+
+                // 12. Seed sample notifications (ThongBao) in Vietnamese
+                try {
+                    com.noithat.qlnt.backend.entity.ThongBao tb1 = new com.noithat.qlnt.backend.entity.ThongBao();
+                    tb1.setLoai("info");
+                    tb1.setTieuDe("Chào mừng khách hàng mới");
+                    tb1.setNoiDung(
+                            "Xin chào " + kh1.getHoTen() + ", cảm ơn bạn đã đăng ký tài khoản tại cửa hàng chúng tôi.");
+                    tb1.setLoaiNguoiNhan("KHACH_HANG");
+                    tb1.setNguoiNhanId(kh1.getMaKhachHang());
+                    tb1.setDoUuTien("normal");
+                    tb1.setNgayTao(java.time.LocalDateTime.now());
+                    tb1.setLienKetId(null);
+
+                    com.noithat.qlnt.backend.entity.ThongBao tb2 = new com.noithat.qlnt.backend.entity.ThongBao();
+                    tb2.setLoai("success");
+                    tb2.setTieuDe("Thanh toán thành công");
+                    tb2.setNoiDung("Đơn hàng #1001 của bạn đã được thanh toán. Cảm ơn bạn!");
+                    tb2.setLoaiNguoiNhan("ALL");
+                    tb2.setDoUuTien("normal");
+                    tb2.setNgayTao(java.time.LocalDateTime.now().minusDays(1));
+
+                    // Persist sample notifications using injected ThongBaoRepository
+                    try {
+                        ThongBao tbEntity1 = new ThongBao();
+                        tbEntity1.setLoai("info");
+                        tbEntity1.setTieuDe("Chào mừng khách hàng mới");
+                        tbEntity1.setNoiDung("Xin chào " + kh1.getHoTen()
+                                + ", cảm ơn bạn đã đăng ký tài khoản tại cửa hàng chúng tôi.");
+                        tbEntity1.setLoaiNguoiNhan("KHACH_HANG");
+                        tbEntity1.setNguoiNhanId(kh1.getMaKhachHang());
+                        tbEntity1.setDoUuTien("normal");
+                        tbEntity1.setNgayTao(LocalDateTime.now());
+
+                        ThongBao tbEntity2 = new ThongBao();
+                        tbEntity2.setLoai("success");
+                        tbEntity2.setTieuDe("Thanh toán thành công");
+                        tbEntity2.setNoiDung("Đơn hàng #1001 của bạn đã được thanh toán. Cảm ơn bạn!");
+                        tbEntity2.setLoaiNguoiNhan("ALL");
+                        tbEntity2.setDoUuTien("normal");
+                        tbEntity2.setNgayTao(LocalDateTime.now().minusDays(1));
+
+                        // Save using the injected repository
+                        thongBaoRepository.saveAll(Arrays.asList(tbEntity1, tbEntity2));
+                        System.out.println("✓ Created 2 sample ThongBao notifications");
+                    } catch (Exception ex) {
+                        System.err.println("Không thể tạo ThongBao sample: " + ex.getMessage());
+                    }
+                } catch (Exception ex) {
+                    System.err.println("Lỗi khi tạo sample ThongBao: " + ex.getMessage());
+                }
+
+                // 13. Create default accounts (admin, staff) and link to sample customers
+                try {
+                    System.out.println("Seeding default accounts (admin, staff, customers)...");
+                    // Admin account
+                    TaiKhoan adminAccount = new TaiKhoan();
+                    adminAccount.setTenDangNhap("admin");
+                    adminAccount.setMatKhauHash(passwordEncoder.encode("admin"));
+                    adminAccount.setEmail("admin@example.com");
+                    adminAccount.setVaiTro(adminRole);
+                    adminAccount.setEnabled(true);
+                    taiKhoanRepository.save(adminAccount);
+
+                    // Staff account
+                    TaiKhoan staffAccount = new TaiKhoan();
+                    staffAccount.setTenDangNhap("staff");
+                    staffAccount.setMatKhauHash(passwordEncoder.encode("staff"));
+                    staffAccount.setEmail("staff@example.com");
+                    staffAccount.setVaiTro(staffRole);
+                    staffAccount.setEnabled(true);
+                    taiKhoanRepository.save(staffAccount);
+
+                    // Create accounts for seeded customers and link
+                    if (customersCreated != null && !customersCreated.isEmpty()) {
+                        TaiKhoan acc1 = new TaiKhoan();
+                        acc1.setTenDangNhap("nguyenvana");
+                        acc1.setMatKhauHash(passwordEncoder.encode("password"));
+                        acc1.setEmail(customersCreated.get(0).getEmail());
+                        acc1.setVaiTro(userRole);
+                        acc1.setEnabled(true);
+                        TaiKhoan savedAcc1 = taiKhoanRepository.save(acc1);
+                        customersCreated.get(0).setTaiKhoan(savedAcc1);
+                        khachHangRepository.save(customersCreated.get(0));
+
+                        if (customersCreated.size() > 1) {
+                            TaiKhoan acc2 = new TaiKhoan();
+                            acc2.setTenDangNhap("tranthib");
+                            acc2.setMatKhauHash(passwordEncoder.encode("password"));
+                            acc2.setEmail(customersCreated.get(1).getEmail());
+                            acc2.setVaiTro(userRole);
+                            acc2.setEnabled(true);
+                            TaiKhoan savedAcc2 = taiKhoanRepository.save(acc2);
+                            customersCreated.get(1).setTaiKhoan(savedAcc2);
+                            khachHangRepository.save(customersCreated.get(1));
+                        }
+                    }
+                    System.out.println("✓ Created default accounts (admin, staff) and linked customer accounts");
+                } catch (Exception ex) {
+                    System.err.println("Lỗi khi tạo tài khoản mặc định: " + ex.getMessage());
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to seed customers: " + e.getMessage());
+            }
+
             // 10. Seed some sample reviews if there are customers
             try {
                 System.out.println("Seeding sample reviews...");
@@ -361,7 +500,8 @@ public class DataSeeder {
         };
     }
 
-    private BienTheSanPham createVariant(SanPham sanPham, String sku, BigDecimal giaMua, BigDecimal giaBan, Integer soLuongTon) {
+    private BienTheSanPham createVariant(SanPham sanPham, String sku, BigDecimal giaMua, BigDecimal giaBan,
+            Integer soLuongTon) {
         BienTheSanPham variant = new BienTheSanPham();
         variant.setSanPham(sanPham);
         variant.setSku(sku);

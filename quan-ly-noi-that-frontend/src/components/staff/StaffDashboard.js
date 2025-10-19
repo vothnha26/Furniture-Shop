@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { IoPerson, IoStorefront, IoReceipt, IoChatbubbles, IoNotifications, IoTrendingUp } from 'react-icons/io5';
 
@@ -92,6 +93,29 @@ const StaffDashboard = () => {
   const getNotificationIcon = (type) => ({ order: IoReceipt, inventory: IoStorefront, customer: IoPerson }[type] || IoNotifications);
   const getPriorityColor = (priority) => ({ high: 'text-red-600', medium: 'text-yellow-600', low: 'text-gray-600' }[priority] || 'text-gray-600');
   const openInventoryWithImport = () => { try { localStorage.setItem('openImportModal', '1'); } catch (e) { } window.location.href = '/staff/inventory'; };
+
+  const navigate = useNavigate();
+
+  const isExternalUrl = (u) => {
+    if (!u) return false;
+    return /^https?:\/\//i.test(u) || u.startsWith('//');
+  };
+
+  const handleNotificationClick = (url) => {
+    try {
+      if (!url) return;
+      if (isExternalUrl(url)) {
+        window.open(url, '_blank', 'noopener');
+        return;
+      }
+      const path = url.startsWith('/') ? url : `/${url}`;
+      navigate(path);
+    } catch (e) {
+      // swallow navigation errors silently
+      // eslint-disable-next-line no-console
+      console.error('Navigation error', e);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -205,6 +229,17 @@ const StaffDashboard = () => {
                             <span className={`text-xs font-medium ${getPriorityColor(notification.priority)}`}>{notification.priority === 'high' ? 'Cao' : notification.priority === 'medium' ? 'Trung bình' : 'Thấp'}</span>
                           </div>
                         </div>
+                        {notification.duongDanHanhDong ? (
+                          <div className="flex items-center ml-3">
+                            <button
+                              onClick={() => handleNotificationClick(notification.duongDanHanhDong)}
+                              className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:opacity-95"
+                              aria-label={`Đi tới ${notification.duongDanHanhDong}`}
+                            >
+                              Đi đến
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}

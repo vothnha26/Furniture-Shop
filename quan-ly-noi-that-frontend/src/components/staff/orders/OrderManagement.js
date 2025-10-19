@@ -47,7 +47,7 @@ const mapOrderFromApi = (order) => ({
 
 const OrderManagement = () => {
     // FIX 1: Thêm state orders bị thiếu
-    const [orders, setOrders] = useState([]); 
+    const [orders, setOrders] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [newOrder, setNewOrder] = useState({
@@ -83,7 +83,7 @@ const OrderManagement = () => {
 
     const mapOrderToApi = (order) => ({
         // Giả định bạn đã có logic lấy maKhachHang, nếu không, bạn cần thêm nó vào UI
-    maKhachHang: order.customerId || undefined,
+        maKhachHang: order.customerId || undefined,
         phuongThucThanhToan: order.paymentMethod,
         trangThai: order.status,
         ghiChu: order.notes,
@@ -97,7 +97,7 @@ const OrderManagement = () => {
         // Thêm các trường này nếu API backend của bạn yêu cầu trực tiếp
         tongTien: order.total,
         giamGia: order.discount,
-        tongTienSauGiam: order.total 
+        tongTienSauGiam: order.total
     });
 
     // --- SIDE EFFECTS & API CALLS ---
@@ -111,7 +111,7 @@ const OrderManagement = () => {
             try {
                 // Giả định api.get('/api/banhang/donhang') trả về một object có property 'data' hoặc trực tiếp là mảng
                 const response = await api.get('/api/banhang/donhang');
-                const data = response.data || response; 
+                const data = response.data || response;
 
                 if (Array.isArray(data)) {
                     setOrders(data.map(mapOrderFromApi));
@@ -157,12 +157,12 @@ const OrderManagement = () => {
 
         try {
             setIsLoading(true);
-            const orderData = mapOrderToApi(newOrder); 
-            const response = await api.post('/api/banhang/donhang', orderData); 
-            
+            const orderData = mapOrderToApi(newOrder);
+            const response = await api.post('/api/banhang/donhang', orderData);
+
             const savedOrder = mapOrderFromApi(response.data || response);
 
-            setOrders([savedOrder, ...orders]); 
+            setOrders([savedOrder, ...orders]);
             // Reset form
             setNewOrder({
                 customerName: '',
@@ -210,9 +210,9 @@ const OrderManagement = () => {
         }
         try {
             // PUT API call
-            await api.put(`/api/banhang/donhang/${orderId}/trangthai`, { trangThai: status }); 
-            setOrders(orders.map(order => 
-                order.id === orderId 
+            await api.put(`/api/banhang/donhang/${orderId}/trangthai`, { trangThai: status });
+            setOrders(orders.map(order =>
+                order.id === orderId
                     ? { ...order, status: status, updatedAt: new Date().toLocaleString('vi-VN') }
                     : order
             ));
@@ -280,9 +280,9 @@ const OrderManagement = () => {
 
     const filteredOrders = orders.filter(order => {
         const matchesSearch = order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              order.customerPhone.includes(searchTerm) ||
-                              order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
+            order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            order.customerPhone.includes(searchTerm) ||
+            order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus;
         const matchesPaymentStatus = selectedPaymentStatus === 'all' || order.paymentStatus === selectedPaymentStatus;
         return matchesSearch && matchesStatus && matchesPaymentStatus;
@@ -414,7 +414,7 @@ const OrderManagement = () => {
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                         <h3 className="text-lg font-semibold text-gray-900">Danh sách đơn hàng</h3>
-                        <button 
+                        <button
                             onClick={() => setShowAddModal(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                         >
@@ -467,8 +467,8 @@ const OrderManagement = () => {
                                                     {order.orderNumber}
                                                 </div>
                                                 <div className="text-sm text-gray-500">
-                                                    {order.paymentMethod === 'cash' ? 'Tiền mặt' : 
-                                                     order.paymentMethod === 'card' ? 'Thẻ' : 'Chuyển khoản'}
+                                                    {order.paymentMethod === 'cash' ? 'Tiền mặt' :
+                                                        order.paymentMethod === 'card' ? 'Thẻ' : 'Chuyển khoản'}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
@@ -582,8 +582,8 @@ const OrderManagement = () => {
                                         <h4 className="font-semibold text-gray-900 mb-2">Thông tin thanh toán & Trạng thái</h4>
                                         <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-2">
                                             <p className="text-gray-900">
-                                                **Phương thức:** {selectedOrder.paymentMethod === 'cash' ? 'Tiền mặt' : 
-                                                               selectedOrder.paymentMethod === 'card' ? 'Thẻ' : 'Chuyển khoản'}
+                                                **Phương thức:** {selectedOrder.paymentMethod === 'cash' ? 'Tiền mặt' :
+                                                    selectedOrder.paymentMethod === 'card' ? 'Thẻ' : 'Chuyển khoản'}
                                             </p>
                                             <div className="flex justify-between items-center">
                                                 <p className="text-gray-900">**Trạng thái TT:**</p>
@@ -735,7 +735,7 @@ const OrderManagement = () => {
                                     Hủy
                                 </button>
                                 <button
-                                    onClick={() => handleUpdateStatus(selectedOrder.id, newStatus)} 
+                                    onClick={() => handleUpdateStatus(selectedOrder.id, newStatus)}
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                     disabled={!newStatus || newStatus === selectedOrder.status}
                                 >
@@ -771,7 +771,7 @@ const OrderManagement = () => {
                                                 <input
                                                     type="text"
                                                     value={newOrder.customerName}
-                                                    onChange={(e) => setNewOrder({...newOrder, customerName: e.target.value})}
+                                                    onChange={(e) => setNewOrder({ ...newOrder, customerName: e.target.value })}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     placeholder="Nhập tên khách hàng"
                                                     required
@@ -782,7 +782,7 @@ const OrderManagement = () => {
                                                 <input
                                                     type="tel"
                                                     value={newOrder.customerPhone}
-                                                    onChange={(e) => setNewOrder({...newOrder, customerPhone: e.target.value})}
+                                                    onChange={(e) => setNewOrder({ ...newOrder, customerPhone: e.target.value })}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     placeholder="Nhập số điện thoại"
                                                     required
@@ -796,7 +796,7 @@ const OrderManagement = () => {
                                                 <input
                                                     type="email"
                                                     value={newOrder.customerEmail}
-                                                    onChange={(e) => setNewOrder({...newOrder, customerEmail: e.target.value})}
+                                                    onChange={(e) => setNewOrder({ ...newOrder, customerEmail: e.target.value })}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     placeholder="Nhập email"
                                                 />
@@ -805,7 +805,7 @@ const OrderManagement = () => {
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Phương thức thanh toán</label>
                                                 <select
                                                     value={newOrder.paymentMethod}
-                                                    onChange={(e) => setNewOrder({...newOrder, paymentMethod: e.target.value})}
+                                                    onChange={(e) => setNewOrder({ ...newOrder, paymentMethod: e.target.value })}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     required
                                                 >
@@ -820,7 +820,7 @@ const OrderManagement = () => {
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ giao hàng</label>
                                             <textarea
                                                 value={newOrder.shippingAddress}
-                                                onChange={(e) => setNewOrder({...newOrder, shippingAddress: e.target.value})}
+                                                onChange={(e) => setNewOrder({ ...newOrder, shippingAddress: e.target.value })}
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 rows="3"
                                                 placeholder="Nhập địa chỉ giao hàng"
@@ -829,92 +829,92 @@ const OrderManagement = () => {
                                         </div>
 
                                         {/* Simplified Product Section for Demo */}
-                                                                <div className="space-y-3">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <select
-                                                                            value={selectedVariantId}
-                                                                            onChange={(e) => setSelectedVariantId(e.target.value)}
-                                                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                                                        >
-                                                                            <option value="">-- Chọn sản phẩm --</option>
-                                                                            {variants.map(v => (
-                                                                                <option key={v.id || v.maBienThe} value={v.id || v.maBienThe}>
-                                                                                    {v.tenSanPham || v.ten || v.tenBienThe || v.maBienThe}
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <input
-                                                                            type="number"
-                                                                            min={1}
-                                                                            value={selectedQuantity}
-                                                                            onChange={(e) => setSelectedQuantity(Math.max(1, Number(e.target.value) || 1))}
-                                                                            className="w-24 px-3 py-2 border border-gray-300 rounded-lg"
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                if (!selectedVariantId) return alert('Vui lòng chọn sản phẩm.');
-                                                                                const variant = variants.find(v => (v.id || v.maBienThe) === selectedVariantId);
-                                                                                if (!variant) return alert('Sản phẩm không tồn tại.');
-                                                                                const price = variant.giaBan || variant.gia || variant.price || 0;
-                                                                                const name = variant.tenSanPham || variant.ten || variant.tenBienThe || variant.maBienThe;
-                                                                                const newItems = [
-                                                                                    ...newOrder.items,
-                                                                                    {
-                                                                                        variantId: selectedVariantId,
-                                                                                        name,
-                                                                                        quantity: selectedQuantity,
-                                                                                        price
-                                                                                    }
-                                                                                ];
-                                                                                const subtotal = newItems.reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
-                                                                                setNewOrder({ ...newOrder, items: newItems, subtotal, total: subtotal - (newOrder.discount || 0) });
-                                                                                setSelectedVariantId('');
-                                                                                setSelectedQuantity(1);
-                                                                            }}
-                                                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                                                        >
-                                                                            Thêm
-                                                                        </button>
-                                                                    </div>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <select
+                                                    value={selectedVariantId}
+                                                    onChange={(e) => setSelectedVariantId(e.target.value)}
+                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="">-- Chọn sản phẩm --</option>
+                                                    {variants.map(v => (
+                                                        <option key={v.id || v.maBienThe} value={v.id || v.maBienThe}>
+                                                            {v.tenSanPham || v.ten || v.tenBienThe || v.maBienThe}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    value={selectedQuantity}
+                                                    onChange={(e) => setSelectedQuantity(Math.max(1, Number(e.target.value) || 1))}
+                                                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!selectedVariantId) return alert('Vui lòng chọn sản phẩm.');
+                                                        const variant = variants.find(v => (v.id || v.maBienThe) === selectedVariantId);
+                                                        if (!variant) return alert('Sản phẩm không tồn tại.');
+                                                        const price = variant.giaBan || variant.gia || variant.price || 0;
+                                                        const name = variant.tenSanPham || variant.ten || variant.tenBienThe || variant.maBienThe;
+                                                        const newItems = [
+                                                            ...newOrder.items,
+                                                            {
+                                                                variantId: selectedVariantId,
+                                                                name,
+                                                                quantity: selectedQuantity,
+                                                                price
+                                                            }
+                                                        ];
+                                                        const subtotal = newItems.reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
+                                                        setNewOrder({ ...newOrder, items: newItems, subtotal, total: subtotal - (newOrder.discount || 0) });
+                                                        setSelectedVariantId('');
+                                                        setSelectedQuantity(1);
+                                                    }}
+                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                                >
+                                                    Thêm
+                                                </button>
+                                            </div>
 
-                                                                    {/* Selected items list */}
-                                                                    <div className="space-y-2">
-                                                                        {newOrder.items.length === 0 ? (
-                                                                            <div className="text-sm text-gray-500">Chưa có sản phẩm trong đơn hàng.</div>
-                                                                        ) : (
-                                                                            newOrder.items.map((it, idx) => (
-                                                                                <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border">
-                                                                                    <div>
-                                                                                        <div className="font-medium">{it.name}</div>
-                                                                                        <div className="text-xs text-gray-500">SL: {it.quantity} × {it.price?.toLocaleString?.('vi-VN') || it.price}đ</div>
-                                                                                    </div>
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="font-semibold">{((it.price||0) * (it.quantity||0)).toLocaleString('vi-VN')}đ</div>
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => {
-                                                                                                const remaining = newOrder.items.filter((_, i) => i !== idx);
-                                                                                                const subtotal = remaining.reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
-                                                                                                setNewOrder({ ...newOrder, items: remaining, subtotal, total: subtotal - (newOrder.discount || 0) });
-                                                                                            }}
-                                                                                            className="text-red-600 hover:text-red-800"
-                                                                                        >
-                                                                                            <IoTrash className="w-4 h-4" />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ))
-                                                                        )}
-                                                                    </div>
-                                                                </div>
+                                            {/* Selected items list */}
+                                            <div className="space-y-2">
+                                                {newOrder.items.length === 0 ? (
+                                                    <div className="text-sm text-gray-500">Chưa có sản phẩm trong đơn hàng.</div>
+                                                ) : (
+                                                    newOrder.items.map((it, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border">
+                                                            <div>
+                                                                <div className="font-medium">{it.name}</div>
+                                                                <div className="text-xs text-gray-500">SL: {it.quantity} × {it.price?.toLocaleString?.('vi-VN') || it.price}đ</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="font-semibold">{((it.price || 0) * (it.quantity || 0)).toLocaleString('vi-VN')}đ</div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const remaining = newOrder.items.filter((_, i) => i !== idx);
+                                                                        const subtotal = remaining.reduce((s, it) => s + (it.price || 0) * (it.quantity || 0), 0);
+                                                                        setNewOrder({ ...newOrder, items: remaining, subtotal, total: subtotal - (newOrder.discount || 0) });
+                                                                    }}
+                                                                    className="text-red-600 hover:text-red-800"
+                                                                >
+                                                                    <IoTrash className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
                                                 <select
                                                     value={newOrder.status}
-                                                    onChange={(e) => setNewOrder({...newOrder, status: e.target.value})}
+                                                    onChange={(e) => setNewOrder({ ...newOrder, status: e.target.value })}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     required
                                                 >
@@ -929,7 +929,7 @@ const OrderManagement = () => {
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái thanh toán</label>
                                                 <select
                                                     value={newOrder.paymentStatus}
-                                                    onChange={(e) => setNewOrder({...newOrder, paymentStatus: e.target.value})}
+                                                    onChange={(e) => setNewOrder({ ...newOrder, paymentStatus: e.target.value })}
                                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     required
                                                 >
@@ -944,7 +944,7 @@ const OrderManagement = () => {
                                             <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
                                             <textarea
                                                 value={newOrder.notes}
-                                                onChange={(e) => setNewOrder({...newOrder, notes: e.target.value})}
+                                                onChange={(e) => setNewOrder({ ...newOrder, notes: e.target.value })}
                                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                 rows="3"
                                                 placeholder="Nhập ghi chú bổ sung..."

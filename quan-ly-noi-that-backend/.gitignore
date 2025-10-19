@@ -29,5 +29,12 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+.metadata/
+
 ### VS Code ###
 .vscode/
+
+# Logs and uploads
+logs/
+uploads/
+*.log

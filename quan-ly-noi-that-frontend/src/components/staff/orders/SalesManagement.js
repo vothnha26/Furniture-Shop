@@ -265,7 +265,31 @@ const SalesManagement = () => {
         trangThai: 'PENDING'
       };
 
-      await createOrder(adminOrder);
+      const createResp = await createOrder(adminOrder);
+
+      // If backend returned an order id, send admin notification to persist ThongBao
+      try {
+        const createdOrder = createResp?.data || createResp;
+        const maDonHang = createdOrder?.maDonHang ?? createdOrder?.id ?? createdOrder?.order?.maDonHang ?? createdOrder?.order?.id;
+        if (maDonHang) {
+          const payload = {
+            loai: 'order',
+            tieuDe: `Đơn hàng mới #${maDonHang}`,
+            noiDung: `Đơn hàng ${maDonHang} được tạo bởi nhân viên`,
+            nguoiNhanId: null,
+            loaiNguoiNhan: 'ALL',
+            duongDanHanhDong: `/admin/orders/${maDonHang}`,
+            doUuTien: 'normal',
+            lienKetId: maDonHang,
+            loaiLienKet: 'DON_HANG'
+          };
+          await api.post('/api/v1/thong-bao', payload);
+        } else {
+          console.info('Create order response did not include maDonHang, skipping notification.');
+        }
+      } catch (notifyErr) {
+        console.warn('Failed to send admin notification for created order', notifyErr);
+      }
 
       // Refresh data
       const data = await api.get('/api/banhang/donhang');

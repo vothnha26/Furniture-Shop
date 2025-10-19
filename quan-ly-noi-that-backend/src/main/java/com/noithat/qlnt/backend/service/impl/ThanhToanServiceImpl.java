@@ -23,6 +23,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,7 @@ public class ThanhToanServiceImpl implements ThanhToanService {
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final com.noithat.qlnt.backend.service.CauHinhService cauHinhService;
     private final HoaDonService hoaDonService;
+    private final com.noithat.qlnt.backend.service.IThongBaoService thongBaoService;
 
     @Override
     public ThongKeThanhToanResponse getThongKe() {
@@ -159,7 +162,8 @@ public class ThanhToanServiceImpl implements ThanhToanService {
 
                     // Compute total discount (treat null as zero)
                     BigDecimal vip = summary.getGiamGiaVip() != null ? summary.getGiamGiaVip() : BigDecimal.ZERO;
-                    BigDecimal voucher = summary.getGiamGiaVoucher() != null ? summary.getGiamGiaVoucher() : BigDecimal.ZERO;
+                    BigDecimal voucher = summary.getGiamGiaVoucher() != null ? summary.getGiamGiaVoucher()
+                            : BigDecimal.ZERO;
                     BigDecimal diem = summary.getGiamGiaDiem() != null ? summary.getGiamGiaDiem() : BigDecimal.ZERO;
                     summary.setTongGiamGia(vip.add(voucher).add(diem));
                 }
@@ -289,22 +293,23 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         donHang.setGiamGiaDiemThuong(summary.getGiamGiaDiem());
         donHang.setDiemThuongSuDung(request.getDiemThuongSuDung());
 
-
-    // If frontend provided a shipping method, prefer configuration-based fees
-    BigDecimal phiVanChuyen = null;
-    String phuongThucGiaoHang = request.getPhuongThucGiaoHang();
-    if (phuongThucGiaoHang != null && !phuongThucGiaoHang.isEmpty()) {
-        // Simple mapping: express -> SHIPPING_FEE_EXPRESS, otherwise SHIPPING_FEE_STANDARD
-        String key = phuongThucGiaoHang.toLowerCase().contains("express") || phuongThucGiaoHang.toLowerCase().contains("nhanh")
-            ? "SHIPPING_FEE_EXPRESS"
-            : "SHIPPING_FEE_STANDARD";
-        phiVanChuyen = cauHinhService.getDecimal(key, null);
-    }
-    // Fall back to stored-proc computed value if config not available
-    if (phiVanChuyen == null) {
-        phiVanChuyen = "Miễn phí".equalsIgnoreCase(summary.getPhiGiaoHang()) ? BigDecimal.ZERO
-            : new BigDecimal(summary.getPhiGiaoHang());
-    }
+        // If frontend provided a shipping method, prefer configuration-based fees
+        BigDecimal phiVanChuyen = null;
+        String phuongThucGiaoHang = request.getPhuongThucGiaoHang();
+        if (phuongThucGiaoHang != null && !phuongThucGiaoHang.isEmpty()) {
+            // Simple mapping: express -> SHIPPING_FEE_EXPRESS, otherwise
+            // SHIPPING_FEE_STANDARD
+            String key = phuongThucGiaoHang.toLowerCase().contains("express")
+                    || phuongThucGiaoHang.toLowerCase().contains("nhanh")
+                            ? "SHIPPING_FEE_EXPRESS"
+                            : "SHIPPING_FEE_STANDARD";
+            phiVanChuyen = cauHinhService.getDecimal(key, null);
+        }
+        // Fall back to stored-proc computed value if config not available
+        if (phiVanChuyen == null) {
+            phiVanChuyen = "Miễn phí".equalsIgnoreCase(summary.getPhiGiaoHang()) ? BigDecimal.ZERO
+                    : new BigDecimal(summary.getPhiGiaoHang());
+        }
         // Persist computed shipping fee into DonHang.phiGiaoHang
         donHang.setPhiGiaoHang(phiVanChuyen);
         donHang.setThanhTien(summary.getTongCong());
@@ -352,7 +357,8 @@ public class ThanhToanServiceImpl implements ThanhToanService {
             ChiTietDonHang chiTiet = new ChiTietDonHang();
             chiTiet.setDonHang(donHang);
             chiTiet.setBienThe(bienThe);
-            // Ensure the embedded id has the variant id so Hibernate can set it and avoid NPEs
+            // Ensure the embedded id has the variant id so Hibernate can set it and avoid
+            // NPEs
             if (chiTiet.getId() == null) {
                 chiTiet.setId(new ChiTietDonHang.ChiTietDonHangId());
             }
@@ -365,18 +371,39 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         }
         donHang.setChiTietDonHangs(chiTietList);
 
-        // 9. Lưu tất cả thay đổi vào CSDL
-        // Nhờ có @Transactional, tất cả các lệnh save (DonHang, Voucher, KhachHang,
-        // BienTheSanPham)
-        // sẽ được thực hiện cùng lúc.
+        // 10. Gửi thông báo đơn hàng mới (dành cho admin)
+        // Persist order first
         DonHang savedDonHang = donHangRepository.save(donHang);
 
+        // Schedule creation/publish of notification after transaction commit
+        final Integer maDonHangForNotif = savedDonHang != null ? savedDonHang.getMaDonHang() : null;
+        try {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            if (maDonHangForNotif != null) thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif);
+                        } catch (Exception ex) {
+                            System.err.println("[ThanhToanService] Lỗi khi tạo thông báo sau commit: " + ex.getMessage());
+                        }
+                    }
+                });
+            } else {
+                // no active transaction - create immediately
+                if (maDonHangForNotif != null) thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif);
+            }
+        } catch (Exception ex) {
+            System.err.println("[ThanhToanService] Không thể đăng ký hoặc thực hiện thông báo: " + ex.getMessage());
+        }
+
         // 10. Tạo hóa đơn
-    TaoHoaDonRequest taoHoaDonRequest = new TaoHoaDonRequest();
-    taoHoaDonRequest.setMaDonHang(savedDonHang.getMaDonHang());
-    // Do not force a default employee; allow null so invoice can be created without a NhanVien
-    taoHoaDonRequest.setMaNhanVienXuat(null);
-    hoaDonService.taoHoaDon(taoHoaDonRequest);
+        TaoHoaDonRequest taoHoaDonRequest = new TaoHoaDonRequest();
+        taoHoaDonRequest.setMaDonHang(savedDonHang.getMaDonHang());
+        // Do not force a default employee; allow null so invoice can be created without
+        // a NhanVien
+        taoHoaDonRequest.setMaNhanVienXuat(null);
+        hoaDonService.taoHoaDon(taoHoaDonRequest);
 
         // 11. Trả về kết quả
         return new ThanhToanResponse(

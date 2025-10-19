@@ -12,6 +12,7 @@ import com.noithat.qlnt.backend.exception.AppException;
 import com.noithat.qlnt.backend.repository.*;
 import com.noithat.qlnt.backend.service.IDonHangService;
 import com.noithat.qlnt.backend.service.ThanhToanService;
+import com.noithat.qlnt.backend.service.IThongBaoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,7 @@ public class DonHangServiceImpl implements IDonHangService {
     private final ThanhToanService thanhToanService;
     private final GiaoDichThanhToanRepository giaoDichThanhToanRepository;
     private final LichSuTrangThaiDonHangRepository lichSuTrangThaiDonHangRepository;
+    private final IThongBaoService thongBaoService;
 
     @Override
     @Transactional
@@ -124,8 +128,10 @@ public class DonHangServiceImpl implements IDonHangService {
             khachHangRepository.save(khachHang);
         }
 
-        // 7. Tạo ChiTietDonHang và Trừ kho
-        List<ChiTietDonHang> chiTietList = new ArrayList<>();
+    // 7. Tạo ChiTietDonHang và Trừ kho
+    List<ChiTietDonHang> chiTietList = new ArrayList<>();
+    // collect post-commit notification actions so they won't be rolled back with the order tx
+    List<Runnable> postCommitNotifications = new ArrayList<>();
         for (ThanhToanRequest ct : request.getChiTietDonHangList()) {
             BienTheSanPham bienThe = bienTheSanPhamRepository.findById(ct.getMaBienThe())
                     .orElseThrow(() -> new AppException(404, "Không tìm thấy biến thể sản phẩm."));
@@ -133,7 +139,41 @@ public class DonHangServiceImpl implements IDonHangService {
             if (bienThe.getSoLuongTon() < ct.getSoLuong()) {
                 throw new AppException(400, "Sản phẩm " + bienThe.getSku() + " không đủ số lượng tồn kho.");
             }
-            bienThe.setSoLuongTon(bienThe.getSoLuongTon() - ct.getSoLuong());
+            // Lưu giá trị trước khi trừ để kiểm tra xem có vượt ngưỡng cảnh báo hay về 0 không
+            Integer beforeStock = bienThe.getSoLuongTon();
+            Integer afterStock = beforeStock - ct.getSoLuong();
+            bienThe.setSoLuongTon(afterStock);
+
+            // Nếu sau khi trừ xuống bằng 0 => tạo thông báo hết hàng (deferred until after commit)
+            try {
+                if (afterStock <= 0) {
+                    Integer maSanPham = bienThe.getSanPham() != null ? bienThe.getSanPham().getMaSanPham() : null;
+                    String tenSanPham = bienThe.getSanPham() != null ? bienThe.getSanPham().getTenSanPham() : bienThe.getSku();
+                    if (maSanPham != null) {
+                        Integer finalMaSanPham = maSanPham;
+                        String finalTenSanPham = tenSanPham;
+                        postCommitNotifications.add(() -> {
+                            try { thongBaoService.taoThongBaoHetHang(finalMaSanPham, finalTenSanPham); } catch (Exception e) { System.err.println("Lỗi publish het hang: " + e.getMessage()); }
+                        });
+                    } else {
+                        String finalTenSanPham = tenSanPham;
+                        postCommitNotifications.add(() -> {
+                            try { thongBaoService.taoThongBaoCanhBaoTonKho(null, finalTenSanPham, afterStock); } catch (Exception e) { System.err.println("Lỗi publish canh bao ton kho: " + e.getMessage()); }
+                        });
+                    }
+                } else if (beforeStock > bienThe.getMucTonToiThieu() && afterStock <= bienThe.getMucTonToiThieu()) {
+                    Integer maSanPham = bienThe.getSanPham() != null ? bienThe.getSanPham().getMaSanPham() : null;
+                    String tenSanPham = bienThe.getSanPham() != null ? bienThe.getSanPham().getTenSanPham() : bienThe.getSku();
+                    Integer finalMaSanPham = maSanPham;
+                    String finalTenSanPham = tenSanPham;
+                    postCommitNotifications.add(() -> {
+                        try { thongBaoService.taoThongBaoCanhBaoTonKho(finalMaSanPham, finalTenSanPham, afterStock); } catch (Exception e) { System.err.println("Lỗi publish canh bao ton kho: " + e.getMessage()); }
+                    });
+                }
+            } catch (Exception ex) {
+                // don't fail the order if notification scheduling fails
+                System.err.println("Không thể lên lịch thông báo tồn kho: " + ex.getMessage());
+            }
 
             ChiTietDonHang chiTiet = new ChiTietDonHang();
             chiTiet.setDonHang(donHang);
@@ -147,6 +187,47 @@ public class DonHangServiceImpl implements IDonHangService {
 
         // 8. Lưu tất cả thay đổi
         DonHang savedDonHang = donHangRepository.save(donHang);
+
+        // Schedule creation/publish of notifications after the order transaction commits
+        if (!postCommitNotifications.isEmpty() || (savedDonHang != null && savedDonHang.getMaDonHang() != null)) {
+            final Integer maDonHangForNotif = savedDonHang != null ? savedDonHang.getMaDonHang() : null;
+            try {
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                    System.out.println("[DonHangService] Đăng ký thông báo sau khi commit cho đơn: " + maDonHangForNotif);
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            // run collected notifications
+                            for (Runnable r : postCommitNotifications) {
+                                try { r.run(); } catch (Exception e) { System.err.println("Lỗi khi thực hiện thông báo sau commit: " + e.getMessage()); }
+                            }
+                            // notify about new order
+                            if (maDonHangForNotif != null) {
+                                try { thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif); } catch (Exception e) { System.err.println("Lỗi tạo thông báo đơn hàng mới sau commit: " + e.getMessage()); }
+                            }
+                        }
+                    });
+                } else {
+                    // If no transaction active, run notifications immediately
+                    System.out.println("[DonHangService] TransactionSynchronization not active - thực hiện thông báo ngay lập tức for order: " + maDonHangForNotif);
+                    for (Runnable r : postCommitNotifications) {
+                        try { r.run(); } catch (Exception e) { System.err.println("Lỗi khi thực hiện thông báo trực tiếp: " + e.getMessage()); }
+                    }
+                    if (maDonHangForNotif != null) {
+                        try { thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif); } catch (Exception e) { System.err.println("Lỗi tạo thông báo đơn hàng mới trực tiếp: " + e.getMessage()); }
+                    }
+                }
+            } catch (Exception ex) {
+                // If registration fails, attempt immediate execution as a fallback
+                System.err.println("[DonHangService] Không thể đăng ký TransactionSynchronization, fallback thực hiện thông báo trực tiếp: " + ex.getMessage());
+                for (Runnable r : postCommitNotifications) {
+                    try { r.run(); } catch (Exception e) { System.err.println("Lỗi khi thực hiện thông báo fallback: " + e.getMessage()); }
+                }
+                if (maDonHangForNotif != null) {
+                    try { thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif); } catch (Exception e) { System.err.println("Lỗi tạo thông báo đơn hàng mới fallback: " + e.getMessage()); }
+                }
+            }
+        }
 
         return mapToResponse(savedDonHang);
     }
@@ -179,6 +260,13 @@ public class DonHangServiceImpl implements IDonHangService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + id));
         donHang.setTrangThaiDonHang(trangThai);
         donHangRepository.save(donHang);
+
+        // Tạo thông báo khi trạng thái đơn hàng thay đổi
+        try {
+            thongBaoService.taoThongBaoThayDoiTrangThai(id, trangThai);
+        } catch (Exception ex) {
+            System.err.println("Không thể tạo thông báo thay đổi trạng thái đơn hàng: " + ex.getMessage());
+        }
     }
 
     @Override
@@ -201,6 +289,13 @@ public class DonHangServiceImpl implements IDonHangService {
     public void xoaDonHang(Integer id) {
         DonHang donHang = donHangRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng với mã: " + id));
+
+        // Tạo thông báo rằng đơn hàng đã bị hủy/ xóa (ký hiệu hủy)
+        try {
+            thongBaoService.taoThongBaoDonHangBiHuy(id, "Đơn hàng đã bị hủy/xóa.");
+        } catch (Exception ex) {
+            System.err.println("Không thể tạo thông báo hủy đơn hàng: " + ex.getMessage());
+        }
 
         // Hoàn kho, hoàn điểm, hoàn voucher...
         // (Cần thêm logic chi tiết ở đây nếu trạng thái đơn hàng không phải là đã hủy)

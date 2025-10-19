@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IoNotifications, IoCheckmarkCircle, IoWarning, IoInformation, IoClose, IoTime, IoPeople, IoStorefront, IoCash, IoCalendar } from 'react-icons/io5';
+import { IoNotifications, IoCheckmarkCircle, IoWarning, IoInformation, IoClose, IoTime, IoPeople, IoStorefront, IoCash } from 'react-icons/io5';
 import api from '../../../api';
 
 // Mapping functions for Vietnamese API field names
@@ -14,6 +14,8 @@ const mapNotificationFromApi = (notification) => ({
   color: getNotificationColor(notification.loai),
   bgColor: getNotificationBgColor(notification.loai),
   userId: notification.nguoi_nhan_id,
+  // map backend's recipient type (snake_case or camelCase)
+  loaiNguoiNhan: notification.loai_nguoi_nhan || notification.loaiNguoiNhan || 'ALL',
   createdAt: notification.ngay_tao,
   actionUrl: notification.duong_dan_hanh_dong,
   priority: notification.do_uu_tien || 'normal'
@@ -55,6 +57,9 @@ const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [quickCreate, setQuickCreate] = useState({ loai: 'info', tieuDe: '', noiDung: '', loaiNguoiNhan: 'ALL' });
   
   const [selectedFilter, setSelectedFilter] = useState('all');
 
@@ -63,13 +68,59 @@ const Notifications = () => {
     setLoading(true);
     try {
       const response = await api.get('/api/v1/thong-bao');
-      setNotifications(response.data.map(mapNotificationFromApi));
+      const data = response && response.data ? response.data : response;
+      if (Array.isArray(data) && data.length > 0) {
+        // Only show notifications intended for ADMIN or STAFF on this page
+        const mapped = data.map(mapNotificationFromApi);
+        const adminOnly = mapped.filter(n => ['ADMIN', 'STAFF'].includes(String(n.loaiNguoiNhan || '').toUpperCase()));
+        setNotifications(adminOnly);
+        setError('');
+        return;
+      }
+
+      // fallback: try details endpoint
+      const detailsRes = await api.get('/api/v1/thong-bao/details').catch(() => null);
+      const detailsData = detailsRes && detailsRes.data ? detailsRes.data : detailsRes;
+      if (Array.isArray(detailsData) && detailsData.length > 0) {
+        const mapped = detailsData.map(mapNotificationFromApi);
+        const adminOnly = mapped.filter(n => ['ADMIN', 'STAFF'].includes(String(n.loaiNguoiNhan || '').toUpperCase()));
+        setNotifications(adminOnly);
+        setError('');
+        return;
+      }
+
+      // fallback: try /me for user-specific notifications
+      const meRes = await api.get('/api/v1/thong-bao/me').catch(() => null);
+      const meData = meRes && meRes.data ? meRes.data : meRes;
+      if (Array.isArray(meData) && meData.length > 0) {
+        const mapped = meData.map(mapNotificationFromApi);
+        const adminOnly = mapped.filter(n => ['ADMIN', 'STAFF'].includes(String(n.loaiNguoiNhan || '').toUpperCase()));
+        setNotifications(adminOnly);
+        setError('');
+        return;
+      }
+
+      // If no data found, store helpful note for debugging
+      setNotifications([]);
+      setError('API returned no notifications. Checked /api/v1/thong-bao, /details and /me — all empty or non-array.');
     } catch (error) {
-      setError('Không thể tải thông báo');
+      // api.request attaches .status and .data for non-ok responses — surface them
+      const status = error && error.status ? error.status : 'network-error';
+      const body = error && error.data ? JSON.stringify(error.data) : String(error);
+      setError(`Error fetching notifications (status: ${status}) — ${body}`);
       console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await api.get('/api/v1/thong-bao/chua-doc/count');
+      const data = res && res.data ? res.data : res;
+      const count = data && (data.unread ?? data.count ?? 0);
+      setUnreadCount(Number(count || 0));
+    } catch (e) { console.debug('Failed to fetch unread count', e); }
   };
 
   const markAsRead = async (notificationId) => {
@@ -87,6 +138,7 @@ const Notifications = () => {
     try {
       await api.put('/api/v1/thong-bao/danh-dau-tat-ca-da-doc');
       setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+      setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
@@ -103,80 +155,14 @@ const Notifications = () => {
 
   useEffect(() => {
     fetchNotifications();
+    fetchUnreadCount();
     
     // Set up polling for new notifications
     const interval = setInterval(fetchNotifications, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
-  const [mockNotifications] = useState([
-    {
-      id: 1,
-      type: 'success',
-      title: 'Đơn hàng mới',
-      message: 'Đơn hàng #ORD001 đã được tạo thành công',
-      time: '2 phút trước',
-      read: false,
-      icon: IoCheckmarkCircle,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
-    },
-    {
-      id: 2,
-      type: 'warning',
-      title: 'Cảnh báo tồn kho',
-      message: 'Ghế gỗ cao cấp sắp hết hàng (còn 3 sản phẩm)',
-      time: '15 phút trước',
-      read: false,
-      icon: IoWarning,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100'
-    },
-    {
-      id: 3,
-      type: 'info',
-      title: 'Khách hàng VIP',
-      message: 'Khách hàng Trần Thị B đã đạt cấp VIP Gold',
-      time: '1 giờ trước',
-      read: true,
-      icon: IoPeople,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100'
-    },
-    {
-      id: 4,
-      type: 'success',
-      title: 'Thanh toán thành công',
-      message: 'Đơn hàng #ORD002 đã thanh toán 15,000,000đ',
-      time: '2 giờ trước',
-      read: true,
-      icon: IoCash,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100'
-    },
-    {
-      id: 5,
-      type: 'warning',
-      title: 'Hết hàng',
-      message: 'Tủ quần áo 3 cánh đã hết hàng',
-      time: '3 giờ trước',
-      read: true,
-      icon: IoStorefront,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100'
-    },
-    {
-      id: 6,
-      type: 'info',
-      title: 'Khuyến mãi sắp hết hạn',
-      message: 'Chương trình giảm giá 20% còn 2 ngày',
-      time: '1 ngày trước',
-      read: true,
-      icon: IoCalendar,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100'
-    }
-  ]);
+  // legacy mock data removed
 
   const filters = [
     { id: 'all', name: 'Tất cả', count: notifications.length },
@@ -192,28 +178,21 @@ const Notifications = () => {
     return notification.type === selectedFilter;
   });
 
-  const handleMarkAsRead = (id) => {
-    markAsRead(id);
-  };
-
-  const handleMarkAllAsRead = () => {
-    markAllAsRead();
-  };
-
-  const handleDeleteNotification = (id) => {
-    deleteNotification(id);
-  };
+  // direct handlers used (markAsRead, markAllAsRead, deleteNotification)
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Thông báo</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Thông báo</h1>
+            <span className="inline-flex items-center px-2 py-1 text-sm font-medium bg-red-100 text-red-800 rounded">Chưa đọc: {unreadCount}</span>
+          </div>
           <p className="text-gray-600">Quản lý và theo dõi các thông báo hệ thống</p>
         </div>
 
-        {/* Filter Tabs */}
+  {/* Filter Tabs */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex flex-wrap gap-2">
             {filters.map((filter) => (
@@ -232,6 +211,14 @@ const Notifications = () => {
           </div>
         </div>
 
+        {loading && (
+          <div className="mb-4 text-sm text-gray-600">Đang tải thông báo…</div>
+        )}
+
+        {error && (
+          <div className="mb-4 text-sm text-red-600">{error}</div>
+        )}
+
         {/* Actions */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center justify-between">
@@ -243,6 +230,12 @@ const Notifications = () => {
                 <IoCheckmarkCircle className="w-5 h-5" />
                 Đánh dấu tất cả đã đọc
               </button>
+              <button
+                onClick={() => setShowQuickCreate(s => !s)}
+                className="flex items-center gap-2 text-green-600 hover:text-green-800"
+              >
+                Tạo thông báo nhanh
+              </button>
               <button className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
                 <IoTime className="w-5 h-5" />
                 Xóa thông báo cũ
@@ -253,6 +246,36 @@ const Notifications = () => {
             </div>
           </div>
         </div>
+
+        {showQuickCreate && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Tạo thông báo nhanh</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <select className="p-2 border rounded" value={quickCreate.loai} onChange={(e) => setQuickCreate(q => ({ ...q, loai: e.target.value }))}>
+                <option value="info">info</option>
+                <option value="success">success</option>
+                <option value="warning">warning</option>
+                <option value="order">order</option>
+                <option value="inventory">inventory</option>
+              </select>
+              <input className="p-2 border rounded" placeholder="Tiêu đề" value={quickCreate.tieuDe} onChange={(e) => setQuickCreate(q => ({ ...q, tieuDe: e.target.value }))} />
+              <input className="p-2 border rounded" placeholder="Nội dung" value={quickCreate.noiDung} onChange={(e) => setQuickCreate(q => ({ ...q, noiDung: e.target.value }))} />
+              <div className="flex items-center gap-2">
+                <button className="bg-green-600 text-white px-4 py-2 rounded" onClick={async () => {
+                  try {
+                    const payload = { ...quickCreate };
+                    await api.post('/api/v1/thong-bao/tong-quat', payload);
+                    // refresh
+                    await fetchNotifications();
+                    await fetchUnreadCount();
+                    setShowQuickCreate(false);
+                  } catch (e) { console.error('Quick create failed', e); }
+                }}>Gửi</button>
+                <button className="px-4 py-2 border rounded" onClick={() => setShowQuickCreate(false)}>Hủy</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Notifications List */}
         <div className="space-y-4">

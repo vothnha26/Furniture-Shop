@@ -592,6 +592,11 @@ public class ProductServiceImpl implements IProductService {
                                         .moTa(sp.getMoTa())
                                         .id(sp.getMaSanPham())
                                         .name(sp.getTenSanPham())
+                                        .category(sp.getDanhMuc() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.CategoryDto.builder().id(sp.getDanhMuc().getMaDanhMuc()).name(sp.getDanhMuc().getTenDanhMuc()).build() : null)
+                                        .supplier(sp.getNhaCungCap() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.SupplierDto.builder().id(sp.getNhaCungCap().getMaNhaCungCap()).name(sp.getNhaCungCap().getTenNhaCungCap()).build() : null)
+                                        // include category and supplier details for frontend filtering
+                                        .category(sp.getDanhMuc() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.CategoryDto.builder().id(sp.getDanhMuc().getMaDanhMuc()).name(sp.getDanhMuc().getTenDanhMuc()).build() : null)
+                                        .supplier(sp.getNhaCungCap() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.SupplierDto.builder().id(sp.getNhaCungCap().getMaNhaCungCap()).name(sp.getNhaCungCap().getTenNhaCungCap()).build() : null)
                                         .price(min > 0 ? min : null)
                                         .originalPrice(max > 0 ? max : null)
                                         .stockQuantity(totalStock)

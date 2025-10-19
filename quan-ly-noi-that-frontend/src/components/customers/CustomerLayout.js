@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutlet, useLocation, useNavigate } from 'react-router-dom';
-import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
-import { IoCart, IoPerson, IoSearch, IoMenu, IoClose, IoHeart, IoNotifications, IoStorefront, IoReceipt } from 'react-icons/io5';
+import { IoCart, IoPerson, IoSearch, IoHeart, IoNotifications, IoStorefront, IoReceipt } from 'react-icons/io5';
+import Header from '../shared/Header';
 import CustomerShop from './CustomerShop';
 import CustomerCart from './CustomerCart';
 import CustomerOrders from './CustomerOrders';
@@ -14,61 +14,7 @@ import CustomerChat from './CustomerChat';
 
 const CustomerLayout = ({ children }) => {
   const [currentView, setCurrentView] = useState('shop');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [cartCount] = useState(3); // Simulate cart count
-  const [favoritesCount, setFavoritesCount] = useState(0);
-  const [notificationsCount] = useState(3); // Simulate notifications count
-  const { user } = useAuth();
-
-  // Load favorites count from backend (if authenticated) or from localStorage
-  useEffect(() => {
-    let mounted = true;
-    const loadCount = async () => {
-      try {
-        if (user) {
-          try {
-            const resp = await api.get('/favorites');
-            const data = resp?.data ?? resp;
-            const len = Array.isArray(data) ? data.length : (data?.items?.length ?? 0);
-            if (mounted) setFavoritesCount(len);
-            return;
-          } catch (e) {
-            // fallback to localStorage below
-          }
-        }
-        try {
-          const raw = localStorage.getItem('favorites') || '[]';
-          const arr = JSON.parse(raw);
-          if (mounted) setFavoritesCount(Array.isArray(arr) ? arr.length : 0);
-        } catch (e) {
-          if (mounted) setFavoritesCount(0);
-        }
-      } catch (e) {
-        if (mounted) setFavoritesCount(0);
-      }
-    };
-    loadCount();
-    return () => { mounted = false; };
-  }, [user]);
-
-  // Listen for favorite-changed events dispatched by other components
-  useEffect(() => {
-    const handler = (e) => {
-      if (e?.detail && typeof e.detail.count === 'number') {
-        setFavoritesCount(e.detail.count);
-        return;
-      }
-      try {
-        const raw = localStorage.getItem('favorites') || '[]';
-        const arr = JSON.parse(raw);
-        setFavoritesCount(Array.isArray(arr) ? arr.length : 0);
-      } catch (err) {
-        setFavoritesCount(0);
-      }
-    };
-    window.addEventListener('favorites:changed', handler);
-    return () => window.removeEventListener('favorites:changed', handler);
-  }, []);
+  useAuth();
 
   const views = [
     { id: 'shop', name: 'Cửa hàng', icon: IoStorefront, component: CustomerShop },
@@ -84,7 +30,6 @@ const CustomerLayout = ({ children }) => {
   const outlet = useOutlet();
 
   const location = useLocation();
-  const navigate = useNavigate();
 
   // If URL contains ?view=favorites allow external navigation to switch tabs
   useEffect(() => {
@@ -110,127 +55,11 @@ const CustomerLayout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold text-primary">FurniShop</h1>
-              </div>
-            </div>
+      {/* Shared Header for shop pages */}
+      <Header />
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex space-x-8">
-              {views.map((view) => (
-                <button
-                  key={view.id}
-                  onClick={() => setCurrentView(view.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    currentView === view.id
-                      ? 'bg-primary text-white'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  <view.icon className="w-4 h-4" />
-                  {view.name}
-                </button>
-              ))}
-            </nav>
-
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-4">
-              {/* Search */}
-              <div className="hidden sm:block">
-                <div className="relative">
-                  <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Tìm kiếm sản phẩm..."
-                    className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Cart */}
-              <button className="relative p-2 text-gray-600 hover:text-gray-900">
-                <IoCart className="w-6 h-6" />
-                {cartCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Favorites */}
-              <button 
-                onClick={() => {
-                  setCurrentView('favorites');
-                  try { navigate(`${location.pathname}?view=favorites`); } catch (e) { /* ignore */ }
-                }}
-                className="relative p-2 text-gray-600 hover:text-gray-900"
-              >
-                <IoHeart className="w-6 h-6" />
-                {favoritesCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {favoritesCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Notifications */}
-              <button 
-                onClick={() => setCurrentView('notifications')}
-                className="relative p-2 text-gray-600 hover:text-gray-900"
-              >
-                <IoNotifications className="w-6 h-6" />
-                {notificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {notificationsCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 text-gray-600 hover:text-gray-900"
-              >
-                {isMobileMenuOpen ? <IoClose className="w-6 h-6" /> : <IoMenu className="w-6 h-6" />}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 bg-white">
-            <div className="px-4 py-2 space-y-1">
-              {views.map((view) => (
-                <button
-                  key={view.id}
-                  onClick={() => {
-                    setCurrentView(view.id);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg transition-colors ${
-                    currentView === view.id
-                      ? 'bg-primary text-white'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  <view.icon className="w-4 h-4" />
-                  {view.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* Main Content (add top padding to avoid being covered by sticky header) */}
-      <main className="pt-16">
+      {/* Main Content (add top padding to avoid being covered by fixed header height h-20) */}
+      <main className="pt-20">
         {renderCurrentView()}
       </main>
 

@@ -22,7 +22,8 @@ import com.noithat.qlnt.backend.service.IAttributeService;
 @RestController
 @RequestMapping("/api/attributes")
 public class AttributeController {
-    @Autowired private IAttributeService attributeService;
+    @Autowired
+    private IAttributeService attributeService;
 
     // ===== Thuộc tính (Attribute) =====
     @PostMapping

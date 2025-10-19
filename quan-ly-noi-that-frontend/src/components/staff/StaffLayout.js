@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IoPerson, IoLogOut, IoMenu, IoClose, IoHome, IoStorefront, IoReceipt, IoChatbubbles, IoNotifications, IoGift, IoStar } from 'react-icons/io5';
+import { IoLogOut, IoMenu, IoClose, IoNotifications } from 'react-icons/io5';
 import StaffDashboard from './StaffDashboard';
 import WarehouseDashboard from '../shared/WarehouseDashboard';
 import CustomerManagement from '../admin/customers/CustomerManagement';
@@ -8,7 +8,7 @@ import ProductManagement from '../admin/products/ProductManagement';
 import InventoryManagement from './inventory/InventoryManagement';
 import CustomerSupport from './support/CustomerSupport';
 import LiveChat from '../shared/LiveChat';
-import PromotionManagement from '../admin/products/PromotionManagement';
+// PromotionManagement replaced by DiscountManagement in menus
 import VIPManagement from '../admin/customers/VIPManagement';
 import SalesManagement from './orders/SalesManagement';
 import ReportsAnalytics from '../admin/system/ReportsAnalytics';
@@ -37,6 +37,23 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  // Persist which child is active and which groups are open
+  const [activeItem, setActiveItem] = useState(() => {
+    try {
+      const v = localStorage.getItem('staff_activeItem');
+      return v || 'home';
+    } catch (e) {
+      return 'home';
+    }
+  });
+  const [openGroups, setOpenGroups] = useState(() => {
+    try {
+      const v = localStorage.getItem('staff_openGroups');
+      return v ? JSON.parse(v) : {};
+    } catch (e) {
+      return {};
+    }
+  });
 
   // Organized by category
   const staffCategories = {
@@ -48,7 +65,7 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     ],
     'Bán hàng': [
       { id: 'sales', name: '💰 Bán hàng', component: SalesManagement },
-      { id: 'promotions', name: '🎁 Khuyến mãi', component: PromotionManagement },
+      { id: 'promotions', name: '🎁 Khuyến mãi', component: require('../admin/products/DiscountManagement').default },
       { id: 'reports', name: '📈 Báo cáo', component: ReportsAnalytics }
     ],
     'Hỗ trợ': [
@@ -93,6 +110,47 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showCategoryDropdown]);
+
+  // Keep currentView in sync with activeItem when activeItem changes
+  useEffect(() => {
+    if (activeItem) setCurrentView(activeItem);
+  }, [activeItem]);
+
+  const persistOpenGroups = (next) => {
+    try {
+      localStorage.setItem('staff_openGroups', JSON.stringify(next));
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const persistActiveItem = (id) => {
+    try {
+      localStorage.setItem('staff_activeItem', id);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const toggleGroup = (category) => {
+    const next = { ...openGroups, [category]: !openGroups[category] };
+    setOpenGroups(next);
+    persistOpenGroups(next);
+  };
+
+  const selectView = (id, category) => {
+    setActiveItem(id);
+    persistActiveItem(id);
+    setCurrentView(id);
+    // ensure parent group is open
+    if (category) {
+      const next = { ...openGroups, [category]: true };
+      setOpenGroups(next);
+      persistOpenGroups(next);
+    }
+    // close mobile menu if open
+    if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+  };
 
   const renderCurrentView = () => {
     // If a routed child component was passed (e.g. <StaffLayout><InventoryManagement/></StaffLayout>), render it.
@@ -184,35 +242,37 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
                 {showCategoryDropdown && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                     {Object.keys(categories).map((category) => (
-                      <div key={category}>
-                        <button
-                          onClick={() => {
-                            setSelectedCategory(category);
-                            setShowCategoryDropdown(false);
-                          }}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-900 border-b border-gray-200"
-                        >
-                          📁 {category}
-                        </button>
-                        {selectedCategory === category && (
-                          <div className="bg-gray-50 p-2 space-y-1">
-                            {categories[category].map((view) => (
-                              <button
-                                key={view.id}
-                                onClick={() => setCurrentView(view.id)}
-                                className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                                  currentView === view.id
-                                    ? 'bg-primary text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                                }`}
-                              >
-                                {view.name}
-                              </button>
-                            ))}
+                          <div key={category}>
+                            <button
+                              onClick={() => {
+                                setSelectedCategory(category);
+                                setShowCategoryDropdown(false);
+                              }}
+                              className={`w-full text-left px-4 py-2 hover:bg-gray-100 font-medium text-gray-900 border-b border-gray-200 ${
+                                openGroups[category] ? 'bg-gray-100' : ''
+                              }`}
+                            >
+                              📁 {category}
+                            </button>
+                            {selectedCategory === category && (
+                              <div className="bg-gray-50 p-2 space-y-1">
+                                {categories[category].map((view) => (
+                                  <button
+                                    key={view.id}
+                                    onClick={() => selectView(view.id, category)}
+                                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                                      activeItem === view.id
+                                        ? 'bg-primary text-white'
+                                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    {view.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        ))}
                   </div>
                 )}
                 
@@ -226,9 +286,9 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
                       {categories[selectedCategory].map((view) => (
                         <button
                           key={view.id}
-                          onClick={() => setCurrentView(view.id)}
+                          onClick={() => selectView(view.id, selectedCategory)}
                           className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
-                            currentView === view.id
+                            activeItem === view.id
                               ? 'bg-primary text-white'
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
@@ -287,12 +347,9 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
               {allViews.map((view) => (
                 <button
                   key={view.id}
-                  onClick={() => {
-                    setCurrentView(view.id);
-                    setIsMobileMenuOpen(false);
-                  }}
+                  onClick={() => selectView(view.id)}
                   className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg transition-colors ${
-                    currentView === view.id
+                    activeItem === view.id
                       ? 'bg-primary text-white'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}

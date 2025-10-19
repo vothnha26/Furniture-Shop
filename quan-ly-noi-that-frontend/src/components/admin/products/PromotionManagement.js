@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { IoAdd, IoSearch, IoCreate, IoTrash, IoEye, IoGift, IoCalendar, IoTime, IoPercent, IoCheckmark, IoClose } from 'react-icons/io5';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { IoAdd, IoSearch, IoCreate, IoTrash, IoEye, IoGift, IoTime, IoCheckmark, IoClose } from 'react-icons/io5';
 import api from '../../../api';
 
 const PromotionManagement = () => {
@@ -31,19 +32,7 @@ const PromotionManagement = () => {
     return typeMap[type] || type;
   };
 
-  const mapPromotionToApi = (promotion) => ({
-    tenChuongTrinh: promotion.name,
-    maCode: promotion.code,
-    loaiGiamGia: promotion.type === 'percentage' ? 'PERCENTAGE' : 'FIXED',
-    giaTriGiam: promotion.value,
-    giaTriDonHangToiThieu: promotion.minOrder,
-    giaTriGiamToiDa: promotion.maxDiscount,
-    ngayBatDau: promotion.startDate,
-    ngayKetThuc: promotion.endDate,
-    soLuongToiDa: promotion.usageLimit,
-    moTa: promotion.description,
-    trangThai: promotion.status
-  });
+  // mapPromotionToApi kept out for now until API save is wired
 
   // Fetch promotions
   useEffect(() => {
@@ -62,9 +51,14 @@ const PromotionManagement = () => {
       }
     };
     fetchPromotions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [promotions, setPromotions] = useState([]);
+
+  // route params (for direct edit/add links)
+  const { id: routeId } = useParams() || {};
+  const location = useLocation();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -139,9 +133,17 @@ const PromotionManagement = () => {
     setPromotions(promotions.filter(promotion => promotion.id !== id));
   };
 
+  const navigate = useNavigate();
+
   const handleEditPromotion = (promotion) => {
     setSelectedPromotion(promotion);
     setShowEditModal(true);
+    // push url so direct navigation works and modal state is reflected
+    try {
+      navigate(`/admin/promotions/${promotion.id}/edit`, { replace: false });
+    } catch (e) {
+      // ignore when navigate not available in tests
+    }
   };
 
   const handleSaveEdit = () => {
@@ -152,12 +154,64 @@ const PromotionManagement = () => {
     ));
     setShowEditModal(false);
     setSelectedPromotion(null);
+    try { navigate('/admin/promotions'); } catch(e) {}
   };
 
   const handleViewPromotion = (promotion) => {
     setSelectedPromotion(promotion);
     setShowDetailModal(true);
   };
+
+  // If user navigates directly to /admin/promotions/:id or /admin/promotions/:id/edit
+  // open the edit modal and populate selectedPromotion. Also support /admin/promotions/add to
+  // open create modal.
+  useEffect(() => {
+    // open add modal when path ends with /add
+    if (location && location.pathname && location.pathname.endsWith('/add')) {
+      setShowAddModal(true);
+      return;
+    }
+
+    if (!routeId) return;
+
+    // try to find in already fetched promotions
+    const found = promotions.find(p => String(p.id) === String(routeId));
+    if (found) {
+      setSelectedPromotion(found);
+      setShowEditModal(true);
+      return;
+    }
+
+    // if not found in list (promotions might still be loading), fetch single promotion
+    const fetchSingle = async () => {
+      try {
+        const data = await api.get(`/api/chuongtrinh-giamgia/${routeId}`);
+        if (data) {
+          const mapped = {
+            id: data.maChuongTrinh || data.id,
+            name: data.tenChuongTrinh || data.name,
+            code: data.maCode || data.code,
+            type: mapPromotionType(data.loaiGiamGia || data.type),
+            value: data.giaTriGiam || data.value || 0,
+            minOrder: data.giaTriDonHangToiThieu || data.minOrder || 0,
+            maxDiscount: data.giaTriGiamToiDa || data.maxDiscount || 0,
+            startDate: data.ngayBatDau || data.startDate,
+            endDate: data.ngayKetThuc || data.endDate,
+            usageLimit: data.soLuongToiDa || data.usageLimit || 0,
+            usedCount: data.soLuongDaSuDung || data.usedCount || 0,
+            status: data.trangThai || data.status || 'active',
+            description: data.moTa || data.description || ''
+          };
+          setSelectedPromotion(mapped);
+          setShowEditModal(true);
+        }
+      } catch (err) {
+        console.error('Failed to fetch promotion by id', routeId, err);
+      }
+    };
+
+    fetchSingle();
+  }, [routeId, promotions, location]);
 
   const filteredPromotions = promotions.filter(promotion => {
     const matchesSearch = promotion.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -765,7 +819,10 @@ const PromotionManagement = () => {
               </div>
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowEditModal(false)}
+                  onClick={() => {
+                    setShowEditModal(false);
+                    try { navigate('/admin/promotions'); } catch(e) {}
+                  }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 >
                   Hủy

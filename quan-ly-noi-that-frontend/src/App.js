@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, NavLink, useLocation } from 'react-router-dom';
 
 // Import admin components
 import AccountManagement from './components/admin/system/AccountManagement';
@@ -16,7 +16,7 @@ import Notifications from './components/admin/system/Notifications';
 import ProductManagement from './components/admin/products/ProductManagement';
 import ProductVariantManagement from './components/admin/products/ProductVariantManagement';
 import ImageManagement from './components/admin/products/ImageManagement';
-import PromotionManagement from './components/admin/products/PromotionManagement';
+// PromotionManagement replaced by DiscountManagement (canonical UI)
 import ReportsAnalytics from './components/admin/system/ReportsAnalytics';
 import Settings from './components/admin/system/Settings';
 import VIPManagement from './components/admin/customers/VIPManagement';
@@ -71,6 +71,7 @@ import Footer from './components/shared/Footer';
 
 import MembershipTierManagement from './components/admin/products/MembershipTierManagement';
 import { CartProvider } from './contexts/CartContext';
+import api from './api';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Import styles
@@ -79,59 +80,212 @@ import './animations.css';
 
 // Admin Layout Component (base)
 const AdminLayoutBase = ({ children }) => {
+  const auth = useAuth();
+  const user = auth?.user || {};
+  const location = useLocation();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifBtnRef = useRef(null);
+  const notifDropdownRef = useRef(null);
+
+  const fetchNotifications = async () => {
+    if (notifLoading) return;
+    setNotifLoading(true);
+    try {
+      // try common endpoints; backend may differ
+      const tryUrls = ['/api/admin/notifications', '/api/notifications', '/api/v1/notifications'];
+      let res = null;
+      for (const u of tryUrls) {
+        try {
+          res = await api.get(u);
+          if (res) break;
+        } catch (e) {
+          // continue to next
+        }
+      }
+      const data = res?.data ?? res ?? [];
+      if (Array.isArray(data)) setNotifications(data.slice(0, 8));
+      else setNotifications([]);
+    } catch (e) {
+      setNotifications([]);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const onDocClick = (ev) => {
+      if (!notifOpen) return;
+      const btn = notifBtnRef.current;
+      const dd = notifDropdownRef.current;
+      if (btn && btn.contains(ev.target)) return;
+      if (dd && dd.contains(ev.target)) return;
+      setNotifOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, [notifOpen]);
+
+  useEffect(() => {
+    if (notifOpen && notifications.length === 0) fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifOpen]);
+
+  // persistable open groups so sidebar stays in the same state
+  const [openGroups, setOpenGroups] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem('admin_openGroups');
+      return raw ? JSON.parse(raw) : { products: true, content: false, customers: false, system: false };
+    } catch (e) {
+      return { products: true, content: false, customers: false, system: false };
+    }
+  });
+
+  const persistOpenGroups = (next) => {
+    try { localStorage.setItem('admin_openGroups', JSON.stringify(next)); } catch (e) { }
+  };
+
+  const toggleGroup = (key) => {
+    const next = { ...openGroups, [key]: !openGroups[key] };
+    setOpenGroups(next);
+    persistOpenGroups(next);
+  };
+
+  // auto-open the group containing the current route so the active link is visible
+  useEffect(() => {
+    const path = location.pathname || '';
+    const next = { ...openGroups };
+    if (path.startsWith('/admin/products')) next.products = true;
+    if (path.startsWith('/admin/discounts') || path.startsWith('/admin/vouchers') || path.startsWith('/admin/promotions')) next.content = true;
+    if (path.startsWith('/admin/customers')) next.customers = true;
+    if (path.startsWith('/admin/notifications') || path.startsWith('/admin/accounts') || path.startsWith('/admin/settings') || path.startsWith('/admin/reports')) next.system = true;
+    setOpenGroups(next);
+    persistOpenGroups(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Admin Navigation */}
-      <nav className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <a href="/admin" className="text-2xl font-bold text-orange-600">
-                  FurniShop Admin
-                </a>
+      {/* Left Sidebar flush to the left, no top header */}
+      <div className="lg:flex">
+        <aside className="w-72 bg-white border-r h-screen sticky top-0 left-0 z-20 hidden lg:block">
+          <div className="p-6 h-full">
+            <a href="/admin" className="text-2xl font-bold text-orange-600 block mb-6">FurniShop Admin</a>
+            <nav className="space-y-4">
+              {/* Products group */}
+              <div className="rounded-lg overflow-hidden">
+                <button onClick={() => toggleGroup('products')} className={`w-full flex items-center justify-between px-3 py-3 bg-white hover:bg-gray-50 transition-colors ${openGroups.products ? 'border-l-4 border-orange-500' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-orange-50 text-orange-600 rounded flex items-center justify-center">📦</div>
+                    <div className="font-medium text-gray-800">Sản phẩm</div>
+                  </div>
+                  <div className={`text-gray-400 transform transition-transform ${openGroups.products ? 'rotate-180' : ''}`}>▾</div>
+                </button>
+                <div className={`${openGroups.products ? 'block' : 'hidden'} bg-white`}> 
+                  <div className="pl-12 pr-4 py-2 space-y-1">
+                    <NavLink to="/admin/products" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`} end>Danh sách sản phẩm</NavLink>
+                    <NavLink to="/admin/products/variants" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Biến thể</NavLink>
+                    <NavLink to="/admin/attributes" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Thuộc tính</NavLink>
+                    <NavLink to="/admin/categories" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Danh mục</NavLink>
+                    <NavLink to="/admin/collections" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Collections</NavLink>
+                  </div>
+                </div>
               </div>
 
-              {/* Admin Nav Links */}
-              <div className="hidden md:ml-6 md:flex md:space-x-4">
-                <a href="/admin/dashboard" className="text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium">
-                  📊 Dashboard
-                </a>
-                <a href="/admin/products" className="text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium">
-                  📦 Sản phẩm
-                </a>
-                <a href="/admin/customers" className="text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium">
-                  👤 Khách hàng
-                </a>
-                <a href="/admin/orders" className="text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium">
-                  🛒 Đơn hàng
-                </a>
-                <a href="/admin/reports" className="text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium">
-                  📈 Báo cáo
-                </a>
+              {/* Content group */}
+              <div className="rounded-lg overflow-hidden">
+                <button onClick={() => toggleGroup('content')} className={`w-full flex items-center justify-between px-3 py-3 bg-white hover:bg-gray-50 transition-colors ${openGroups.content ? 'border-l-4 border-orange-500' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded flex items-center justify-center">🧾</div>
+                    <div className="font-medium text-gray-800">Nội dung</div>
+                  </div>
+                  <div className={`text-gray-400 transform transition-transform ${openGroups.content ? 'rotate-180' : ''}`}>▾</div>
+                </button>
+                <div className={`${openGroups.content ? 'block' : 'hidden'} bg-white`}>
+                  <div className="pl-12 pr-4 py-2 space-y-1">
+                    <NavLink to="/admin/discounts" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Khuyến mãi</NavLink>
+                    <NavLink to="/admin/vouchers" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Voucher</NavLink>
+                  </div>
+                </div>
               </div>
+
+              {/* Customers group */}
+              <div className="rounded-lg overflow-hidden">
+                <button onClick={() => toggleGroup('customers')} className={`w-full flex items-center justify-between px-3 py-3 bg-white hover:bg-gray-50 transition-colors ${openGroups.customers ? 'border-l-4 border-orange-500' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-purple-50 text-purple-600 rounded flex items-center justify-center">👥</div>
+                    <div className="font-medium text-gray-800">Khách hàng</div>
+                  </div>
+                  <div className={`text-gray-400 transform transition-transform ${openGroups.customers ? 'rotate-180' : ''}`}>▾</div>
+                </button>
+                <div className={`${openGroups.customers ? 'block' : 'hidden'} bg-white`}>
+                  <div className="pl-12 pr-4 py-2 space-y-1">
+                    <NavLink to="/admin/customers" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Danh sách khách</NavLink>
+                    <NavLink to="/admin/customers/vip" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>VIP</NavLink>
+                  </div>
+                </div>
+              </div>
+
+              {/* System group */}
+              <div className="rounded-lg overflow-hidden">
+                <button onClick={() => toggleGroup('system')} className={`w-full flex items-center justify-between px-3 py-3 bg-white hover:bg-gray-50 transition-colors ${openGroups.system ? 'border-l-4 border-orange-500' : ''}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded flex items-center justify-center">⚙️</div>
+                    <div className="font-medium text-gray-800">Hệ thống</div>
+                  </div>
+                  <div className={`text-gray-400 transform transition-transform ${openGroups.system ? 'rotate-180' : ''}`}>▾</div>
+                </button>
+                <div className={`${openGroups.system ? 'block' : 'hidden'} bg-white`}>
+                  <div className="pl-12 pr-4 py-2 space-y-1">
+                    <NavLink to="/admin/notifications" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Thông báo</NavLink>
+                    <NavLink to="/admin/account" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Tài khoản</NavLink>
+                    <NavLink to="/admin/settings" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Cài đặt</NavLink>
+                    <NavLink to="/admin/reports" className={({isActive}) => `block text-sm rounded px-2 py-1 ${isActive ? 'text-orange-600 bg-gray-50' : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'}`}>Báo cáo</NavLink>
+                  </div>
+                </div>
+              </div>
+            </nav>
+          </div>
+        </aside>
+
+        <div className="flex-1 lg:ml-0">
+          <div className="flex items-center justify-end gap-4 p-4 border-b bg-white relative">
+            <div className="relative">
+              <button ref={notifBtnRef} onClick={() => setNotifOpen(v => !v)} className="text-gray-600 hover:text-gray-800 text-lg">🔔</button>
+              {notifOpen && (
+                <div ref={notifDropdownRef} className="absolute right-0 mt-2 w-80 bg-white border rounded-md shadow-lg z-50">
+                  <div className="p-3 border-b flex items-center justify-between">
+                    <div className="font-medium">Thông báo gần đây</div>
+                    <a href="/admin/notifications" className="text-sm text-blue-600">Xem tất cả</a>
+                  </div>
+                  <div className="max-h-64 overflow-auto">
+                    {notifLoading ? (
+                      <div className="p-4 text-center text-sm text-gray-500">Đang tải...</div>
+                    ) : (notifications.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">Không có thông báo</div>
+                    ) : (
+                      notifications.map((n, idx) => (
+                        <a key={idx} href={n.link ?? '#'} className="block p-3 hover:bg-gray-50 border-b last:border-b-0 text-sm">
+                          <div className="font-medium text-gray-800">{n.title ?? n.tieuDe ?? 'Thông báo'}</div>
+                          <div className="text-xs text-gray-500 mt-1">{n.summary ?? n.noiDung ?? ''}</div>
+                        </a>
+                      ))
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Right side */}
-            <div className="flex items-center space-x-4">
-              <a href="/admin/notifications" className="text-gray-700 hover:text-orange-600">
-                🔔
-              </a>
-              <a href="/admin/settings" className="text-gray-700 hover:text-orange-600">
-                ⚙️
-              </a>
-              <a href="/" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
-                🏠 Trang chủ
-              </a>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-gray-600">{user?.fullName ?? user?.name ?? user?.ten ?? 'Nhân viên'}</div>
+              <a href="/admin/account" className="px-3 py-1 bg-gray-100 text-sm rounded-md">Tài khoản</a>
             </div>
           </div>
+          <main className="p-6 lg:pl-8">
+            {children}
+          </main>
         </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="py-6">
-        {children}
-      </main>
+      </div>
     </div>
   );
 };
@@ -150,7 +304,8 @@ const AdminLayout = ({ children }) => {
 
   return (
     <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
-      <AdminLayoutBase>{children}</AdminLayoutBase>
+      {/* Render Outlet (children routes) inside AdminLayoutBase so the sidebar stays mounted */}
+      <AdminLayoutBase>{children ?? <Outlet />}</AdminLayoutBase>
     </ProtectedRoute>
   );
 };
@@ -281,147 +436,146 @@ const App = () => {
 
 
           {/* ============================================
-            ADMIN ROUTES - Quản trị viên
+            ADMIN ROUTES - Quản trị viên (nested so AdminLayout stays mounted)
         ============================================ */}
 
-          {/* Admin Dashboard */}
-          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="/admin/dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
+          <Route path="/admin/*" element={<AdminLayout /> }>
+            {/* default admin root -> dashboard */}
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
 
-          {/* Product Management */}
-          <Route path="/admin/products" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-          <Route path="/admin/products/add" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-          <Route path="/admin/products/:id" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-          <Route path="/admin/products/:id/edit" element={<AdminLayout><ProductManagement /></AdminLayout>} />
-          <Route path="/admin/products/:id/images" element={<AdminLayout><ImageManagement /></AdminLayout>} />
-          <Route path="/admin/products/:id/variants" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-          <Route path="/admin/products/variants" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-          <Route path="/admin/products/variants/add" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
-          <Route path="/admin/products/variants/:id" element={<AdminLayout><ProductVariantManagement /></AdminLayout>} />
+            {/* Product Management */}
+            <Route path="products" element={<ProductManagement />} />
+            <Route path="products/add" element={<ProductManagement />} />
+            <Route path="products/:id" element={<ProductManagement />} />
+            <Route path="products/:id/edit" element={<ProductManagement />} />
+            <Route path="products/:id/images" element={<ImageManagement />} />
+            <Route path="products/:id/variants" element={<ProductVariantManagement />} />
+            <Route path="products/variants" element={<ProductVariantManagement />} />
+            <Route path="products/variants/add" element={<ProductVariantManagement />} />
+            <Route path="products/variants/:id" element={<ProductVariantManagement />} />
 
-          {/* Category Management */}
-          <Route path="/admin/categories" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-          <Route path="/admin/categories/add" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-          <Route path="/admin/categories/:id" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
-          <Route path="/admin/categories/:id/edit" element={<AdminLayout><CategoryManagement /></AdminLayout>} />
+            {/* Category & Collection */}
+            <Route path="categories" element={<CategoryManagement />} />
+            <Route path="categories/add" element={<CategoryManagement />} />
+            <Route path="categories/:id" element={<CategoryManagement />} />
+            <Route path="categories/:id/edit" element={<CategoryManagement />} />
+            <Route path="collections" element={<CollectionManagement />} />
+            <Route path="collections/add" element={<CollectionManagement />} />
+            <Route path="collections/:id" element={<CollectionManagement />} />
+            <Route path="collections/:id/edit" element={<CollectionManagement />} />
 
-          {/* Collection Management */}
-          <Route path="/admin/collections" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-          <Route path="/admin/collections/add" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-          <Route path="/admin/collections/:id" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
-          <Route path="/admin/collections/:id/edit" element={<AdminLayout><CollectionManagement /></AdminLayout>} />
+            {/* Attributes */}
+            <Route path="attributes" element={<AttributeManagement />} />
+            <Route path="attributes/add" element={<AttributeManagement />} />
+            <Route path="attributes/:id" element={<AttributeManagement />} />
+            <Route path="attributes/:id/edit" element={<AttributeManagement />} />
+            <Route path="attribute-values" element={<AttributeValueManagement />} />
+            <Route path="attribute-values/add" element={<AttributeValueManagement />} />
+            <Route path="attribute-values/:id" element={<AttributeValueManagement />} />
 
-          {/* Attribute Management */}
-          <Route path="/admin/attributes" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-          <Route path="/admin/attributes/add" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-          <Route path="/admin/attributes/:id" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-          <Route path="/admin/attributes/:id/edit" element={<AdminLayout><AttributeManagement /></AdminLayout>} />
-          <Route path="/admin/attribute-values" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
-          <Route path="/admin/attribute-values/add" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
-          <Route path="/admin/attribute-values/:id" element={<AdminLayout><AttributeValueManagement /></AdminLayout>} />
+            {/* Customers */}
+            <Route path="customers" element={<CustomerManagement />} />
+            <Route path="customers/add" element={<CustomerManagement />} />
+            <Route path="customers/:id" element={<CustomerManagement />} />
+            <Route path="customers/:id/edit" element={<CustomerManagement />} />
+            <Route path="customers/:id/orders" element={<CustomerManagement />} />
+            <Route path="customers/:id/points" element={<CustomerManagement />} />
 
-          {/* Customer Management */}
-          <Route path="/admin/customers" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-          <Route path="/admin/customers/add" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-          <Route path="/admin/customers/:id" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-          <Route path="/admin/customers/:id/edit" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-          <Route path="/admin/customers/:id/orders" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
-          <Route path="/admin/customers/:id/points" element={<AdminLayout><CustomerManagement /></AdminLayout>} />
+            {/* VIP & Membership */}
+            <Route path="vip" element={<VIPManagement />} />
+            <Route path="vip/levels" element={<VIPManagement />} />
+            <Route path="vip/levels/add" element={<VIPManagement />} />
+            <Route path="vip/levels/:id" element={<VIPManagement />} />
+            <Route path="vip/customers" element={<VIPManagement />} />
+            <Route path="membership" element={<Navigate to="/admin/vip" replace />} />
 
-          {/* VIP & Membership Management */}
-          <Route path="/admin/vip" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-          <Route path="/admin/vip/levels" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-          <Route path="/admin/vip/levels/add" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-          <Route path="/admin/vip/levels/:id" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-          <Route path="/admin/vip/customers" element={<AdminLayout><VIPManagement /></AdminLayout>} />
-          <Route path="/admin/membership" element={<Navigate to="/admin/vip" replace />} />
+            {/* Orders */}
+            <Route path="orders" element={<OrderManagement />} />
+            <Route path="orders/add" element={<OrderManagement />} />
+            <Route path="orders/:id" element={<OrderDetailManagement />} />
+            <Route path="orders/:id/edit" element={<OrderDetailManagement />} />
+            <Route path="orders/:id/status" element={<OrderDetailManagement />} />
+            <Route path="orders/:id/cancel" element={<OrderDetailManagement />} />
 
-          {/* Order Management */}
-          <Route path="/admin/orders" element={<AdminLayout><OrderManagement /></AdminLayout>} />
-          <Route path="/admin/orders/add" element={<AdminLayout><OrderManagement /></AdminLayout>} />
-          <Route path="/admin/orders/:id" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-          <Route path="/admin/orders/:id/edit" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-          <Route path="/admin/orders/:id/status" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
-          <Route path="/admin/orders/:id/cancel" element={<AdminLayout><OrderDetailManagement /></AdminLayout>} />
+            {/* Invoices */}
+            <Route path="invoices" element={<InvoiceManagement />} />
+            <Route path="invoices/:id" element={<InvoiceManagement />} />
+            <Route path="invoices/:id/print" element={<InvoiceManagement />} />
 
-          {/* Invoice Management */}
-          <Route path="/admin/invoices" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
-          <Route path="/admin/invoices/:id" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
-          <Route path="/admin/invoices/:id/print" element={<AdminLayout><InvoiceManagement /></AdminLayout>} />
+            {/* Payments */}
+            <Route path="payments" element={<PaymentTransactionManagement />} />
+            <Route path="payments/:id" element={<PaymentTransactionManagement />} />
+            <Route path="payments/pending" element={<PaymentTransactionManagement />} />
+            <Route path="payments/completed" element={<PaymentTransactionManagement />} />
+            <Route path="transactions" element={<Navigate to="/admin/payments" replace />} />
 
-          {/* Payment Management */}
-          <Route path="/admin/payments" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-          <Route path="/admin/payments/:id" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-          <Route path="/admin/payments/pending" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-          <Route path="/admin/payments/completed" element={<AdminLayout><PaymentTransactionManagement /></AdminLayout>} />
-          <Route path="/admin/transactions" element={<Navigate to="/admin/payments" replace />} />
+            {/* Promotions / Discounts */}
+            <Route path="promotions" element={<Navigate to="/admin/discounts" replace />} />
+            <Route path="promotions/add" element={<Navigate to="/admin/discounts/add" replace />} />
+            <Route path="promotions/:id" element={<Navigate to="/admin/discounts/:id" replace />} />
+            <Route path="promotions/:id/edit" element={<Navigate to="/admin/discounts/:id/edit" replace />} />
+            <Route path="discounts" element={<DiscountManagement />} />
+            <Route path="discounts/add" element={<DiscountManagement />} />
+            <Route path="discounts/:id" element={<DiscountManagement />} />
+            <Route path="discounts/:id/edit" element={<DiscountManagement />} />
 
-          {/* Promotion & Discount Management */}
-          <Route path="/admin/promotions" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-          <Route path="/admin/promotions/add" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-          <Route path="/admin/promotions/:id" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
-          <Route path="/admin/promotions/:id/edit" element={<AdminLayout><PromotionManagement /></AdminLayout>} />
+            {/* Vouchers */}
+            <Route path="vouchers" element={<VoucherManagement />} />
+            <Route path="vouchers/add" element={<VoucherManagement />} />
+            <Route path="vouchers/:id" element={<VoucherManagement />} />
+            <Route path="vouchers/:id/edit" element={<VoucherManagement />} />
+            <Route path="vouchers/:id/assign" element={<VoucherManagement />} />
 
-          <Route path="/admin/discounts" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-          <Route path="/admin/discounts/add" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-          <Route path="/admin/discounts/:id" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
-          <Route path="/admin/discounts/:id/edit" element={<AdminLayout><DiscountManagement /></AdminLayout>} />
+            {/* Inventory */}
+            <Route path="inventory" element={<InventoryAlerts />} />
+            <Route path="inventory/alerts" element={<InventoryAlerts />} />
+            <Route path="inventory/stock" element={<InventoryAlerts />} />
+            <Route path="inventory/import" element={<InventoryAlerts />} />
+            <Route path="inventory/export" element={<InventoryAlerts />} />
 
-          {/* Voucher Management */}
-          <Route path="/admin/vouchers" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-          <Route path="/admin/vouchers/add" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-          <Route path="/admin/vouchers/:id" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-          <Route path="/admin/vouchers/:id/edit" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
-          <Route path="/admin/vouchers/:id/assign" element={<AdminLayout><VoucherManagement /></AdminLayout>} />
+            {/* Sales */}
+            <Route path="sales" element={<SalesManagement />} />
+            <Route path="sales/pos" element={<SalesManagement />} />
+            <Route path="sales/statistics" element={<SalesManagement />} />
 
-          {/* Inventory Management */}
-          <Route path="/admin/inventory" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-          <Route path="/admin/inventory/alerts" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-          <Route path="/admin/inventory/stock" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-          <Route path="/admin/inventory/import" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
-          <Route path="/admin/inventory/export" element={<AdminLayout><InventoryAlerts /></AdminLayout>} />
+            {/* Reports */}
+            <Route path="reports" element={<ReportsAnalytics />} />
+            <Route path="reports/revenue" element={<ReportsAnalytics />} />
+            <Route path="reports/products" element={<ReportsAnalytics />} />
+            <Route path="reports/customers" element={<ReportsAnalytics />} />
+            <Route path="reports/inventory" element={<ReportsAnalytics />} />
+            <Route path="analytics" element={<Navigate to="/admin/reports" replace />} />
 
-          {/* Sales Management */}
-          <Route path="/admin/sales" element={<AdminLayout><SalesManagement /></AdminLayout>} />
-          <Route path="/admin/sales/pos" element={<AdminLayout><SalesManagement /></AdminLayout>} />
-          <Route path="/admin/sales/statistics" element={<AdminLayout><SalesManagement /></AdminLayout>} />
+            {/* Accounts */}
+            <Route path="accounts" element={<AccountManagement />} />
+            <Route path="accounts/add" element={<AccountManagement />} />
+            <Route path="accounts/:id" element={<AccountManagement />} />
+            <Route path="accounts/:id/edit" element={<AccountManagement />} />
+            <Route path="users" element={<Navigate to="/admin/accounts" replace />} />
 
-          {/* Reports & Analytics */}
-          <Route path="/admin/reports" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-          <Route path="/admin/reports/revenue" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-          <Route path="/admin/reports/products" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-          <Route path="/admin/reports/customers" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-          <Route path="/admin/reports/inventory" element={<AdminLayout><ReportsAnalytics /></AdminLayout>} />
-          <Route path="/admin/analytics" element={<Navigate to="/admin/reports" replace />} />
+            {/* Settings */}
+            <Route path="settings" element={<Settings />} />
+            <Route path="settings/general" element={<Settings />} />
+            <Route path="settings/payment" element={<Settings />} />
+            <Route path="settings/shipping" element={<Settings />} />
+            <Route path="settings/email" element={<Settings />} />
+            <Route path="settings/sms" element={<Settings />} />
 
-          {/* Account & User Management */}
-          <Route path="/admin/accounts" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-          <Route path="/admin/accounts/add" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-          <Route path="/admin/accounts/:id" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-          <Route path="/admin/accounts/:id/edit" element={<AdminLayout><AccountManagement /></AdminLayout>} />
-          <Route path="/admin/users" element={<Navigate to="/admin/accounts" replace />} />
+            {/* Backup & Restore */}
+            <Route path="backup" element={<BackupRestore />} />
+            <Route path="backup/create" element={<BackupRestore />} />
+            <Route path="backup/restore" element={<BackupRestore />} />
+            <Route path="backup/schedule" element={<BackupRestore />} />
 
-          {/* System Settings */}
-          <Route path="/admin/settings" element={<AdminLayout><Settings /></AdminLayout>} />
-          <Route path="/admin/settings/general" element={<AdminLayout><Settings /></AdminLayout>} />
-          <Route path="/admin/settings/payment" element={<AdminLayout><Settings /></AdminLayout>} />
-          <Route path="/admin/settings/shipping" element={<AdminLayout><Settings /></AdminLayout>} />
-          <Route path="/admin/settings/email" element={<AdminLayout><Settings /></AdminLayout>} />
-          <Route path="/admin/settings/sms" element={<AdminLayout><Settings /></AdminLayout>} />
+            {/* Notifications */}
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="notifications/send" element={<Notifications />} />
 
-          {/* Backup & Restore */}
-          <Route path="/admin/backup" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-          <Route path="/admin/backup/create" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-          <Route path="/admin/backup/restore" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-          <Route path="/admin/backup/schedule" element={<AdminLayout><BackupRestore /></AdminLayout>} />
-
-          {/* Notifications */}
-          <Route path="/admin/notifications" element={<AdminLayout><Notifications /></AdminLayout>} />
-          <Route path="/admin/notifications/send" element={<AdminLayout><Notifications /></AdminLayout>} />
-
-          {/* Backend Explorer - Development Tool */}
-          <Route path="/admin/backend-explorer" element={<AdminLayout><BackendExplorer /></AdminLayout>} />
-          <Route path="/admin/api-explorer" element={<Navigate to="/admin/backend-explorer" replace />} />
+            {/* Backend explorer */}
+            <Route path="backend-explorer" element={<BackendExplorer />} />
+            <Route path="api-explorer" element={<Navigate to="/admin/backend-explorer" replace />} />
+          </Route>
 
 
           {/* ============================================

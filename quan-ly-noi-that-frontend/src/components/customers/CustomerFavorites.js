@@ -49,6 +49,7 @@ const CustomerFavorites = () => {
         try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mapped.length } })); } catch (err) {}
       } catch (e) {
         console.debug('Favorites API not available', e);
+        try { window.__FAVORITES_API_BROKEN = true; } catch (err) {}
         // Fallback to localStorage favorites saved by shop page
         try {
           const raw = localStorage.getItem('favorites') || '[]';
@@ -122,8 +123,9 @@ const CustomerFavorites = () => {
     ));
   };
 
+  const _search = String(searchTerm || '').toLowerCase();
   const filteredFavorites = favorites.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    String(item?.name || '').toLowerCase().includes(_search)
   );
 
   return (

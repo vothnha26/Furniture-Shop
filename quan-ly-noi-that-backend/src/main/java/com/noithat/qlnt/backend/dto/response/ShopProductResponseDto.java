@@ -43,6 +43,19 @@ public class ShopProductResponseDto {
     // Ratings
     private Double averageRating;
     private Integer reviewCount;
+    // Category and supplier info for shop filtering
+    private CategoryDto category;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class SupplierDto {
+        private Integer id;
+        private String name;
+    }
+    private SupplierDto supplier;
 
     @Getter
     @Setter

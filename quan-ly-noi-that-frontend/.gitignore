@@ -1,0 +1,18 @@
+# Node modules and cache
+node_modules/
+.cache/
+*.log
+# Build output
+dist/
+build/
+# OS files
+.DS_Store
+Thumbs.db
+# Env files
+.env
+.env.*
+# IDE
+.vscode/
+.idea/
+# Ignore pack files
+*.pack

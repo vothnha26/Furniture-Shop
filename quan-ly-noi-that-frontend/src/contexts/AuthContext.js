@@ -242,11 +242,15 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await api.put('/api/v1/khach-hang/' + (profileData.maKhachHang || ''), profileData);
+      // Use /me endpoint for customer self-update
+      const response = await api.put('/api/v1/khach-hang/me', profileData);
       const userData = response.data || response;
-      setUser(userData);
-      try { localStorage.setItem('user', JSON.stringify(userData)); } catch (e) { }
-      return { success: true, data: userData };
+      
+      // Merge with existing user data to preserve other fields
+      const mergedUser = { ...user, ...userData };
+      setUser(mergedUser);
+      try { localStorage.setItem('user', JSON.stringify(mergedUser)); } catch (e) { }
+      return { success: true, data: mergedUser };
     } catch (error) {
       return { success: false, error: error.response?.data?.message || error.message || 'Cập nhật thất bại' };
     }

@@ -111,6 +111,68 @@ public class KhachHangController {
         return ResponseEntity.status(404).build();
     }
 
+    // [Quyền: Khách hàng (Auth)] - Cập nhật thông tin cá nhân của chính mình
+    @PutMapping("/me")
+    public ResponseEntity<KhachHang> updateMyProfile(
+            @Valid @RequestBody KhachHang request,
+            java.security.Principal principal) {
+        
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        String username = principal.getName();
+        
+        // Find customer by linked account username
+        try {
+            java.util.Optional<KhachHang> maybe = khachHangRepository
+                    .findByTaiKhoan_TenDangNhap(username);
+            
+            if (maybe != null && maybe.isPresent()) {
+                KhachHang existingKhachHang = maybe.get();
+                Integer maKhachHang = existingKhachHang.getMaKhachHang();
+                
+                // Update only allowed fields for customer self-update
+                existingKhachHang.setHoTen(request.getHoTen());
+                existingKhachHang.setEmail(request.getEmail());
+                existingKhachHang.setSoDienThoai(request.getSoDienThoai());
+                existingKhachHang.setDiaChi(request.getDiaChi());
+                existingKhachHang.setNgaySinh(request.getNgaySinh());
+                existingKhachHang.setGioiTinh(request.getGioiTinh());
+                
+                // Save updated customer
+                KhachHang updated = khachHangService.update(maKhachHang, existingKhachHang);
+                return ResponseEntity.ok(updated);
+            }
+        } catch (Exception ex) {
+            System.err.println("[KhachHangController] update profile failed: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+        
+        // Fallback: try to find by phone number (legacy)
+        try {
+            KhachHang byPhone = khachHangService.findBySoDienThoai(username);
+            if (byPhone != null) {
+                Integer maKhachHang = byPhone.getMaKhachHang();
+                
+                // Update only allowed fields
+                byPhone.setHoTen(request.getHoTen());
+                byPhone.setEmail(request.getEmail());
+                byPhone.setSoDienThoai(request.getSoDienThoai());
+                byPhone.setDiaChi(request.getDiaChi());
+                byPhone.setNgaySinh(request.getNgaySinh());
+                byPhone.setGioiTinh(request.getGioiTinh());
+                
+                KhachHang updated = khachHangService.update(maKhachHang, byPhone);
+                return ResponseEntity.ok(updated);
+            }
+        } catch (Exception ex) {
+            System.err.println("[KhachHangController] phone update failed: " + ex.getMessage());
+        }
+        
+        return ResponseEntity.status(404).build();
+    }
+
     // [Quyền: Khách hàng (Auth), Nhân viên/Admin] - Lấy danh sách đơn hàng của
     // khách hàng
     @GetMapping("/{maKhachHang}/don-hang")

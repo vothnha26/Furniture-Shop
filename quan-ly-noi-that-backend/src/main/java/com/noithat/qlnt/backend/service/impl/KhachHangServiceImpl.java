@@ -69,16 +69,26 @@ public class KhachHangServiceImpl implements IKhachHangService {
     @Transactional
     public KhachHang update(Integer maKhachHang, KhachHang request) {
         KhachHang existing = getKhachHangProfile(maKhachHang);
-        existing.setHoTen(request.getHoTen());
-        existing.setEmail(request.getEmail());
-        existing.setSoDienThoai(request.getSoDienThoai());
-        existing.setDiemThuong(request.getDiemThuong());
-        if (request.getHangThanhVien() != null) {
+        // Partial update: only overwrite fields that are provided (non-null)
+        if (request.getHoTen() != null) existing.setHoTen(request.getHoTen());
+        if (request.getEmail() != null) existing.setEmail(request.getEmail());
+        if (request.getSoDienThoai() != null) existing.setSoDienThoai(request.getSoDienThoai());
+        if (request.getDiaChi() != null) existing.setDiaChi(request.getDiaChi());
+        // Update ngaySinh and gioiTinh if provided
+        if (request.getNgaySinh() != null) existing.setNgaySinh(request.getNgaySinh());
+        if (request.getGioiTinh() != null) existing.setGioiTinh(request.getGioiTinh());
+
+        // Only update diemThuong if explicitly provided (avoid nulling out)
+        if (request.getDiemThuong() != null) existing.setDiemThuong(request.getDiemThuong());
+
+        // Update hang thanh vien only when provided and valid
+        if (request.getHangThanhVien() != null && request.getHangThanhVien().getMaHangThanhVien() != null) {
             Integer hangId = request.getHangThanhVien().getMaHangThanhVien();
             var hang = hangThanhVienRepository.findById(hangId)
                     .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
             existing.setHangThanhVien(hang);
         }
+
         return khachHangRepository.save(existing);
     }
 

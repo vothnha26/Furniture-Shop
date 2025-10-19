@@ -42,8 +42,8 @@ const CustomerProfile = () => {
             address: user.diaChi || user.address || '',
             dateOfBirth: user.ngaySinh || user.dateOfBirth || '',
             gender: user.gioiTinh || user.gender || 'male',
-            vipLevel: user.capDoThanhVien || user.vipLevel || 'bronze',
-            joinDate: user.ngayTaoTaiKhoan || user.createdAt || new Date().toISOString().split('T')[0],
+            vipLevel: user.hangThanhVien?.tenHang?.toLowerCase() || user.capDoThanhVien || user.vipLevel || 'bronze',
+            joinDate: user.ngayThamGia || user.ngayTaoTaiKhoan || user.createdAt || new Date().toISOString().split('T')[0],
             totalOrders: user.tongDonHang || user.totalOrders || 0,
             totalSpent: user.tongChiTieu || user.totalSpent || 0,
             avatar: user.avatar || user.hinhAnh || 'https://via.placeholder.com/150'
@@ -94,10 +94,21 @@ const CustomerProfile = () => {
   };
 
   const formatPrice = (price) => {
+    // Handle null, undefined, or invalid values
+    if (!price || isNaN(price)) {
+      return '0 ₫';
+    }
+    
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    
+    if (isNaN(numPrice)) {
+      return '0 ₫';
+    }
+    
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
-    }).format(price);
+    }).format(numPrice);
   };
 
   const handleEdit = () => {
@@ -119,7 +130,7 @@ const CustomerProfile = () => {
         email: editProfile.email,
         soDienThoai: editProfile.phone,
         diaChi: editProfile.address,
-        ngaySinh: editProfile.dateOfBirth,
+        ngaySinh: editProfile.dateOfBirth || null,
         gioiTinh: editProfile.gender
       };
 
@@ -159,18 +170,32 @@ const CustomerProfile = () => {
 
   const getStatusColor = (status) => {
     const colors = {
+      // English status
       delivered: 'text-green-600 bg-green-100',
       shipping: 'text-yellow-600 bg-yellow-100',
-      processing: 'text-blue-600 bg-blue-100'
+      processing: 'text-blue-600 bg-blue-100',
+      // Vietnamese status from backend
+      'CHO_XU_LY': 'text-blue-600 bg-blue-100',
+      'DANG_GIAO_HANG': 'text-yellow-600 bg-yellow-100',
+      'DA_GIAO_HANG': 'text-orange-600 bg-orange-100',
+      'HOAN_THANH': 'text-green-600 bg-green-100',
+      'DA_HUY': 'text-red-600 bg-red-100'
     };
     return colors[status] || 'text-gray-600 bg-gray-100';
   };
 
   const getStatusLabel = (status) => {
     const labels = {
+      // English status
       delivered: 'Đã giao hàng',
       shipping: 'Đang giao hàng',
-      processing: 'Đang xử lý'
+      processing: 'Đang xử lý',
+      // Vietnamese status from backend
+      'CHO_XU_LY': 'Chờ xử lý',
+      'DANG_GIAO_HANG': 'Đang giao hàng', 
+      'DA_GIAO_HANG': 'Đã giao hàng',
+      'HOAN_THANH': 'Hoàn thành',
+      'DA_HUY': 'Đã hủy'
     };
     return labels[status] || status;
   };
@@ -356,14 +381,18 @@ const CustomerProfile = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Ngày sinh
                         </label>
-                        <p className="text-gray-900">{profile.dateOfBirth}</p>
+                        <p className="text-gray-900">{profile.dateOfBirth || 'Chưa cập nhật'}</p>
                       </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Giới tính
                       </label>
-                      <p className="text-gray-900 capitalize">{profile.gender}</p>
+                      <p className="text-gray-900">
+                        {profile.gender === 'male' ? 'Nam' : 
+                         profile.gender === 'female' ? 'Nữ' : 
+                         profile.gender === 'other' ? 'Khác' : 'Chưa cập nhật'}
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -423,15 +452,17 @@ const CustomerProfile = () => {
               <div className="space-y-3">
                 {recentOrders.length > 0 ? (
                   recentOrders.map((order) => (
-                    <div key={order.id || order.maDonHang} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={order.maDonHang || order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
-                        <p className="font-medium text-gray-900">#{order.id || order.maDonHang}</p>
-                        <p className="text-sm text-gray-500">{order.date || order.ngayDatHang}</p>
+                        <p className="font-medium text-gray-900">#{order.maDonHang || order.id}</p>
+                        <p className="text-sm text-gray-500">
+                          {order.ngayDatHangStr || (order.ngayDatHang ? new Date(order.ngayDatHang).toLocaleDateString('vi-VN') : order.date)}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-gray-900">{formatPrice(order.total || order.tongTien)}</p>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status || order.trangThai)}`}>
-                          {getStatusLabel(order.status || order.trangThai)}
+                        <p className="font-medium text-gray-900">{formatPrice(order.thanhTien || order.tongTien || order.total)}</p>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.trangThai || order.status)}`}>
+                          {getStatusLabel(order.trangThai || order.status)}
                         </span>
                       </div>
                     </div>

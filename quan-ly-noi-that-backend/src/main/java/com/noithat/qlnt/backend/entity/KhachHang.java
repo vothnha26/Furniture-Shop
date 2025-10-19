@@ -32,6 +32,12 @@ public class KhachHang {
     @Column(name = "DiaChi")
     private String diaChi;
 
+    @Column(name = "NgaySinh")
+    private java.time.LocalDate ngaySinh;
+
+    @Column(name = "GioiTinh")
+    private String gioiTinh;
+
     @Column(name = "DiemThuong", nullable = false)
     private Integer diemThuong = 0;
 

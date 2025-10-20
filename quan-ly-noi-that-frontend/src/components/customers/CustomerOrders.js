@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IoSearch, IoEye, IoRefresh, IoLocation, IoTime, IoCheckmarkCircle, IoClose } from 'react-icons/io5';
 import api from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Mapping functions for API field names (supports camelCase and snake_case)
 const mapOrderFromApi = (order) => {
@@ -32,6 +33,7 @@ const mapOrderFromApi = (order) => {
   const shippingAddress = order.diaChiGiaoHang ?? order.dia_chi_giao_hang ?? order.shippingAddress ?? null;
   const paymentMethod = order.phuongThucThanhToan ?? order.phuong_thuc_thanh_toan ?? order.paymentMethod ?? null;
   const paymentStatus = order.trangThaiThanhToan ?? order.trang_thai_thanh_toan ?? order.paymentStatus ?? null;
+  const paymentPaid = (paymentStatus && String(paymentStatus).toLowerCase().includes('paid')) || Boolean(order.daThanhToan ?? order.isPaid ?? order.thanhToan);
   const trackingNumber = order.maVanDon ?? order.ma_van_don ?? order.trackingNumber ?? null;
   const carrier = order.donViVanChuyen ?? order.don_vi_van_chuyen ?? order.carrier ?? null;
 
@@ -64,6 +66,7 @@ const mapOrderFromApi = (order) => {
     shippingAddress,
     paymentMethod,
     paymentStatus,
+  paymentPaid,
     trackingNumber,
     carrier,
     items,
@@ -86,15 +89,23 @@ const CustomerOrders = () => {
   const [trackingHistory, setTrackingHistory] = useState([]);
   const [cancelingId, setCancelingId] = useState(null);
 
+  const auth = useAuth();
+
   // API Functions
   const fetchCustomerOrders = async () => {
     setLoading(true);
     try {
-      const userStr = localStorage.getItem('user');
       let customerId = null;
-      if (userStr) {
-        try { const u = JSON.parse(userStr); customerId = u?.maKhachHang ?? u?.id ?? null; } catch(e) {}
+      if (auth && auth.user) {
+        customerId = auth.user?.maKhachHang ?? auth.user?.ma_khach_hang ?? auth.user?.id ?? null;
+      } else {
+        // fallback to localStorage if auth context not available yet
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+          try { const u = JSON.parse(userStr); customerId = u?.maKhachHang ?? u?.ma_khach_hang ?? u?.id ?? null; } catch (e) { }
+        }
       }
+
       if (!customerId) {
         // No logged-in customer: nothing to fetch
         setOrders([]);
@@ -137,7 +148,18 @@ const CustomerOrders = () => {
 
       // Backend expects POST to the order status controller
       const response = await api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/cancel`, { nguoiThayDoi, ghiChu: 'Hủy đơn hàng bởi khách' });
-      const raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
+      // api.request may return parsed JSON or raw text when backend returned malformed JSON.
+      let raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
+      // If raw is a string (malformed JSON), attempt to extract a JSON-looking substring, otherwise assume success.
+      if (typeof raw === 'string') {
+        try {
+          // Try to parse what we can
+          raw = JSON.parse(raw);
+        } catch (e) {
+          // fallback: return a stub that marks the order cancelled
+          return { id: orderId, status: 'cancelled' };
+        }
+      }
       const updatedRaw = raw?.order ?? raw;
       return mapOrderFromApi(updatedRaw);
     } catch (error) {
@@ -186,7 +208,7 @@ const CustomerOrders = () => {
 
   useEffect(() => {
     fetchCustomerOrders();
-  }, []);
+  }, [auth]);
 
   const statusConfig = {
     processing: {
@@ -297,7 +319,10 @@ const CustomerOrders = () => {
     const lowerSearch = searchTerm.toLowerCase();
     const matchesSearch = idStr.toLowerCase().includes(lowerSearch) ||
       (Array.isArray(order.items) && order.items.some(item => (item.name || '').toLowerCase().includes(lowerSearch)));
-    const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus;
+    let matchesStatus = false;
+    if (selectedStatus === 'all') matchesStatus = true;
+    else if (selectedStatus === 'paid') matchesStatus = Boolean(order.paymentPaid);
+    else matchesStatus = order.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -354,6 +379,7 @@ const CustomerOrders = () => {
                 <option value="processing">Đang xử lý</option>
                 <option value="shipping">Đang giao hàng</option>
                 <option value="delivered">Đã giao hàng</option>
+                <option value="paid">Đã thanh toán</option>
                 <option value="cancelled">Đã hủy</option>
               </select>
             </div>

@@ -59,15 +59,41 @@ const CustomerOrderTracking = () => {
   };
 
   const searchOrderById = async (orderId) => {
-    try {
-      const response = await api.get(`/api/v1/theo-doi-don-hang/${orderId}`);
-      const data = response?.data ?? response;
-      if (!data) throw new Error('Không tìm thấy đơn hàng');
-      return mapTrackingFromApi(data);
-    } catch (err) {
-      console.warn('searchOrderById error', err);
-      throw new Error('Không tìm thấy đơn hàng');
+    // Try multiple endpoints and heuristics so ORD-prefixed or numeric IDs are resolved.
+    const tryUrls = [
+      `/api/v1/theo-doi-don-hang/${orderId}`,
+      `/api/v1/theo-doi-don-hang/ma-don-hang/${orderId}`,
+      `/api/v1/banhang/donhang/${orderId}`,
+      `/api/banhang/donhang/${orderId}`,
+      `/api/orders/${orderId}`,
+    ];
+    for (const u of tryUrls) {
+      try {
+        const res = await api.get(u);
+        const data = res?.data ?? res;
+        if (!data) continue;
+        // Backend may return different shapes; try to map the likely fields
+        const normalized = {
+          ma_don_hang: data.maDonHang ?? data.ma_don_hang ?? data.id ?? data.orderId ?? data.maDonHang,
+          ma_van_don: data.maVanDon ?? data.ma_van_don ?? data.trackingNumber ?? data.tracking_number,
+          trang_thai: data.trangThai ?? data.trang_thai ?? data.status,
+          don_vi_van_chuyen: data.donViVanChuyen ?? data.don_vi_van_chuyen ?? data.carrier,
+          ten_khach_hang: data.tenKhachHang ?? data.ten_khach_hang ?? data.customerName,
+          sdt_khach_hang: data.sdtKhachHang ?? data.sdt_khach_hang ?? data.customerPhone,
+          dia_chi_giao_hang: data.diaChiGiaoHang ?? data.dia_chi_giao_hang ?? data.shippingAddress,
+          ngay_giao_hang_du_kien: data.ngayGiaoHangDuKien ?? data.ngay_giao_hang_du_kien ?? data.estimatedDelivery,
+          ngay_giao_hang_thuc_te: data.ngayGiaoHangThucTe ?? data.ngay_giao_hang_thuc_te ?? data.actualDelivery,
+          lich_su_van_chuyen: data.lichSuVanChuyen ?? data.lich_su_van_chuyen ?? data.trackingHistory ?? data.timeline ?? [] ,
+          san_pham: data.items ?? data.san_pham ?? data.products ?? []
+        };
+        return mapTrackingFromApi(normalized);
+      } catch (err) {
+        // try next endpoint
+        continue;
+      }
     }
+    console.warn('searchOrderById error: no endpoint returned data for', orderId);
+    throw new Error('Không tìm thấy đơn hàng');
   };
 
   const handleSearch = async () => {

@@ -449,19 +449,21 @@ const CustomerProductDetail = ({ product: initialProduct, onBack, onAddToCart, o
             alert('Sản phẩm này hiện đang hết hàng!');
             return;
         }
-        if (quantity > selectedVariant.stock) {
+            if (quantity > selectedVariant.stock) {
             alert(`Số lượng tối đa: ${selectedVariant.stock}`);
             return;
         }
-        addToCart(productState, selectedVariant, quantity);
-        setAddedToCart(true);
-        setTimeout(() => setAddedToCart(false), 2000);
-        const cartItem = {
-            ...productState,
-            bienTheChon: selectedVariant,
-            soLuong: quantity
-        };
-        onAddToCart?.(cartItem);
+            const result = addToCart(productState, selectedVariant, quantity);
+            if (result !== false) {
+                setAddedToCart(true);
+                setTimeout(() => setAddedToCart(false), 2000);
+                const cartItem = {
+                    ...productState,
+                    bienTheChon: selectedVariant,
+                    soLuong: quantity
+                };
+                onAddToCart?.(cartItem);
+            }
     };
 
     // Logic Review (Giữ nguyên)

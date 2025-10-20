@@ -6,14 +6,10 @@ const normalizeRole = (r) => String(r || '').toUpperCase().replace(/^ROLE_/, '')
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem('user');
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      return null;
-    }
-  });
+  // Do NOT auto-initialize `user` from localStorage to avoid treating a cached
+  // profile as an authenticated session. We'll only populate `user` after
+  // verifying a token or session with the backend.
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => {
     try { return localStorage.getItem('authToken'); } catch (e) { return null; }
   });
@@ -234,10 +230,27 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    try { localStorage.removeItem('authToken'); localStorage.removeItem('user'); localStorage.removeItem('userRole'); } catch (e) {}
-    try { api.clearAuthToken(); } catch (e) {}
-    setToken(null);
-    setUser(null);
+    // Try to call a backend logout endpoint if available so server-side sessions/cookies are invalidated.
+    (async () => {
+      try {
+        // Try a few common logout endpoints; ignore errors
+        await Promise.all([
+          api.post('/api/v1/auth/logout').catch(() => null),
+          api.post('/api/logout').catch(() => null),
+          api.get('/api/v1/auth/logout').catch(() => null),
+          api.get('/api/logout').catch(() => null)
+        ]);
+      } catch (e) {
+        // ignore
+      } finally {
+        try { localStorage.removeItem('authToken'); localStorage.removeItem('user'); localStorage.removeItem('userRole'); } catch (e) {}
+        try { api.clearAuthToken(); } catch (e) {}
+        setToken(null);
+        setUser(null);
+        // Also broadcast storage change so other tabs update
+        try { window.dispatchEvent(new Event('storage')); } catch (e) {}
+      }
+    })();
   };
 
   const updateProfile = async (profileData) => {

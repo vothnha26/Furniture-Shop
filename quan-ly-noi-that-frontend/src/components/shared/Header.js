@@ -18,13 +18,16 @@ const Header = () => {
 			try { return getTotalItems(); } catch (e) { return 0; }
 		};
 
-		// Auth state
-		const { isAuthenticated } = useAuth();
-		const isLoggedIn = !!isAuthenticated;
-
-	// Favorites count (fallback to localStorage if API unavailable)
+			// Auth state
+			const { isAuthenticated, user, logout } = useAuth();
+			const isLoggedIn = !!isAuthenticated;
 	const [favoritesCount, setFavoritesCount] = useState(() => {
-		try { const raw = localStorage.getItem('favorites') || '[]'; const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed.length : 0; } catch (e) { return 0; }
+		try { 
+			const key = user ? `favorites:user:${user.maKhachHang || user.ma_khach_hang || user.id || user.maTaiKhoan || user.tenDangNhap}` : 'favorites:anon';
+			const raw = localStorage.getItem(key) || localStorage.getItem('favorites') || '[]';
+			const parsed = JSON.parse(raw);
+			return Array.isArray(parsed) ? parsed.length : 0; 
+		} catch (e) { return 0; }
 	});
 
 	// Search dropdown state
@@ -68,7 +71,8 @@ const Header = () => {
 				const mapped = (items || []).slice(0,6).map(p => ({
 					id: p.maSanPham ?? p.id ?? p.productId ?? p.ma_san_pham,
 					name: p.tenSanPham ?? p.name ?? p.ten ?? p.ten_san_pham ?? '',
-					image: (Array.isArray(p.hinhAnhs) && p.hinhAnhs.length>0) ? (p.hinhAnhs[0].duongDanHinhAnh ?? p.hinhAnhs[0]) : (p.hinhAnh ?? p.image ?? p.thumbnail ?? null)
+					image: (Array.isArray(p.hinhAnhs) && p.hinhAnhs.length>0) ? (p.hinhAnhs[0].duongDanHinhAnh ?? p.hinhAnhs[0]) : (p.hinhAnh ?? p.image ?? p.thumbnail ?? null),
+					price: Number(p.gia ?? p.giaBan ?? p.price ?? p.minPrice ?? p.min_price ?? p.priceMin ?? p.priceAfterDiscount ?? 0) || 0
 				}));
 				setSuggestions(mapped);
 				setShowSearchDropdown(true);
@@ -103,12 +107,27 @@ const Header = () => {
 					setFavoritesCount(e.detail.count);
 					return;
 				}
-				const raw = localStorage.getItem('favorites') || '[]';
-				const parsed = JSON.parse(raw);
-				setFavoritesCount(Array.isArray(parsed) ? parsed.length : 0);
+				// compute per-user key and fallback to legacy
+				try {
+					const key = user ? `favorites:user:${user.maKhachHang || user.ma_khach_hang || user.id || user.maTaiKhoan || user.tenDangNhap}` : 'favorites:anon';
+					const raw = localStorage.getItem(key) || localStorage.getItem('favorites') || '[]';
+					const parsed = JSON.parse(raw);
+					setFavoritesCount(Array.isArray(parsed) ? parsed.length : 0);
+				} catch (inner) {
+					setFavoritesCount(0);
+				}
 			} catch (err) { /* ignore */ }
 		};
-		const storageHandler = (ev) => { if (ev.key === 'favorites') onFav(ev); };
+		const storageHandler = (ev) => {
+			// react to either per-user key changes or legacy global favorites
+			const key = user ? `favorites:user:${user.maKhachHang || user.ma_khach_hang || user.id || user.maTaiKhoan || user.tenDangNhap}` : 'favorites:anon';
+			if (!ev.key) {
+				// some browsers may provide null key for clear; re-evaluate
+				onFav({});
+				return;
+			}
+			if (ev.key === key || ev.key === 'favorites') onFav(ev);
+		};
 		window.addEventListener('favorites:changed', onFav);
 		window.addEventListener('storage', storageHandler);
 		return () => {
@@ -135,18 +154,22 @@ const Header = () => {
 							<button
 								key={index}
 								onClick={() => {
-									try {
-										const name = String(item?.name || '').toLowerCase();
-										if (name === 'features' || name === 'feature') {
-											navigate('/shop');
-											return;
-										}
-										const href = String(item?.href || '');
-										if (href.startsWith('#')) navigate(href.slice(1));
-										else navigate(href);
-									} catch (e) {
-										navigate('/');
+								try {
+									const name = String(item?.name || '').toLowerCase();
+									if (name === 'features' || name === 'feature') {
+										navigate('/shop');
+										return;
 									}
+									if (name === 'collections' || String(item?.href || '').toLowerCase() === 'collections') {
+										navigate('/shop/collections');
+										return;
+									}
+									const href = String(item?.href || '');
+									if (href.startsWith('#')) navigate(href.slice(1));
+									else navigate(href);
+								} catch (e) {
+									navigate('/');
+								}
 								}}
 								className='text-gray-700 text-sm font-medium uppercase hover:text-red-600 transition-colors duration-300 h-20 flex items-center'
 							>
@@ -169,11 +192,16 @@ const Header = () => {
 								<IoSearchOutline size={18} className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'/>
 								{/* Dropdown */}
 								{showSearchDropdown && suggestions && suggestions.length > 0 && (
-									<div className='absolute left-0 mt-2 w-full bg-white border border-gray-200 rounded shadow-lg z-50'>
+									<div className='absolute left-0 top-full mt-2 w-full bg-white border border-gray-200 rounded shadow-lg z-50 max-h-72 overflow-auto'>
 										{suggestions.map(s => (
-											<button key={s.id || s.name} onClick={() => { setShowSearchDropdown(false); setSearchQuery(''); navigate(`/shop/products/${s.id}`); }} className='w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-3'>
-												{s.image ? <img src={api.buildUrl(s.image)} alt={s.name} className='w-10 h-10 object-cover rounded'/> : <div className='w-10 h-10 bg-gray-100 rounded'/>}
-												<div className='text-sm text-gray-700'>{s.name}</div>
+											<button key={s.id || s.name} onClick={() => { setShowSearchDropdown(false); setSearchQuery(''); navigate(`/shop/products/${s.id}`); }} className='w-full text-left px-3 py-3 hover:bg-gray-50 flex items-center justify-between gap-3'>
+												<div className='flex-1 pr-3'>
+													<div className='text-sm text-gray-700 truncate'>{s.name}</div>
+													<div className='text-xs text-gray-500 mt-1'>{formatPrice(s.price)}</div>
+												</div>
+												<div className='w-14 h-14 flex-shrink-0'>
+													{s.image ? <img src={api.buildUrl(s.image)} alt={s.name} className='w-14 h-14 object-cover rounded'/> : <div className='w-14 h-14 bg-gray-100 rounded'/>}
+												</div>
 											</button>
 										))}
 									</div>
@@ -185,17 +213,30 @@ const Header = () => {
 								<div className='hidden md:flex items-center space-x-6'>
 									<div className='flex space-x-4 items-center'>
 										{/* Account */}
-										<button 
-											onClick={() => navigate(isLoggedIn ? '/profile' : '/login')}
-											className='text-gray-700 hover:text-red-600 transition-colors relative group h-20 flex items-center px-3'
-										>
-											<IoPersonOutline size={22} />
-											<span className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'>{isLoggedIn ? 'Tài khoản' : 'Đăng nhập'}</span>
-										</button>
+										<div className='flex items-center space-x-2'>
+											<button 
+												onClick={() => navigate(isLoggedIn ? '/profile' : '/login')}
+												className='text-gray-700 hover:text-red-600 transition-colors relative group h-20 flex items-center px-3'
+											>
+												<IoPersonOutline size={22} />
+												<span className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'>{isLoggedIn ? 'Tài khoản' : 'Đăng nhập'}</span>
+											</button>
+											{/* Show Login/Register when not logged in */}
+											{!isLoggedIn && (
+												<>
+													<button onClick={() => navigate('/login')} className='text-sm text-gray-700 hover:text-red-600 px-2'>Đăng nhập</button>
+													<button onClick={() => navigate('/register')} className='text-sm text-gray-700 hover:text-red-600 px-2'>Đăng ký</button>
+												</>
+											)}
+											{/* Show Logout when logged in */}
+											{isLoggedIn && (
+												<button onClick={() => { try { logout && logout(); } catch (e) {} navigate('/'); }} className='text-sm text-gray-700 hover:text-red-600 px-2'>Đăng xuất</button>
+											)}
+										</div>
               
 										{/* Favorites */}
 										<button 
-											onClick={() => navigate('/favorites')}
+											onClick={() => navigate(user ? '/favorites' : '/login')}
 											className='text-gray-700 hover:text-red-600 transition-colors h-20 flex items-center px-3 relative'
 										>
 											<IoHeart size={22} />

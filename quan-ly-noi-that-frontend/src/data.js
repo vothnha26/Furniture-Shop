@@ -42,8 +42,16 @@ export const navigation = [
     href: 'about',
   },
   {
+    name: 'orders',
+    href: '/orders',
+  },
+  {
     name: 'features',
     href: 'features',
+  },
+  {
+    name: 'collections',
+    href: 'collections',
   },
   {
     name: 'contact',

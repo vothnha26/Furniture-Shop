@@ -4,6 +4,8 @@ import { IoSearch, IoCart, IoHeart, IoStar, IoGrid, IoList, IoEye, IoChevronDown
 import CustomerProductDetail from './CustomerProductDetail';
 import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../contexts/CartContext';
+import { getFavoritesKey, readFavoritesLocal, writeFavoritesLocal, readFavoritesWithLegacy } from '../../utils/favorites';
 
 // --- (KHỞI TẠO VÀ LOGIC KHÔNG THAY ĐỔI) ---
 
@@ -18,7 +20,7 @@ const CustomerShop = () => {
   const { user } = useAuth();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
-  const [, setCart] = useState([]);
+  const { addToCart } = useCart();
   const [isLoading, setIsLoading] = useState(false);
   const [, setError] = useState(null);
   const [apiCategories, setApiCategories] = useState([]);
@@ -268,8 +270,7 @@ const CustomerShop = () => {
         // If we previously detected favorites API is broken, skip network call and fallback to localStorage
         if (window.__FAVORITES_API_BROKEN) {
           try {
-            const raw = localStorage.getItem('favorites') || '[]';
-            const arr = JSON.parse(raw);
+            const arr = readFavoritesWithLegacy(user);
             const ids = Array.isArray(arr) ? arr.map(f => f.id ?? f.maSanPham).filter(Boolean) : [];
             if (mounted) {
               setFavorites(ids);
@@ -287,6 +288,8 @@ const CustomerShop = () => {
             return;
           }
           const ids = data.map(p => p.maSanPham ?? p.id ?? p.productId ?? p.productId ?? p.id).filter(Boolean);
+          // persist per-user fallback copy locally so we don't mix users
+          try { writeFavoritesLocal(user, ids.map(i=>({ id: i }))); } catch(e) {}
           if (mounted) {
             setFavorites(ids);
             try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: ids.length } })); } catch (e) { }
@@ -299,8 +302,7 @@ const CustomerShop = () => {
         }
       }
       try {
-        const raw = localStorage.getItem('favorites') || '[]';
-        const arr = JSON.parse(raw);
+        const arr = readFavoritesLocal(user);
         const ids = Array.isArray(arr) ? arr.map(f => f.id ?? f.maSanPham).filter(Boolean) : [];
         if (mounted) {
           setFavorites(ids);
@@ -501,11 +503,18 @@ const CustomerShop = () => {
     const id = typeof productOrId === 'string' || typeof productOrId === 'number' ? productOrId : (productOrId && (productOrId.id ?? productOrId.maSanPham));
     if (!id) return;
 
-    // optimistic toggle locally
+    // require login
+    if (!user) {
+      // redirect to login page
+      window.location.href = '/login';
+      return;
+    }
+
+    // optimistic toggle locally (per-user)
     setFavorites(prev => {
       const exists = prev.includes(id);
       const next = exists ? prev.filter(x => x !== id) : [...prev, id];
-      try { localStorage.setItem('favorites', JSON.stringify(next.map(i=>({ id: i })))); } catch (e) {}
+      try { writeFavoritesLocal(user, next.map(i=>({ id: i }))); } catch (e) {}
       try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: next.length } })); } catch (e) {}
       return next;
     });
@@ -519,6 +528,8 @@ const CustomerShop = () => {
     } catch (e) {
       console.debug('Favorites toggle API failed, marking as broken', e);
       try { window.__FAVORITES_API_BROKEN = true; } catch (err) {}
+      // ensure per-user copy is in localStorage
+      try { const existing = readFavoritesLocal(user); const exists = existing.find(f => String(f.id) === String(id)); let nextArr; if (exists) nextArr = existing.filter(f => String(f.id) !== String(id)); else nextArr = [...existing, { id }]; writeFavoritesLocal(user, nextArr); } catch(e) {}
     }
   };
 
@@ -527,8 +538,29 @@ const CustomerShop = () => {
     setSelectedProduct(product);
     setShowProductDetail(true);
   };
-  const handleAddToCart = (product) => { /* Logic giữ nguyên */ };
-  const handleBackToShop = () => { /* Logic giữ nguyên */ };
+
+  const handleAddToCart = (product) => {
+    // Require login before allowing add to cart
+    if (!user) {
+      window.location.href = '/login';
+      return;
+    }
+    try {
+      // No explicit variant on listing page; add product as-is with default quantity 1
+      const ok = addToCart(product, null, 1);
+      if (ok !== false) {
+        alert(`Đã thêm ${product.name || product.tenSanPham || 'sản phẩm'} vào giỏ hàng!`);
+      }
+    } catch (e) {
+      console.error('Failed to add to cart', e);
+      alert('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
+    }
+  };
+
+  const handleBackToShop = () => {
+    setShowProductDetail(false);
+    setSelectedProduct(null);
+  };
   const renderStars = (rating) => { /* Logic giữ nguyên */ return Array.from({ length: 5 }, (_, i) => (<IoStar key={i} className={`w-4 h-4 ${i < Math.round(rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`} />)); };
 
 
@@ -883,18 +915,22 @@ const CustomerShop = () => {
             product={selectedProduct}
             onBack={handleBackToShop}
             onAddToCart={(cartItem) => {
-              setCart(prev => {
-                const existingItem = prev.find(item => item.id === cartItem.id);
-                if (existingItem) {
-                  return prev.map(item =>
-                    item.id === cartItem.id
-                      ? { ...item, quantity: item.quantity + cartItem.soLuong }
-                      : item
-                  );
+              // Ensure user is logged in before adding
+              if (!user) {
+                window.location.href = '/login';
+                return;
+              }
+              try {
+                const variant = cartItem.bienTheChon || cartItem.bienThe || cartItem.variant || null;
+                const qty = cartItem.soLuong || cartItem.quantity || 1;
+                const ok = addToCart(cartItem, variant, qty);
+                if (ok !== false) {
+                  alert(`Đã thêm ${cartItem.tenSanPham || cartItem.name || 'sản phẩm'} vào giỏ hàng!`);
                 }
-                return [...prev, { ...cartItem, quantity: cartItem.soLuong }];
-              });
-              alert(`Đã thêm ${cartItem.tenSanPham || cartItem.name} vào giỏ hàng!`);
+              } catch (e) {
+                console.error('Failed to add from modal', e);
+                alert('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
+              }
             }}
             onToggleFavorite={(productId) => toggleFavorite(productId)}
           />

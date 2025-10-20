@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { IoSearch, IoFilter, IoHeart, IoCart, IoStar, IoGrid, IoList, IoArrowForward } from 'react-icons/io5';
 // note: FontAwesome icons removed (unused)
 import api from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../contexts/CartContext';
+import { readFavoritesLocal, writeFavoritesLocal } from '../../utils/favorites';
 
 // Mapping functions for Vietnamese API field names
 const mapProductFromApi = (product) => {
@@ -61,6 +65,10 @@ const mapCategoryFromApi = (category) => ({
 });
 
 const CustomerShopPage = () => {
+  const auth = useAuth();
+  const currentUser = auth?.user ?? null;
+  const navigate = useNavigate();
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -263,31 +271,52 @@ const CustomerShopPage = () => {
 
   const addToFavorites = async (productId) => {
     try {
-  // Accept either product object or id
-  const id = typeof productId === 'object' ? (productId.id ?? productId.maSanPham) : productId;
-  // Optimistic UI update
-  setCategories(prev => prev); // no-op to keep consistent signature
-  setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: !p.isFavorite } : p));
-      // Call backend if endpoint exists (best-effort)
-      try {
-  await api.post('/api/v1/yeu-thich', { san_pham_id: id });
-      } catch (e) {
-        // ignore if backend not ready
-        console.debug('Favorites API not available', e);
-      }
+  const isAuthenticated = auth?.isAuthenticated;
+    // Accept either product object or id
+    const id = typeof productId === 'object' ? (productId.id ?? productId.maSanPham) : productId;
+    if (!isAuthenticated) {
+      // redirect to login
+      window.location.href = '/login';
+      return;
+    }
+    // Optimistic UI update
+    setCategories(prev => prev); // no-op to keep consistent signature
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: !p.isFavorite } : p));
+    // persist per-user fallback
+    try {
+      const user = auth?.user ?? null;
+  const existing = readFavoritesLocal(currentUser);
+      const exists = existing.find(f => String(f.id) === String(id));
+      const next = exists ? existing.filter(f => String(f.id) !== String(id)) : [...existing, { id }];
+      writeFavoritesLocal(user, next);
+    } catch (e) {}
+    // Call backend if endpoint exists (best-effort)
+    try {
+      await api.post('/api/v1/yeu-thich', { san_pham_id: id });
+    } catch (e) {
+      // ignore if backend not ready
+      console.debug('Favorites API not available', e);
+    }
     } catch (error) {
       console.error('Error adding to favorites:', error);
     }
   };
 
+  const { addToCart: cartAddToCart } = useCart();
+
   const addToCart = async (productId, quantity = 1) => {
     try {
-      // Optimistic UI: update local products/cart state if needed
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, inCart: true } : p));
-      try {
-        await api.post('/api/v1/gio-hang', { san_pham_id: productId, so_luong: quantity });
-      } catch (e) {
-        console.debug('Cart API not available', e);
+      if (!auth?.isAuthenticated) {
+        window.location.href = '/login';
+        return;
+      }
+      // Find product object to provide to cart (so CartContext can derive image/price/variant)
+      const product = products.find(p => String(p.id) === String(productId)) || { id: productId };
+      const ok = cartAddToCart(product, null, quantity);
+      // Only update UI when addToCart did not redirect or return false
+      if (ok !== false) {
+        // optimistic UI mark
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, inCart: true } : p));
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
@@ -299,6 +328,18 @@ const CustomerShopPage = () => {
     fetchCollections();
     fetchProducts({}, 0, size, false);
   }, [fetchProducts, size]);
+
+  // If the URL contains ?tab=collections (header links use this), redirect to the dedicated collections route
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || '');
+      if (params.get('tab') === 'collections') {
+        navigate('/shop/collections');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [location.search, navigate]);
 
   useEffect(() => {
     const filters = {

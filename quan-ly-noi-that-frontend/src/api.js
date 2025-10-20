@@ -66,7 +66,18 @@ async function request(method, path, { body, query, headers } = {}) {
   const contentType = res.headers.get('content-type') || '';
   let data = null;
   if (contentType.includes('application/json')) {
-    data = await res.json();
+    try {
+      data = await res.json();
+    } catch (e) {
+      // Invalid JSON returned despite JSON content-type. Fall back to raw text so callers can inspect.
+      try {
+        const text = await res.text();
+        data = text;
+        console.debug('[api] Warning: invalid JSON response, raw text:', text);
+      } catch (tErr) {
+        data = null;
+      }
+    }
   } else {
     data = await res.text();
   }

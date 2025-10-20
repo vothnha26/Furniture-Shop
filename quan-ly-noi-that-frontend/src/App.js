@@ -403,11 +403,11 @@ const App = () => {
             CUSTOMER ROUTES - Yêu cầu đăng nhập
         ============================================ */}
 
-          {/* Shopping Cart & Checkout */}
-          <Route path="/cart" element={<CustomerLayout><CustomerCart /></CustomerLayout>} />
-          <Route path="/checkout" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
-          <Route path="/checkout/success" element={<CustomerLayout><CustomerOrderConfirmation /></CustomerLayout>} />
-          <Route path="/checkout/cancel" element={<CustomerLayout><CustomerCheckout /></CustomerLayout>} />
+          {/* Shopping Cart & Checkout - require authentication */}
+          <Route path="/cart" element={<ProtectedRoute><CustomerLayout><CustomerCart /></CustomerLayout></ProtectedRoute>} />
+          <Route path="/checkout" element={<ProtectedRoute><CustomerLayout><CustomerCheckout /></CustomerLayout></ProtectedRoute>} />
+          <Route path="/checkout/success" element={<ProtectedRoute><CustomerLayout><CustomerOrderConfirmation /></CustomerLayout></ProtectedRoute>} />
+          <Route path="/checkout/cancel" element={<ProtectedRoute><CustomerLayout><CustomerCheckout /></CustomerLayout></ProtectedRoute>} />
 
           {/* Customer Profile & Account */}
           <Route path="/profile" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
@@ -426,8 +426,8 @@ const App = () => {
           <Route path="/orders/track/:id" element={<CustomerLayout><CustomerOrderTracking /></CustomerLayout>} />
           <Route path="/order-history" element={<Navigate to="/orders" replace />} />
 
-          {/* Customer Favorites & Wishlist */}
-          <Route path="/favorites" element={<CustomerLayout><CustomerFavorites /></CustomerLayout>} />
+          {/* Customer Favorites & Wishlist - require authentication */}
+          <Route path="/favorites" element={<ProtectedRoute><CustomerLayout><CustomerFavorites /></CustomerLayout></ProtectedRoute>} />
           <Route path="/wishlist" element={<Navigate to="/favorites" replace />} />
 
           {/* Customer Notifications */}

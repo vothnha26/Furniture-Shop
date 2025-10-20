@@ -32,29 +32,17 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
   const [customerInfo, setCustomerInfo] = useState({ ma_khach_hang: null, name: '', phone: '', email: '' });
   const [cartDetails, setCartDetails] = useState([]); // Cart items from server
 
-  // Debug: Check localStorage on mount
-  useEffect(() => {
-    console.log('=== 🔍 DIAGNOSTIC CHECK ===');
-    console.log('📦 authToken:', localStorage.getItem('authToken') ? 'EXISTS' : 'NULL');
-    console.log('📦 user:', localStorage.getItem('user') ? 'EXISTS' : 'NULL');
-
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const parsedUser = JSON.parse(userStr);
-        console.log('👤 User object:', parsedUser);
-        console.log('🔑 Fields available:', Object.keys(parsedUser));
-        console.log('🆔 ma_khach_hang:', parsedUser.ma_khach_hang);
-        console.log('🆔 id:', parsedUser.id);
-      } catch (e) {
-        console.error('❌ Failed to parse user:', e);
-      }
-    }
-    console.log('=========================');
-  }, []);
-
   // Prefer AuthContext.user, fallback to localStorage and/or server-by-phone
   const auth = useAuth();
+
+  // Debug: log auth context on mount (avoid trusting raw localStorage user)
+  useEffect(() => {
+    console.log('=== � DIAGNOSTIC CHECK ===');
+    console.log('� auth.token exists:', !!(auth && (auth.token || auth.authToken)));
+    console.log('👤 auth.user:', auth && auth.user ? auth.user : 'NULL');
+    console.log('=========================');
+  }, [auth]);
+
   useEffect(() => {
     const loadCustomerInfo = async () => {
       try {
@@ -84,16 +72,20 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         // 2) Then try localStorage.user as before
         const userStr = localStorage.getItem('user');
         if (userStr) {
-          const user = JSON.parse(userStr);
-          const customerData = {
-            ma_khach_hang: user?.ma_khach_hang ?? user?.id ?? null,
-            name: user.hoTen || user.name || '',
-            phone: user.soDienThoai || user.phone || '',
-            email: user.email || ''
-          };
-          console.log('✅ [CustomerCheckout] Using localStorage.user:', customerData);
-          setCustomerInfo(customerData);
-          return;
+          try {
+            const user = JSON.parse(userStr);
+            const customerData = {
+              ma_khach_hang: user?.ma_khach_hang ?? user?.id ?? null,
+              name: user.hoTen || user.name || '',
+              phone: user.soDienThoai || user.phone || '',
+              email: user.email || ''
+            };
+            console.log('✅ [CustomerCheckout] Using localStorage.user:', customerData);
+            setCustomerInfo(customerData);
+            return;
+          } catch (e) {
+            // ignore parse errors and continue
+          }
         }
 
         // 3) If we have no local info, fall back to server profile (safe) or leave null
@@ -193,28 +185,28 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
             console.warn('⚠️ [Vouchers] Could not fetch /api/v1/khach-hang/me to populate ma_khach_hang:', e);
           }
 
-          // If still no ma_khach_hang, try lookup by phone (if we have a phone in any source)
-          if (!ma_khach_hang) {
-            try {
-              const possiblePhone = customerInfo.phone || (auth && auth.user && (auth.user.soDienThoai || auth.user.phone)) || (() => {
-                try { const u = JSON.parse(localStorage.getItem('user') || '{}'); return u?.soDienThoai || u?.phone || null; } catch (er) { return null; }
-              })();
-              if (possiblePhone) {
-                console.log('🔎 [Vouchers] Trying /api/v1/khach-hang/by-phone with phone=', possiblePhone);
-                const byPhone = await api.get(`/api/v1/khach-hang/by-phone/${encodeURIComponent(possiblePhone)}`);
-                const byPhoneData = byPhone?.data ?? byPhone;
-                console.log('🔎 [Vouchers] Response from by-phone:', byPhoneData);
-                if (byPhoneData) {
-                  // Backend returns camelCase (maKhachHang), normalize to snake_case
-                  ma_khach_hang = byPhoneData.maKhachHang ?? byPhoneData.ma_khach_hang ?? byPhoneData.id ?? null;
-                  setCustomerInfo(prev => ({ ...prev, ma_khach_hang, name: byPhoneData.hoTen || byPhoneData.name || prev.name, phone: possiblePhone }));
-                  try { const raw = localStorage.getItem('user'); const parsed = raw ? JSON.parse(raw) : {}; parsed.ma_khach_hang = parsed.ma_khach_hang ?? ma_khach_hang; parsed.maKhachHang = parsed.maKhachHang ?? ma_khach_hang; localStorage.setItem('user', JSON.stringify(parsed)); } catch (e) { }
-                }
+        // If still no ma_khach_hang, try lookup by phone (if we have a phone in any source)
+        if (!ma_khach_hang) {
+          try {
+            const possiblePhone = customerInfo.phone || (auth && auth.user && (auth.user.soDienThoai || auth.user.phone)) || (() => {
+              try { const u = JSON.parse(localStorage.getItem('user') || '{}'); return u?.soDienThoai || u?.phone || null; } catch (er) { return null; }
+            })();
+            if (possiblePhone) {
+              console.log('🔎 [Vouchers] Trying /api/v1/khach-hang/by-phone with phone=', possiblePhone);
+              const byPhone = await api.get(`/api/v1/khach-hang/by-phone/${encodeURIComponent(possiblePhone)}`);
+              const byPhoneData = byPhone?.data ?? byPhone;
+              console.log('🔎 [Vouchers] Response from by-phone:', byPhoneData);
+              if (byPhoneData) {
+                // Backend returns camelCase (maKhachHang), normalize to snake_case
+                ma_khach_hang = byPhoneData.maKhachHang ?? byPhoneData.ma_khach_hang ?? byPhoneData.id ?? null;
+                setCustomerInfo(prev => ({ ...prev, ma_khach_hang, name: byPhoneData.hoTen || byPhoneData.name || prev.name, phone: possiblePhone }));
+                try { const raw = localStorage.getItem('user'); const parsed = raw ? JSON.parse(raw) : {}; parsed.ma_khach_hang = parsed.ma_khach_hang ?? ma_khach_hang; parsed.maKhachHang = parsed.maKhachHang ?? ma_khach_hang; localStorage.setItem('user', JSON.stringify(parsed)); } catch (e) { }
               }
-            } catch (ex) {
-              console.warn('⚠️ [Vouchers] by-phone lookup failed:', ex);
             }
+          } catch (ex) {
+            console.warn('⚠️ [Vouchers] by-phone lookup failed:', ex);
           }
+        }
         }
 
         // Only fetch vouchers when we have a ma_khach_hang and at least one cart item

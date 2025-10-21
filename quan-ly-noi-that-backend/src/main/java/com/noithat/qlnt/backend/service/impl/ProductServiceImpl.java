@@ -608,7 +608,8 @@ public class ProductServiceImpl implements IProductService {
                                         .images(imageUrls)
                                         .discountPercent(discountPercent)
                                         .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
-                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue());
+                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue())
+                                        .diemThuong(sp.getDiemThuong());
 
                         // attach lowest variant info if found
                         if (lowestFinalVariantId != null) {

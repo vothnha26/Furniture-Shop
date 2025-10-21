@@ -46,6 +46,9 @@ public class ShopProductResponseDto {
     // Category and supplier info for shop filtering
     private CategoryDto category;
 
+    // Bonus points (Điểm thưởng)
+    private Integer diemThuong;
+
     @Getter
     @Setter
     @NoArgsConstructor

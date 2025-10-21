@@ -2,6 +2,7 @@ package com.noithat.qlnt.backend.service.impl;
 
 import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.BienTheUpdateRequestDto;
+import com.noithat.qlnt.backend.dto.request.BienThePatchRequestDto;
 import com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse;
 import com.noithat.qlnt.backend.entity.BienTheGiamGia;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
@@ -202,6 +203,41 @@ public class BienTheSanPhamServiceImpl implements IBienTheSanPhamService {
     @Transactional
     public void deleteBienTheSanPham(Integer id) {
         delete(id);
+    }
+
+    @Transactional
+    public BienTheSanPham patchBienTheSanPham(Integer id, BienThePatchRequestDto request) {
+        BienTheSanPham existing = getById(id);
+
+        // Only update fields that are provided (non-null)
+        if (request.giaMua() != null) {
+            existing.setGiaMua(request.giaMua());
+        }
+        
+        if (request.giaBan() != null) {
+            existing.setGiaBan(request.giaBan());
+        }
+
+        // Handle attribute updates if provided
+        if (request.thuocTinhGiaTriTuDo() != null && !request.thuocTinhGiaTriTuDo().isEmpty()) {
+            // Remove existing attribute mappings
+            bienTheThuocTinhRepository.deleteByBienTheSanPham_MaBienThe(existing.getMaBienThe());
+            existing.getBienTheThuocTinhs().clear();
+            
+            // Create new attribute mappings
+            request.thuocTinhGiaTriTuDo().forEach(mapping -> {
+                thuocTinhRepository.findById(mapping.maThuocTinh()).ifPresent(tt -> {
+                    com.noithat.qlnt.backend.entity.BienTheThuocTinh btt = new com.noithat.qlnt.backend.entity.BienTheThuocTinh();
+                    btt.setBienTheSanPham(existing);
+                    btt.setThuocTinh(tt);
+                    btt.setGiaTri(mapping.giaTri());
+                    bienTheThuocTinhRepository.save(btt);
+                    existing.getBienTheThuocTinhs().add(btt);
+                });
+            });
+        }
+
+        return bienTheSanPhamRepository.save(existing);
     }
 
     @Transactional

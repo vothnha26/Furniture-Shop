@@ -1,0 +1,83 @@
+{
+  "groups": [
+    {
+      "name": "Màu sắc & Vật liệu",
+      "attributes": [
+        {
+          "key": "Màu sắc",
+          "values": ["Đỏ", "Xanh", "Vàng", "Trắng", "Đen", "Gỗ tự nhiên"]
+        },
+        {
+          "key": "Chất liệu",
+          "values": ["Gỗ", "Kim loại", "Nhựa", "Kính", "Vải"]
+        },
+        {
+          "key": "Màu gỗ",
+          "values": ["Óc chó", "Sồi", "Căm xe", "Thông"]
+        },
+        {
+          "key": "Vân gỗ",
+          "values": ["Vân thẳng", "Vân xoắn", "Vân chéo"]
+        }
+      ]
+    },
+    {
+      "name": "Kích thước & Hình dáng",
+      "attributes": [
+        {
+          "key": "Kích thước",
+          "values": ["120x60cm", "140x70cm", "160x80cm"]
+        },
+        {
+          "key": "Chiều rộng",
+          "values": ["60cm", "70cm", "80cm"]
+        },
+        {
+          "key": "Chiều cao",
+          "values": ["75cm", "80cm", "90cm"]
+        },
+        {
+          "key": "Kiểu dáng",
+          "values": ["Hiện đại", "Cổ điển", "Tối giản", "Vintage"]
+        },
+        {
+          "key": "Phong cách",
+          "values": ["Scandinavian", "Industrial", "Minimalist", "Retro"]
+        }
+      ]
+    },
+    {
+      "name": "Công năng & Tính năng",
+      "attributes": [
+        {
+          "key": "Số lượng chỗ",
+          "values": ["1 chỗ", "2 chỗ", "4 chỗ"]
+        },
+        {
+          "key": "Công năng",
+          "values": ["Gấp gọn", "Có ngăn kéo", "Có kệ sách"]
+        },
+        {
+          "key": "Trạng thái",
+          "values": ["Mới", "Đã qua sử dụng", "Hàng trưng bày"]
+        },
+        {
+          "key": "Cấu hình thêm",
+          "values": ["Có ổ điện", "Có đèn LED", "Có bánh xe"]
+        },
+        {
+          "key": "Mức độ dễ vệ sinh",
+          "values": ["Dễ vệ sinh", "Khó vệ sinh"]
+        },
+        {
+          "key": "Chống ẩm",
+          "values": ["Có", "Không"]
+        },
+        {
+          "key": "Khác",
+          "values": ["Tùy chọn theo yêu cầu"]
+        }
+      ]
+    }
+  ]
+}

@@ -23,7 +23,7 @@ public class BienTheSanPham {
     @JoinColumn(name = "MaSanPham", nullable = false)
     private SanPham sanPham;
 
-    @Column(name = "SKU", unique = true, nullable = false)
+    @Column(name = "SKU", unique = true, nullable = false, columnDefinition = "NVARCHAR(256)")
     private String sku;
 
     @Column(name = "GiaMua", precision = 18, scale = 2)
@@ -32,18 +32,17 @@ public class BienTheSanPham {
     @Column(name = "GiaBan", precision = 18, scale = 2, nullable = false)
     private BigDecimal giaBan;
 
-    @Column(name = "SoLuongTon", nullable = false)
-
+    @Column(name = "SoLuongTon", nullable = true)
     private Integer soLuongTon = 0;
 
-    @Column(name = "MucTonToiThieu")
-    private Integer mucTonToiThieu = 5;
+    @Column(name = "MucTonToiThieu", nullable = true)
+    private Integer mucTonToiThieu = 0;
 
     @Column(name = "NgayCapNhatKho")
     private LocalDateTime ngayCapNhatKho;
 
-    @Column(name = "TrangThaiKho")
-    private String trangThaiKho = "ACTIVE"; // ACTIVE, LOW_STOCK, OUT_OF_STOCK, DISCONTINUED
+    @Column(name = "TrangThaiKho", columnDefinition = "NVARCHAR(50)")
+    private String trangThaiKho = "INACTIVE"; // ACTIVE, LOW_STOCK, OUT_OF_STOCK, DISCONTINUED, INACTIVE
 
     // Relationship với thuộc tính (lưu giá trị trực tiếp trong join)
     @OneToMany(mappedBy = "bienTheSanPham", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)

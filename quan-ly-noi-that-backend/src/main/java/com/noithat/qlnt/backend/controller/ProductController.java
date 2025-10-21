@@ -2,9 +2,11 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.SanPhamRequestDto;
+import com.noithat.qlnt.backend.dto.request.HinhAnhRequestDto;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.dto.response.BienTheSanPhamDetailResponse;
 import com.noithat.qlnt.backend.entity.SanPham;
+import com.noithat.qlnt.backend.entity.HinhAnhSanPham;
 import com.noithat.qlnt.backend.service.IProductService;
 import jakarta.validation.Valid;
 
@@ -16,12 +18,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping({ "/api/products", "/api/san-pham" }) // Support both endpoints
 public class ProductController {
     @Autowired
     private IProductService productService;
     @Autowired
     private com.noithat.qlnt.backend.repository.BienTheGiamGiaRepository bienTheGiamGiaRepository;
+    @Autowired
+    private com.noithat.qlnt.backend.repository.HinhAnhSanPhamRepository hinhAnhSanPhamRepository;
 
     // ===== CRUD cho Sản phẩm (Sản phẩm gốc) =====
     @GetMapping
@@ -47,7 +51,8 @@ public class ProductController {
         }
     }
 
-    // New endpoint: products shaped for shop listing (variant-aware price range & stock)
+    // New endpoint: products shaped for shop listing (variant-aware price range &
+    // stock)
     @GetMapping("/shop")
     public ResponseEntity<?> getProductsForShop(@RequestParam(value = "page", required = false) Integer page,
             @RequestParam(value = "size", required = false) Integer size) {
@@ -76,7 +81,8 @@ public class ProductController {
         }
     }
 
-    // Endpoint mới: Lấy chi tiết sản phẩm đầy đủ với biến thể, thuộc tính và giá giảm
+    // Endpoint mới: Lấy chi tiết sản phẩm đầy đủ với biến thể, thuộc tính và giá
+    // giảm
     @GetMapping("/{id}/detail")
     public ResponseEntity<?> getProductDetailWithVariants(@PathVariable Integer id) {
         try {
@@ -95,6 +101,50 @@ public class ProductController {
     @PutMapping("/{id}")
     public ResponseEntity<SanPham> updateSanPham(@PathVariable Integer id, @Valid @RequestBody SanPhamRequestDto dto) {
         return ResponseEntity.ok(productService.updateSanPham(id, dto));
+    }
+
+    /**
+     * Update images for a product
+     * PUT /api/products/{id}/images or /api/san-pham/{id}/images
+     * Request body: List of image objects with thuTu, laAnhChinh, etc.
+     */
+    @PutMapping("/{id}/images")
+    public ResponseEntity<?> updateProductImages(
+            @PathVariable Integer id,
+            @RequestBody java.util.List<HinhAnhRequestDto> imageDtos) {
+        try {
+            // Get existing product
+            SanPham product = productService.getProductById(id);
+            if (product == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(java.util.Map.of("error", "Không tìm thấy sản phẩm"));
+            }
+
+            // Delete all existing images for this product
+            var existingImages = hinhAnhSanPhamRepository.findBySanPhamMaSanPhamOrderByThuTuAsc(id);
+            hinhAnhSanPhamRepository.deleteAll(existingImages);
+
+            // Save new images
+            java.util.List<HinhAnhSanPham> savedImages = new java.util.ArrayList<>();
+            for (HinhAnhRequestDto dto : imageDtos) {
+                HinhAnhSanPham img = new HinhAnhSanPham();
+                img.setSanPham(product);
+                img.setDuongDanHinhAnh(dto.getDuongDanHinhAnh());
+                img.setThuTu(dto.getThuTu() != null ? dto.getThuTu() : 0);
+                img.setLaAnhChinh(dto.getLaAnhChinh() != null ? dto.getLaAnhChinh() : false);
+                img.setMoTa(dto.getMoTa());
+                img.setTrangThai(dto.getTrangThai() != null ? dto.getTrangThai() : true);
+                savedImages.add(hinhAnhSanPhamRepository.save(img));
+            }
+
+            return ResponseEntity.ok(java.util.Map.of(
+                    "message", "Cập nhật hình ảnh thành công",
+                    "count", savedImages.size()));
+        } catch (Exception e) {
+            e.printStackTrace(); // Log the error
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -189,43 +239,52 @@ public class ProductController {
                     .tenSanPham(bt.getSanPham() != null ? bt.getSanPham().getTenSanPham() : null)
                     .build();
 
-        // map attributes: ensure at most one value per attribute (group by attribute id and pick first)
-        if (bt.getBienTheThuocTinhs() != null) {
-        java.util.Map<Object, java.util.List<com.noithat.qlnt.backend.entity.BienTheThuocTinh>> grouped = bt.getBienTheThuocTinhs().stream()
-            .filter(btt -> btt != null)
-            .collect(java.util.stream.Collectors.groupingBy(btt -> {
-                if (btt.getThuocTinh() != null) return btt.getThuocTinh().getMaThuocTinh();
-                // fallback grouping key when ThuocTinh is null: use the giaTri string
-                return btt.getGiaTri() != null ? btt.getGiaTri() : java.util.UUID.randomUUID().toString();
-            }));
+            // map attributes: ensure at most one value per attribute (group by attribute id
+            // and pick first)
+            if (bt.getBienTheThuocTinhs() != null) {
+                java.util.Map<Object, java.util.List<com.noithat.qlnt.backend.entity.BienTheThuocTinh>> grouped = bt
+                        .getBienTheThuocTinhs().stream()
+                        .filter(btt -> btt != null)
+                        .collect(java.util.stream.Collectors.groupingBy(btt -> {
+                            if (btt.getThuocTinh() != null)
+                                return btt.getThuocTinh().getMaThuocTinh();
+                            // fallback grouping key when ThuocTinh is null: use the giaTri string
+                            return btt.getGiaTri() != null ? btt.getGiaTri() : java.util.UUID.randomUUID().toString();
+                        }));
 
-        List<BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse> attrs = grouped.values().stream()
-            .map(list -> list.get(0)) // pick first entry for each attribute
-            .map(btt -> BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse.builder()
-                .maThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getMaThuocTinh() : null)
-                .tenThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getTenThuocTinh() : null)
-                .maGiaTriThuocTinh(null)
-                .giaTriThuocTinh(btt.getGiaTri())
-                .build())
-            .collect(java.util.stream.Collectors.toList());
+                List<BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse> attrs = grouped.values().stream()
+                        .map(list -> list.get(0)) // pick first entry for each attribute
+                        .map(btt -> BienTheSanPhamDetailResponse.ThuocTinhBienTheResponse.builder()
+                                .maThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getMaThuocTinh() : null)
+                                .tenThuocTinh(btt.getThuocTinh() != null ? btt.getThuocTinh().getTenThuocTinh() : null)
+                                .maGiaTriThuocTinh(null)
+                                .giaTriThuocTinh(btt.getGiaTri())
+                                .build())
+                        .collect(java.util.stream.Collectors.toList());
 
-        resp.setThuocTinhs(attrs);
-        }
+                resp.setThuocTinhs(attrs);
+            }
 
-            // map current discounts if any (reuse repository via service layer would be better but keep simple)
+            // map current discounts if any (reuse repository via service layer would be
+            // better but keep simple)
             // Attempt to include best available discount info
             // fetch any BienTheGiamGia mappings for this variant
             try {
-                List<com.noithat.qlnt.backend.entity.BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+                List<com.noithat.qlnt.backend.entity.BienTheGiamGia> discounts = bienTheGiamGiaRepository
+                        .findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
                 if (discounts != null && !discounts.isEmpty()) {
-                    List<BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse> gd = discounts.stream().map(d ->
-                            BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse.builder()
-                                    .maChuongTrinhGiamGia(d.getChuongTrinhGiamGia() != null ? d.getChuongTrinhGiamGia().getMaChuongTrinhGiamGia() : null)
-                                    .tenChuongTrinh(d.getChuongTrinhGiamGia() != null ? d.getChuongTrinhGiamGia().getTenChuongTrinh() : null)
+                    List<BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse> gd = discounts.stream()
+                            .map(d -> BienTheSanPhamDetailResponse.GiamGiaHienTaiResponse.builder()
+                                    .maChuongTrinhGiamGia(d.getChuongTrinhGiamGia() != null
+                                            ? d.getChuongTrinhGiamGia().getMaChuongTrinhGiamGia()
+                                            : null)
+                                    .tenChuongTrinh(d.getChuongTrinhGiamGia() != null
+                                            ? d.getChuongTrinhGiamGia().getTenChuongTrinh()
+                                            : null)
                                     .giaSauGiam(d.getGiaSauGiam())
                                     .phanTramGiam(null)
-                                    .build()
-                    ).collect(java.util.stream.Collectors.toList());
+                                    .build())
+                            .collect(java.util.stream.Collectors.toList());
                     resp.setGiamGias(gd);
                 }
             } catch (Exception ex) {

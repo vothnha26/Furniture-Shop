@@ -2,6 +2,7 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.dto.request.BienTheRequestDto;
 import com.noithat.qlnt.backend.dto.request.BienTheUpdateRequestDto;
+import com.noithat.qlnt.backend.dto.request.BienThePatchRequestDto;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.service.IBienTheSanPhamService;
 import jakarta.validation.Valid;
@@ -59,6 +60,16 @@ public class BienTheSanPhamController {
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         bienTheSanPhamService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<BienTheSanPham> patchBienTheSanPham(
+            @PathVariable Integer id,
+            @Valid @RequestBody BienThePatchRequestDto request) {
+
+        BienTheSanPham updatedBienThe = ((com.noithat.qlnt.backend.service.impl.BienTheSanPhamServiceImpl) bienTheSanPhamService)
+                .patchBienTheSanPham(id, request);
+        return ResponseEntity.ok(updatedBienThe);
     }
 
     // Extended endpoints used by frontends (implementation lives in the service

@@ -24,7 +24,7 @@ public record BienTheRequestDto(
 
         @NotNull(message = "Giá bán không được để trống") @DecimalMin(value = "0.0", inclusive = false, message = "Giá bán phải lớn hơn 0") BigDecimal giaBan,
 
-        @NotNull(message = "Số lượng tồn không được để trống") @Min(value = 0, message = "Số lượng tồn không được âm") Integer soLuongTon,
+        @Min(value = 0, message = "Số lượng tồn không được âm") Integer soLuongTon,
 
         // Thêm các trường quản lý kho nâng cao (optional)
 

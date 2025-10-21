@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { IoAdd, IoImage, IoCube, IoPricetag, IoGrid, IoList } from 'react-icons/io5';
-import api from '../../../api';
-import DataTable from '../../shared/DataTable';
-import Modal from '../../shared/Modal';
-import FileUpload from '../../shared/FileUpload';
+import api from '../../../api'; // Giữ nguyên việc import API
+import DataTable from '../../shared/DataTable'; // Giữ nguyên việc import component dùng chung
+import Modal from '../../shared/Modal'; // Giữ nguyên việc import component dùng chung
+import FileUpload from '../../shared/FileUpload'; // Giữ nguyên việc import component dùng chung
 
 const ProductManagement = () => {
+  // --- STATE MANAGEMENT ---
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -13,13 +14,15 @@ const ProductManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Modals for Products
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [showImageManagementModal, setShowImageManagementModal] = useState(false);
 
-  // Variant state
+  // Modals and State for Variants (Simplified for this file's scope)
   const [showAddVariantModal, setShowAddVariantModal] = useState(false);
   const [showEditVariantModal, setShowEditVariantModal] = useState(false);
   const [showDeleteVariantConfirm, setShowDeleteVariantConfirm] = useState(false);
@@ -29,19 +32,21 @@ const ProductManagement = () => {
   const [attrLoading, setAttrLoading] = useState(false);
   const [attrError, setAttrError] = useState(null);
   const [variantSelections, setVariantSelections] = useState({}); // { attributeId: Array(valueId) }
-  const [bulkVariantsPreview, setBulkVariantsPreview] = useState([]); // preview list for bulk creation
-  const [useExplicitRows, setUseExplicitRows] = useState(false);
-  const [explicitRows, setExplicitRows] = useState([]); // [{ maThuocTinh, giaTri }]
-  const [variantMode, setVariantMode] = useState('single'); // 'single' | 'rows'
-  const [attrTextInputs, setAttrTextInputs] = useState({}); // { [attrId]: current input text }
-  const [attrLastAdded, setAttrLastAdded] = useState({}); // { [attrId]: last added raw value }
+  const [bulkVariantsPreview, setBulkVariantsPreview] = useState([]); // placeholder: preview list for bulk creation
+  const [explicitRows, setExplicitRows] = useState([]); // placeholder: [{ maThuocTinh, giaTri }]
+  const [newAttr, setNewAttr] = useState('');
+  const [newValue, setNewValue] = useState('');
+  const [variantMode, setVariantMode] = useState('selection'); // 'selection' | 'manual'
+  const [attributeSearchTerm, setAttributeSearchTerm] = useState(''); // Search term for filtering attributes
+  // Avoid list reordering while user is typing a custom value
+  const [activeEditingAttrKey, setActiveEditingAttrKey] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterCollection, setFilterCollection] = useState('');
   const [filterSupplier, setFilterSupplier] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState('info'); // Will default to 'info' or 'variants'
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
 
   const [productForm, setProductForm] = useState({
@@ -58,14 +63,73 @@ const ProductManagement = () => {
   const [variantCountsMap, setVariantCountsMap] = useState({}); // { [productId]: count }
 
   const [variantForm, setVariantForm] = useState({
-    tenBienThe: '',
     sku: '',
     giaMua: '',
     giaBan: '',
     soLuongTon: '',
-    mucTonToiThieu: '',
-    moTa: ''
+    mucTonToiThieu: ''
   });
+
+  // Auto-generate SKU when selections change
+  useEffect(() => {
+    try {
+      if (!selectedProduct) return;
+
+      // Build mappings from current UI state
+      let mappings = [];
+      if (variantMode === 'rows' && Array.isArray(explicitRows) && explicitRows.length > 0) {
+        mappings = explicitRows
+          .filter(r => r && r.maThuocTinh && String(r.giaTri ?? '').trim() !== '')
+          .map(r => ({ maThuocTinh: r.maThuocTinh, giaTri: String(r.giaTri).trim() }));
+      } else if (Array.isArray(attributes)) {
+        for (const attr of attributes) {
+          const aKey = String(attr.id || attr.maThuocTinh);
+          const sel = variantSelections[aKey] || [];
+          if (sel.length === 1 && String(sel[0]).trim() !== '') {
+            mappings.push({ maThuocTinh: attr.id || attr.maThuocTinh, giaTri: String(sel[0]).trim() });
+          }
+        }
+      }
+
+      if (mappings.length === 0) {
+        if (showAddVariantModal) {
+          setVariantForm(prev => ({ ...prev, sku: '' }));
+        }
+        return;
+      }
+
+      // Inline SKU composition to satisfy hook dependency rules
+      const rawName = String(selectedProduct?.tenSanPham || selectedProduct?.name || '');
+      const nameUpper = rawName
+        .normalize('NFD')
+        .replace(/\p{Diacritic}+/gu, '')
+        .replace(/[đĐ]/g, (m) => (m === 'đ' ? 'd' : 'D'))
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim();
+      const initials = nameUpper.split(' ').filter(Boolean).map(w => w[0]).join('');
+      const prefix = (initials || 'PRD').slice(0, 4);
+      const parts = mappings.map(m => {
+        const val = String(m.giaTri || '')
+          .normalize('NFD')
+          .replace(/\p{Diacritic}+/gu, '')
+          .replace(/[đĐ]/g, (mm) => (mm === 'đ' ? 'd' : 'D'))
+          .toUpperCase()
+          .replace(/[^A-Z0-9]+/g, '')
+          .trim();
+        return val.slice(0, 3) || 'X';
+      });
+      const autoSku = parts.length ? `${prefix}-${parts.join('-')}` : '';
+      if (showAddVariantModal) {
+        setVariantForm(prev => ({ ...prev, sku: autoSku }));
+      } else if (showEditVariantModal) {
+        // In edit flow, update SKU if attribute mappings are explicitly changed
+        setVariantForm(prev => ({ ...prev, sku: autoSku }));
+      }
+    } catch (e) {
+      // Non-fatal: keep manual SKU if any
+    }
+  }, [variantMode, explicitRows, variantSelections, attributes, selectedProduct, showAddVariantModal, showEditVariantModal]);
 
   // Minimal mapping helpers (kept local here to avoid large refactors)
   const mapProductFromApi = (p) => ({
@@ -95,6 +159,8 @@ const ProductManagement = () => {
     diemThuong: p.diemThuong != null ? parseInt(p.diemThuong) : 0
   });
 
+  // (helpers for SKU generation are inlined within the effect to avoid hook deps churn)
+
   const isFileLike = (f) => {
     if (!f) return false;
     if (typeof File !== 'undefined' && f instanceof File) return true;
@@ -103,23 +169,7 @@ const ProductManagement = () => {
     return false;
   };
 
-  const logFormData = (fd, label = 'FormData') => {
-    try {
-      console.log(`[DEBUG] ${label} entries:`);
-      for (const pair of fd.entries()) {
-        const [k, v] = pair;
-        if (typeof File !== 'undefined' && v instanceof File) {
-          console.log(k, 'File ->', v.name, v.size, v.type);
-        } else {
-          console.log(k, v);
-        }
-      }
-    } catch (e) {
-      console.log('[DEBUG] failed to log FormData', e);
-    }
-  };
-
-  // Fetch products list (kept lightweight and robust against paged or non-paged responses)
+  // --- FETCHING FUNCTIONS ---
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -127,11 +177,11 @@ const ProductManagement = () => {
       if (Array.isArray(data)) {
         const mapped = data.map(mapProductFromApi);
         setProducts(mapped);
-        fetchVariantCountsForProducts(mapped).catch(() => {});
+        fetchVariantCountsForProducts(mapped).catch(() => { });
       } else if (data && data.content) {
         const mapped = data.content.map(mapProductFromApi);
         setProducts(mapped);
-        fetchVariantCountsForProducts(mapped).catch(() => {});
+        fetchVariantCountsForProducts(mapped).catch(() => { });
       } else {
         setProducts([]);
       }
@@ -143,11 +193,9 @@ const ProductManagement = () => {
     }
   }, []);
 
-  // Fetch variant counts for a list of products and populate variantCountsMap.
-  // This runs in small batches to avoid flooding the backend with too many concurrent requests.
   const fetchVariantCountsForProducts = async (productsList) => {
     if (!Array.isArray(productsList) || productsList.length === 0) return;
-    const batchSize = 8; // concurrent requests per batch
+    const batchSize = 8;
     const counts = {};
     for (let i = 0; i < productsList.length; i += batchSize) {
       const batch = productsList.slice(i, i + batchSize);
@@ -156,13 +204,11 @@ const ProductManagement = () => {
           const resp = await api.get(`/api/bien-the-san-pham/san-pham/${p.id}`);
           counts[p.id] = Array.isArray(resp) ? resp.length : Number(p.soLuongBienThe || 0);
         } catch (e) {
-          // fallback to stored value on error
           console.warn(`Failed to load variants for product ${p.id}`, e?.message || e);
           counts[p.id] = Number(p.soLuongBienThe || 0);
         }
       }));
     }
-    // merge into state
     setVariantCountsMap(prev => ({ ...prev, ...counts }));
   };
 
@@ -204,7 +250,6 @@ const ProductManagement = () => {
     try {
       const data = await api.get(`/api/bien-the-san-pham/san-pham/${maSanPham}`);
       setProductVariants(Array.isArray(data) ? data : []);
-      // update counts map so list view can reflect loaded counts
       if (Array.isArray(data)) {
         setVariantCountsMap(prev => ({ ...prev, [maSanPham]: data.length }));
       }
@@ -214,7 +259,6 @@ const ProductManagement = () => {
     }
   };
 
-  // Lightweight attribute loader used when we only need attribute names for display
   const fetchAttributesSilent = async () => {
     setAttrLoading(true);
     try {
@@ -222,13 +266,19 @@ const ProductManagement = () => {
       if (!Array.isArray(attrs)) {
         setAttributes([]);
       } else {
-        const loaded = attrs.map(a => ({
-          id: a.maThuocTinh || a.id,
-          tenThuocTinh: a.tenThuocTinh || a.name || a.label || String(a.maThuocTinh || a.id),
-          values: Array.isArray(a.values) ? a.values.map(v => ({ id: v.maGiaTriThuocTinh || v.id, tenGiaTri: v.tenGiaTri || v.name || v.value })) : [],
-          raw: a
-        }));
-        setAttributes(loaded);
+        // Group attributes by category if available
+        const grouped = {};
+        attrs.forEach(a => {
+          const group = a.nhomThuocTinh || a.group || a.category || 'Khác';
+          if (!grouped[group]) grouped[group] = [];
+          grouped[group].push({
+            id: a.maThuocTinh || a.id,
+            tenThuocTinh: a.tenThuocTinh || a.name || a.label || String(a.maThuocTinh || a.id),
+            values: Array.isArray(a.values) ? a.values.map(v => ({ id: v.maGiaTriThuocTinh || v.id, tenGiaTri: v.tenGiaTri || v.name || v.value })) : [],
+            raw: a
+          });
+        });
+        setAttributes(grouped);
       }
     } catch (e) {
       console.warn('fetchAttributesSilent failed', e?.message || e);
@@ -237,76 +287,63 @@ const ProductManagement = () => {
     }
   };
 
-  // Compute the number of variants for a product. Prefer live `productVariants` if it matches the product.
   const computeVariantCount = (product) => {
     if (!product) return 0;
-    // Prefer an explicit count we stored when variants were fetched
     if (variantCountsMap && variantCountsMap[product.id] != null) return Number(variantCountsMap[product.id]);
-    // If the currently selected product matches and we have productVariants loaded, use that
     if (selectedProduct && product.id === selectedProduct.id && Array.isArray(productVariants)) {
       return productVariants.length;
     }
-    // Fallback to the stored count on product object
     return Number(product.soLuongBienThe || 0);
+  };
+
+  // --- PRODUCT HANDLERS ---
+
+  const resetForm = () => {
+    setProductForm({
+      tenSanPham: '',
+      moTa: '',
+      maDanhMuc: '',
+      maNhaCungCap: '',
+      maBoSuuTap: '',
+      diemThuong: 0
+    });
+    setProductImages([]);
   };
 
   const handleAddProduct = async () => {
     const formData = new FormData();
 
-    // Add product data - ensure required fields are always sent
     formData.append('tenSanPham', productForm.tenSanPham);
     formData.append('maNhaCungCap', productForm.maNhaCungCap);
 
-    // Add optional fields if they have values
-    if (productForm.moTa) {
-      formData.append('moTa', productForm.moTa);
-    }
-    if (productForm.maDanhMuc) {
-      formData.append('maDanhMuc', productForm.maDanhMuc);
-    }
-    if (productForm.maBoSuuTap) {
-      formData.append('maBoSuuTap', productForm.maBoSuuTap);
-    }
-    // bonus points
-    if (productForm.diemThuong != null) {
-      formData.append('diemThuong', String(productForm.diemThuong));
-    }
+    if (productForm.moTa) formData.append('moTa', productForm.moTa);
+    if (productForm.maDanhMuc) formData.append('maDanhMuc', productForm.maDanhMuc);
+    if (productForm.maBoSuuTap) formData.append('maBoSuuTap', productForm.maBoSuuTap);
+    if (productForm.diemThuong != null) formData.append('diemThuong', String(productForm.diemThuong));
 
-    // Add images (append array-style keys so Spring can bind to Integer[] / Boolean[])
-    // Only append real File-like images. Let the backend assign thuTu and laAnhChinh (first image becomes main).
-    // Debug: print productImages array shape and types
-    console.debug('[DEBUG] handleAddProduct - productImages.length=', Array.isArray(productImages) ? productImages.length : 0);
-    productImages.forEach((file, i) => {
-      console.debug(`[DEBUG] handleAddProduct - productImages[${i}] type:`, file && file.constructor ? file.constructor.name : typeof file, 'keys:', file && typeof file === 'object' ? Object.keys(file) : undefined);
+    productImages.forEach((file) => {
       if (isFileLike(file)) {
-        // If file is wrapped, unwrap
         const f = file.file || file;
         formData.append('images', f);
       }
     });
 
-    // Log FormData (shows File entries with name/size/type)
-    logFormData(formData, 'Creating product with images');
-
     try {
-      const created = await api.post('/api/products/with-images', { body: formData });
+      let created = await api.post('/api/products/with-images', { body: formData });
 
-      // If server response is partial (no images or timestamps), fetch full product
-      let finalCreated = created;
       if (created && ((!created.hinhAnhs || created.hinhAnhs.length === 0) || !created.ngayTao || !created.ngayCapNhat)) {
         try {
-          console.debug('[DEBUG] create response missing images/timestamps, refetching product', created?.maSanPham || created?.id);
           const id = created?.maSanPham || created?.id;
           if (id) {
             const refreshed = await api.get(`/api/products/${id}`);
-            if (refreshed) finalCreated = refreshed;
+            if (refreshed) created = refreshed;
           }
         } catch (refetchErr) {
           console.warn('Failed to refetch product after create', refetchErr);
         }
       }
 
-      const createdMapped = mapProductFromApi(finalCreated);
+      const createdMapped = mapProductFromApi(created);
       setProducts(prev => [...prev, createdMapped]);
       setShowAddModal(false);
       resetForm();
@@ -320,20 +357,16 @@ const ProductManagement = () => {
     try {
       const payload = mapProductToApi(productForm);
 
-      // First, update the product JSON fields
       let updatedProduct = null;
       try {
         updatedProduct = await api.put(`/api/products/${selectedProduct.id}`, { body: payload });
       } catch (jsonErr) {
-        // If the single-field update fails, still try to continue to image upload if needed
         console.warn('PUT /api/products failed, will still try image upload if present', jsonErr?.message || jsonErr);
       }
 
-      // If there are any File-like objects in productImages, upload them
       const hasFileObjects = Array.isArray(productImages) && productImages.some(f => f && ((typeof File !== 'undefined' && f instanceof File) || (f.name && typeof f.size === 'number')));
       if (hasFileObjects) {
         const formData = new FormData();
-        // include product JSON fields so server can associate
         formData.append('maSanPham', selectedProduct.id);
         formData.append('tenSanPham', productForm.tenSanPham);
         if (productForm.moTa) formData.append('moTa', productForm.moTa);
@@ -342,11 +375,7 @@ const ProductManagement = () => {
         if (productForm.maNhaCungCap) formData.append('maNhaCungCap', productForm.maNhaCungCap);
         if (productForm.diemThuong != null) formData.append('diemThuong', String(productForm.diemThuong));
 
-        // Debug: print productImages array and each entry's runtime details
-        console.debug('[DEBUG] handleEditProduct - productImages.length=', Array.isArray(productImages) ? productImages.length : 0);
-        productImages.forEach((file, index) => {
-          console.debug(`[DEBUG] handleEditProduct - productImages[${index}] type:`, file && file.constructor ? file.constructor.name : typeof file, 'keys:', file && typeof file === 'object' ? Object.keys(file) : undefined);
-          // only append File-like objects
+        productImages.forEach((file) => {
           if (file && ((typeof File !== 'undefined' && file instanceof File) || (file.name && typeof file.size === 'number'))) {
             if (isFileLike(file)) {
               const f = file.file || file;
@@ -355,25 +384,17 @@ const ProductManagement = () => {
           }
         });
 
-        // Try a dedicated images upload endpoint first, then fallback to a with-images update endpoint
         try {
-          // Debug: log FormData contents so we can verify files are attached
-          logFormData(formData, `Uploading images for product ${selectedProduct?.id}`);
-          // Upload files to the product images upload endpoint
           const imgResp = await api.post(`/api/products/${selectedProduct.id}/images/upload`, { body: formData });
           if (imgResp) updatedProduct = imgResp;
         } catch (imgErr1) {
           console.error('Image upload failed for product', selectedProduct?.id, imgErr1);
-          // don't throw — product fields may have been updated above
         }
       }
 
-      // Update UI using server response when available, otherwise merge local changes
       if (updatedProduct) {
-        // If the upload endpoint returned a partial object (no hinhAnhs or timestamps), fetch the full product
         if ((!updatedProduct.hinhAnhs || updatedProduct.hinhAnhs.length === 0) || !updatedProduct.ngayTao || !updatedProduct.ngayCapNhat) {
           try {
-            console.debug('[DEBUG] upload response missing images/timestamps, fetching full product', selectedProduct?.id);
             const refreshed = await api.get(`/api/products/${selectedProduct.id}`);
             if (refreshed) updatedProduct = refreshed;
           } catch (refetchErr) {
@@ -434,7 +455,6 @@ const ProductManagement = () => {
       maNhaCungCap: product.maNhaCungCap,
       maBoSuuTap: product.maBoSuuTap
     });
-    // Normalize images coming from API so FileUpload can render them reliably
     const normalized = (product.hinhAnhs || []).map((h, idx) => ({
       maHinhAnh: h.maHinhAnh || h.id,
       duongDanHinhAnh: h.duongDanHinhAnh || h.url || h.path,
@@ -444,8 +464,7 @@ const ProductManagement = () => {
     }));
     setProductImages(normalized);
     await fetchProductVariants(product.id);
-    // Ensure attribute names are loaded so variant attribute display shows names
-    await fetchAttributesSilent();
+    await fetchAttributesSilent(); // For variant attribute display
     setShowDetailModal(true);
     setActiveTab('info');
   };
@@ -457,9 +476,9 @@ const ProductManagement = () => {
       moTa: product.moTa,
       maDanhMuc: product.maDanhMuc,
       maNhaCungCap: product.maNhaCungCap,
-      maBoSuuTap: product.maBoSuuTap
+      maBoSuuTap: product.maBoSuuTap,
+      diemThuong: product.diemThuong || 0
     });
-    // Normalize images for edit modal too
     const normalized = (product.hinhAnhs || []).map((h, idx) => ({
       maHinhAnh: h.maHinhAnh || h.id,
       duongDanHinhAnh: h.duongDanHinhAnh || h.url || h.path,
@@ -471,34 +490,17 @@ const ProductManagement = () => {
     setShowEditModal(true);
   };
 
-  const resetForm = () => {
-    setProductForm({
-      tenSanPham: '',
-      moTa: '',
-      maDanhMuc: '',
-      maNhaCungCap: '',
-      maBoSuuTap: ''
-    });
-    setProductImages([]);
-  };
-
+  // --- IMAGE HANDLERS ---
   const handleImageUpload = (files) => {
     const newFiles = Array.isArray(files) ? files : [files];
-    console.debug('[DEBUG] handleImageUpload - received', newFiles.length, 'files');
     setProductImages(prev => {
       const merged = [...(Array.isArray(prev) ? prev : []), ...newFiles];
-      // If no image is currently marked main, mark the first found (either existing laAnhChinh or new file)
       const hasMain = merged.some(i => !!(i.laAnhChinh || i._isMain || i.isMain || i.main));
       if (!hasMain && merged.length > 0) {
-        // mark first new File as _isMain, preserve File prototype
         for (let i = 0; i < merged.length; i++) {
           const item = merged[i];
-          if (item instanceof File) {
-            Object.assign(item, { _isMain: true });
-            break;
-          }
-          if (item && item.laAnhChinh) {
-            // already server-marked
+          if (item instanceof File || (item && item.duongDanHinhAnh)) { // Find first available image
+            Object.assign(item, { _isMain: true, laAnhChinh: true });
             break;
           }
         }
@@ -508,41 +510,44 @@ const ProductManagement = () => {
   };
 
   const handleImageRemove = (index) => {
-    setProductImages(prev => prev.filter((_, i) => i !== index));
+    setProductImages(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      // Ensure there's still a main image if we removed the old one
+      if (next.length > 0 && !next.some(i => !!(i.laAnhChinh || i._isMain))) {
+        const firstAvailable = next.find(i => i instanceof File || i.duongDanHinhAnh);
+        if (firstAvailable) {
+          Object.assign(firstAvailable, { _isMain: true, laAnhChinh: true });
+        }
+      }
+      return next;
+    });
   };
 
   const handleToggleImageMain = (index) => {
     setProductImages(prev => {
       if (!Array.isArray(prev)) return prev;
-      // Don't spread File objects - just mark the index, we'll handle laAnhChinh at upload time
-      // Store main index separately or use array index order (first = main)
       return prev.map((img, i) => {
-        // If img is a File, attach a custom property without spreading
+        const isMain = i === index;
         if (img instanceof File) {
-          // Create a wrapper that preserves the File
-          return Object.assign(img, { _isMain: i === index });
+          return Object.assign(img, { _isMain: isMain, laAnhChinh: isMain });
         }
-        // For existing image objects (from server), spread is fine
-        return { ...img, laAnhChinh: i === index };
+        return { ...img, laAnhChinh: isMain };
       });
     });
   };
 
-  // --- Variant Management Logic ---
+  // --- VARIANT MANAGEMENT LOGIC (Keeping existing, simplified implementation) ---
 
   const resetVariantForm = () => {
     setVariantForm({
-      tenBienThe: '',
       sku: '',
       giaMua: '',
       giaBan: '',
-      soLuongTon: '',
-      moTa: ''
+      soLuongTon: ''
     });
   };
 
   const handleAddVariant = () => {
-    // Open add-variant modal and load attributes+values
     if (!selectedProduct) {
       console.error('Cannot add variant: no product selected');
       return;
@@ -550,159 +555,138 @@ const ProductManagement = () => {
     resetVariantForm();
     setBulkVariantsPreview([]);
     setVariantSelections({});
+    setExplicitRows([{ maThuocTinh: '', giaTri: '' }]); // Initialize with one empty row
+    setVariantMode('selection'); // Default to selection mode
+    setAttributeSearchTerm(''); // Reset search term
 
-    // fetch attributes and their values (shows add modal after load)
     fetchAttributes(true);
   };
+
   const fetchAttributes = async (openForAdd = true, variantForPrefill = null) => {
     setAttrLoading(true);
     setAttrError(null);
     try {
       const attrs = await api.get('/api/attributes');
-      if (!Array.isArray(attrs)) {
-        setAttributes([]);
-      } else {
-        // Load values for each attribute by querying the product-variants endpoint (server provides variant attribute values there).
-        // This avoids the per-attribute endpoint which may return 500. We still keep /api/attribute-values as a last-resort fallback.
-        // Use product-variant endpoint as the sole source of attribute values.
-        let variantsValues = [];
+      let variantsValues = [];
+      if (selectedProduct && selectedProduct.id != null) {
         try {
-          if (selectedProduct && selectedProduct.id != null) {
-            const resp = await api.get(`/api/bien-the-san-pham/san-pham/${selectedProduct.id}`);
-            console.log('fetchProducts data end:', resp);
-            variantsValues = Array.isArray(resp) ? resp : [];
-          }
+          const resp = await api.get(`/api/bien-the-san-pham/san-pham/${selectedProduct.id}`);
+          variantsValues = Array.isArray(resp) ? resp : [];
         } catch (e) {
           console.warn('Failed to load variant-values from /api/bien-the-san-pham/san-pham/{id}', e?.message || e);
-          variantsValues = [];
         }
-        // Debug: show raw variantsValues retrieved for this product
-        console.debug('[DEBUG] fetchAttributes - variantsValues for product', selectedProduct?.id, variantsValues);
+      }
 
-        // If we are editing a specific variant and the caller provided the variant data (variantForPrefill),
-        // prefer constructing the attributes list from that single-variant's mappings so the edit UI shows
-        // exactly the attribute:value pairs present on that variant (avoids aggregating values across all product variants).
-        let loaded;
-        if (!openForAdd && variantForPrefill) {
-          // Accept many possible shapes returned by the server for a single variant (including bienTheThuocTinhs)
-          const mappingCandidates =
-            variantForPrefill.thuocTinhGiaTriTuDo ||
-            variantForPrefill.bienTheThuocTinhs ||
-            variantForPrefill.giaTriThuocTinhs ||
-            variantForPrefill.thuocTinh ||
-            variantForPrefill.thuocTinhMappings ||
-            [];
-          // Normalize mapping entries to { maThuocTinh, giaTri }
-          const norm = (Array.isArray(mappingCandidates) ? mappingCandidates : []).map(m => {
-            // Support nested shapes like { bienTheThuocTinhs: [{ thuocTinh: { maThuocTinh }, giaTri: { giaTri } }] }
-            if (!m) return null;
-            // If mapping itself is a wrapper containing an array
-            if (Array.isArray(m.bienTheThuocTinhs || m.thuocTinhMappings || m.mappings)) {
-              // extract first entry for normalization (we'll flatten below for list-based flows)
-              const first = (m.bienTheThuocTinhs || m.thuocTinhMappings || m.mappings)[0] || {};
-              return { maThuocTinh: first.maThuocTinh ?? first.thuocTinh?.maThuocTinh ?? first.thuocTinh?.id ?? first.attributeId ?? first.ma, giaTri: first.giaTri ?? first.giaTri?.giaTri ?? first.tenGiaTri ?? first.value ?? first.name };
-            }
-            // Direct mapping shapes
-            return { maThuocTinh: m.maThuocTinh ?? m.attributeId ?? m.ma ?? m.thuocTinh?.maThuocTinh ?? m.thuocTinh?.id, giaTri: m.giaTri ?? m.giaTri?.giaTri ?? m.tenGiaTri ?? m.value ?? m.name };
-          }).filter(Boolean);
-          console.debug('[DEBUG] fetchAttributes - variantForPrefill mappingCandidates normalized (norm):', norm, 'variantForPrefill:', variantForPrefill);
+      let loaded = [];
+      if (!openForAdd && variantForPrefill) {
+        // Edit mode: Load only mapped attributes with their values
+        const mappingCandidates =
+          variantForPrefill.thuocTinhGiaTriTuDo ||
+          variantForPrefill.bienTheThuocTinhs ||
+          variantForPrefill.giaTriThuocTinhs ||
+          variantForPrefill.thuocTinh ||
+          variantForPrefill.thuocTinhMappings ||
+          [];
 
-          // Build attributes only for mapped attribute IDs, using metadata from attrs when available
-          loaded = (norm || []).map((m) => {
-            const attrId = m.maThuocTinh;
-            const meta = attrs.find(a => String(a.maThuocTinh || a.id) === String(attrId)) || {};
-            const val = { id: String(m.giaTri ?? ''), tenGiaTri: String(m.giaTri ?? ''), raw: m };
-            return { id: attrId, tenThuocTinh: meta.tenThuocTinh || meta.name || meta.label || String(attrId), values: [val], raw: meta };
-          });
+        const norm = (Array.isArray(mappingCandidates) ? mappingCandidates : []).map(m => {
+          if (!m) return null;
+          // Normalize to { maThuocTinh, giaTri }
+          const maThuocTinh = m.maThuocTinh ?? m.attributeId ?? m.ma ?? m.thuocTinh?.maThuocTinh ?? m.thuocTinh?.id;
+          const giaTri = m.giaTri ?? m.giaTri?.giaTri ?? m.tenGiaTri ?? m.value ?? m.name;
+          return maThuocTinh ? { maThuocTinh, giaTri } : null;
+        }).filter(Boolean);
 
-          // Also include any attribute metadata that might be useful but not present in the variant mapping
-          // (keeps attribute order stable). Append attributes from attrs that were not in the variant mapping but
-          // include an empty values array so selection UI still renders if needed.
-          const mappedIds = new Set((norm || []).map(m => String(m.maThuocTinh)));
-          for (const a of attrs) {
-            const aId = a.maThuocTinh || a.id;
-            if (!mappedIds.has(String(aId))) {
-              loaded.push({ id: aId, tenThuocTinh: a.tenThuocTinh || a.name || a.label || String(aId), values: [], raw: a });
-            }
+        loaded = (norm || []).map((m) => {
+          const attrId = m.maThuocTinh;
+          const meta = attrs.find(a => String(a.maThuocTinh || a.id) === String(attrId)) || {};
+          const val = { id: String(m.giaTri ?? ''), tenGiaTri: String(m.giaTri ?? ''), raw: m };
+          return { id: attrId, tenThuocTinh: meta.tenThuocTinh || meta.name || meta.label || String(attrId), values: [val], raw: meta };
+        });
+
+        const mappedIds = new Set((norm || []).map(m => String(m.maThuocTinh)));
+        for (const a of attrs) {
+          const aId = a.maThuocTinh || a.id;
+          if (!mappedIds.has(String(aId))) {
+            loaded.push({ id: aId, tenThuocTinh: a.tenThuocTinh || a.name || a.label || String(aId), values: [], raw: a });
           }
-        } else {
-          // Previous behavior: aggregate textual values across all product variants
-          loaded = await Promise.all(attrs.map(async (a) => {
-            const attrId = a.maThuocTinh || a.id;
-            const mapVals = (vals) => (Array.isArray(vals) ? vals.map(v => ({
-              id: v.maGiaTriThuocTinh || v.id,
-              tenGiaTri: v.giaTri || v.tenGiaTri || v.tenGiaTriThuocTinh || v.name || v.value || String(v.id || v.maGiaTriThuocTinh),
-              raw: v
-            })) : []);
-
-            // variantsValues is a list of variant objects; each variant may contain thuocTinhGiaTriTuDo: [{ maThuocTinh, giaTri }]
-            // Flatten those mappings and use them as attribute values (textual values)
-            let flatMappings = [];
-            if (Array.isArray(variantsValues)) {
-              for (const variantItem of variantsValues) {
-                if (!variantItem) continue;
-                // variant may store mappings under different keys - try several possible fields (including bienTheThuocTinhs)
-                const candidate = variantItem.thuocTinhGiaTriTuDo || variantItem.thuocTinhGiaTriTuDos || variantItem.thuocTinh || variantItem.thuocTinhMappings || variantItem.bienTheThuocTinhs || variantItem.giaTriThuocTinhs || null;
-                if (Array.isArray(candidate)) {
-                  for (const m of candidate) {
-                    if (!m) continue;
-                    // m may be { maThuocTinh, giaTri } or { thuocTinh: { maThuocTinh, ... }, giaTri }
-                    const extractedMa = m.maThuocTinh ?? m.attributeId ?? m.ma ?? (m.thuocTinh && (m.thuocTinh.maThuocTinh ?? m.thuocTinh.id ?? m.thuocTinh.ma)) ?? null;
-                    const extractedVal = m.giaTri ?? (typeof m.giaTri === 'object' ? (m.giaTri.giaTri ?? m.giaTri.value ?? '') : null) ?? m.tenGiaTri ?? m.value ?? m.name;
-                    if (extractedMa != null) {
-                      flatMappings.push({ maThuocTinh: extractedMa, giaTri: extractedVal });
-                    }
+        }
+      } else {
+        // Add mode: Aggregate all textual values across all product variants
+        loaded = await Promise.all(attrs.map(async (a) => {
+          const attrId = a.maThuocTinh || a.id;
+          let flatMappings = [];
+          if (Array.isArray(variantsValues)) {
+            for (const variantItem of variantsValues) {
+              if (!variantItem) continue;
+              const candidate = variantItem.thuocTinhGiaTriTuDo || variantItem.thuocTinhGiaTriTuDos || variantItem.thuocTinh || variantItem.thuocTinhMappings || variantItem.bienTheThuocTinhs || variantItem.giaTriThuocTinhs || null;
+              if (Array.isArray(candidate)) {
+                for (const m of candidate) {
+                  if (!m) continue;
+                  const extractedMa = m.maThuocTinh ?? m.attributeId ?? m.ma ?? (m.thuocTinh && (m.thuocTinh.maThuocTinh ?? m.thuocTinh.id ?? m.thuocTinh.ma)) ?? null;
+                  const extractedVal = m.giaTri ?? (typeof m.giaTri === 'object' ? (m.giaTri.giaTri ?? m.giaTri.value ?? '') : null) ?? m.tenGiaTri ?? m.value ?? m.name;
+                  if (extractedMa != null) {
+                    flatMappings.push({ maThuocTinh: extractedMa, giaTri: extractedVal });
                   }
                 }
               }
             }
-            // Debug: per-attribute collected flatMappings
-            console.debug('[DEBUG] fetchAttributes - attrId', attrId, 'flatMappings:', flatMappings.slice(0, 20));
+          }
+          const filtered = flatMappings.filter(m => String(m.maThuocTinh) === String(attrId));
+          const mappedVals = (filtered || []).map((m, idx) => ({ id: String(m.giaTri ?? `val-${idx}`), tenGiaTri: String(m.giaTri ?? ''), raw: m }));
+          return { id: attrId, tenThuocTinh: a.tenThuocTinh || a.name || a.label || String(attrId), values: mappedVals, raw: a };
+        }));
+      }
 
-            const filtered = flatMappings.filter(m => String(m.maThuocTinh) === String(attrId));
-            // map to value objects
-            const mappedVals = (filtered || []).map((m, idx) => ({ id: String(m.giaTri ?? `val-${idx}`), tenGiaTri: String(m.giaTri ?? ''), raw: m }));
-            return { id: attrId, tenThuocTinh: a.tenThuocTinh || a.name || a.label || String(attrId), values: mapVals(mappedVals), raw: a };
-          }));
-        }
+      setAttributes(loaded);
 
-        setAttributes(loaded);
+      // Prefill selections when editing.
+      if (!openForAdd && variantForPrefill) {
+        const variantToUse = variantForPrefill;
+        const pre = {};
 
-        // Prefill selections when editing. Accept an explicit variantForPrefill to avoid race with setState.
-        if (!openForAdd) {
-          const variantToUse = variantForPrefill || selectedVariant;
-          if (variantToUse) {
-            const pre = {};
-
-            // legacy numeric IDs
+        // Free-text mappings (preferred for single variant editing UI)
+        if (Array.isArray(variantToUse.thuocTinhGiaTriTuDo) && variantToUse.thuocTinhGiaTriTuDo.length > 0) {
+          const rows = variantToUse.thuocTinhGiaTriTuDo.map(m => ({ maThuocTinh: m.maThuocTinh, giaTri: m.giaTri }));
+          setExplicitRows(rows); // Set explicit rows for simplified edit view
+          // Also set selections for form submission fallback
+          for (const mapping of variantToUse.thuocTinhGiaTriTuDo) {
+            const aKey = String(mapping.maThuocTinh);
+            pre[aKey] = Array.isArray(pre[aKey]) ? [...pre[aKey], String(mapping.giaTri)] : [String(mapping.giaTri)];
+          }
+        } else {
+          // Try to derive existing mappings into explicitRows for edit display
+          const complexMappings = variantToUse.bienTheThuocTinhs || variantToUse.thuocTinhGiaTriTuDo || variantToUse.thuocTinhGiaTriTuDos || variantToUse.thuocTinh || variantToUse.thuocTinhMappings;
+          if (Array.isArray(complexMappings) && complexMappings.length > 0) {
+            const rows = complexMappings.map(m => {
+              const ma = m.maThuocTinh ?? (m.thuocTinh && (m.thuocTinh.maThuocTinh ?? m.thuocTinh.id)) ?? m.attributeId ?? m.ma ?? '';
+              const value = m.giaTri ?? (m.giaTri && typeof m.giaTri === 'object' ? (m.giaTri.giaTri ?? m.giaTri.value) : null) ?? m.tenGiaTri ?? m.value ?? m.name ?? '';
+              return { maThuocTinh: String(ma), giaTri: String(value) };
+            }).filter(r => r.maThuocTinh !== '');
+            setExplicitRows(rows);
+          } else {
+            setExplicitRows([]); // Clear explicit rows if none exist
+            // Legacy numeric IDs (fallback for older variants)
             if (Array.isArray(variantToUse.giaTriThuocTinhIds) && variantToUse.giaTriThuocTinhIds.length > 0) {
+              const rows = [];
               for (const attr of loaded) {
                 const aKey = String(attr.id || attr.maThuocTinh);
                 const vals = (attr.values || []).map(v => String(v.id || v.maGiaTriThuocTinh));
                 const selectedForAttr = (variantToUse.giaTriThuocTinhIds || []).map(String).filter(id => vals.includes(id));
-                if (selectedForAttr.length > 0) pre[aKey] = selectedForAttr;
+                if (selectedForAttr.length > 0) {
+                  pre[aKey] = selectedForAttr;
+                  // Attempt to find human-readable labels from attr.values, else use the id
+                  for (const selId of selectedForAttr) {
+                    const match = (attr.values || []).find(v => String(v.id || v.maGiaTriThuocTinh) === String(selId));
+                    rows.push({ maThuocTinh: aKey, giaTri: String(match?.tenGiaTri ?? selId) });
+                  }
+                }
               }
-            }
-
-            // free-text mappings
-            if (Array.isArray(variantToUse.thuocTinhGiaTriTuDo) && variantToUse.thuocTinhGiaTriTuDo.length > 0) {
-              for (const mapping of variantToUse.thuocTinhGiaTriTuDo) {
-                const aKey = String(mapping.maThuocTinh);
-                pre[aKey] = Array.isArray(pre[aKey]) ? [...pre[aKey], String(mapping.giaTri)] : [String(mapping.giaTri)];
-              }
-            }
-
-            setVariantSelections(pre);
-            // If the variant has free-text mappings (thuocTinhGiaTriTuDo) populate explicitRows,
-            // otherwise clear explicitRows to avoid showing mappings left over from previous edits.
-            if (Array.isArray(variantToUse.thuocTinhGiaTriTuDo) && variantToUse.thuocTinhGiaTriTuDo.length > 0) {
-              const rows = variantToUse.thuocTinhGiaTriTuDo.map(m => ({ maThuocTinh: m.maThuocTinh, giaTri: m.giaTri }));
-              setExplicitRows(rows);
-            } else {
-              setExplicitRows([]);
+              if (rows.length > 0) setExplicitRows(rows);
             }
           }
         }
+
+        setVariantSelections(pre);
       }
     } catch (err) {
       console.error('Load attributes error', err);
@@ -714,123 +698,174 @@ const ProductManagement = () => {
     }
   };
 
-  // Sửa lỗi: Đảm bảo logic thêm/xóa ID trong mảng trạng thái
-  const toggleSelection = (attributeId, valueId) => {
-    const aKey = String(attributeId);
-    const vKey = String(valueId);
-    setVariantSelections(prev => {
-      const next = { ...prev };
-      const current = Array.isArray(next[aKey]) ? next[aKey].slice() : [];
-      const idx = current.indexOf(vKey);
-      if (idx >= 0) current.splice(idx, 1); else current.push(vKey);
-      next[aKey] = current;
-      // clear bulk preview when selection changes
-      setBulkVariantsPreview([]);
-      return next;
-    });
-  };
+  // Selection toggling is handled inline in UI handlers; no standalone toggle function needed.
 
   // note: bulk-preview functionality removed; keep placeholder removed
-
-  // Keep a no-op effect to reference bulkVariantsPreview so linters don't warn about unused state
   React.useEffect(() => {
-    // intentionally no-op; this ensures bulkVariantsPreview is referenced and won't be flagged as unused
     void bulkVariantsPreview;
   }, [bulkVariantsPreview]);
 
-  
+  // Attach numeric suffix to SKU like BASE-<n>, replacing existing trailing -digits if present
+  const attachSkuSuffix = (baseSku, n) => {
+    const name = String(baseSku || '').trim();
+    if (!name) return '';
+    const stripped = name.replace(/-\d+$/i, '');
+    return `${stripped}-${Number(n)}`;
+  };
+
+  // Ensure SKU is unique by probing backend and appending a counter if needed
+  const ensureUniqueSku = async (baseSku) => {
+    const norm = (s) => (s || '').trim();
+    let candidate = norm(baseSku);
+    if (!candidate) {
+      candidate = `AUTO-${Date.now().toString(36).slice(-6).toUpperCase()}`;
+    }
+    let attempt = 1;
+    const maxAttempts = 20;
+    while (attempt <= maxAttempts) {
+      try {
+        // If this returns 200, SKU exists => try next candidate
+        await api.get(`/api/bien-the-san-pham/sku/${encodeURIComponent(candidate)}`);
+        attempt++;
+        candidate = `${norm(baseSku)}-${attempt}`;
+      } catch (e) {
+        // If 404, it's available
+        if (e && e.status === 404) return candidate;
+        // For server errors, fallback to time/random suffix once
+        if (e && e.status >= 500) {
+          return `${norm(baseSku)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        }
+        // Any other error, consider it available to avoid blocking
+        return candidate;
+      }
+    }
+    // Fallback after many attempts
+    return `${norm(baseSku)}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+  };
 
   const handleCreateSingleFromSelection = async () => {
     if (!selectedProduct) return;
-    // Build thuocTinhGiaTriTuDo from textual inputs in variantSelections
-    const mappings = [];
-    for (const attr of attributes) {
-      const aKey = String(attr.id || attr.maThuocTinh);
-      const sel = variantSelections[aKey] || [];
-
-      if (sel.length > 1) {
-        alert('Vui lòng chỉ nhập 1 giá trị trên mỗi thuộc tính để tạo biến thể đơn.');
-        return;
-      }
-
-      if (sel.length === 1 && String(sel[0]).trim() !== '') {
-        mappings.push({ maThuocTinh: attr.id || attr.maThuocTinh, giaTri: String(sel[0]).trim() });
+    
+    let mappings = [];
+    
+    if (variantMode === 'manual') {
+      // Use explicitRows for manual mode
+      mappings = explicitRows
+        .filter(r => r.maThuocTinh && String(r.giaTri).trim() !== '')
+        .map(r => ({ 
+          maThuocTinh: Number(r.maThuocTinh), 
+          giaTri: String(r.giaTri).trim() 
+        }));
+    } else {
+      // Use variantSelections for selection mode
+      for (const attr of attributes) {
+        const aKey = String(attr.id || attr.maThuocTinh);
+        const sel = variantSelections[aKey] || [];
+        
+        if (sel.length === 1 && String(sel[0]).trim() !== '') {
+          mappings.push({ 
+            maThuocTinh: Number(attr.id || attr.maThuocTinh), 
+            giaTri: String(sel[0]).trim() 
+          });
+        }
       }
     }
 
-    if (mappings.length === 0) { alert('Vui lòng nhập ít nhất một giá trị thuộc tính'); return; }
-
-    // Build label from mappings
-    const labels = mappings.map(m => m.giaTri).join(' / ');
+    if (mappings.length === 0) { 
+      alert('Vui lòng nhập ít nhất một giá trị thuộc tính'); 
+      return; 
+    }
 
     try {
+      // Resolve a unique SKU before sending
+      let desiredSku = (variantForm.sku && String(variantForm.sku).trim()) || `AUTO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      const currentCount = Number((variantCountsMap && variantCountsMap[selectedProduct.id]) ?? selectedProduct.soLuongBienThe ?? 0);
+      const nextIndex = currentCount + 1;
+      const desiredSkuWithCount = attachSkuSuffix(desiredSku, nextIndex);
+      const uniqueSku = await ensureUniqueSku(desiredSkuWithCount);
+      if (uniqueSku !== desiredSku) {
+        setVariantForm(prev => ({ ...prev, sku: uniqueSku }));
+      }
+
       const payload = {
         maSanPham: selectedProduct.id,
-        tenBienThe: variantForm.tenBienThe || labels,
-        sku: variantForm.sku || `AUTO-${Math.random().toString(36).slice(2, 8)}`,
-        moTa: variantForm.moTa,
-        giaMua: variantForm.giaMua ? Number(variantForm.giaMua) : 0,
-        giaBan: variantForm.giaBan ? Number(variantForm.giaBan) : 0,
-        soLuongTon: parseInt(variantForm.soLuongTon || 0),
-        mucTonToiThieu: variantForm.mucTonToiThieu != null ? Number(variantForm.mucTonToiThieu) : undefined,
-        // include free-text attribute values for server to create/persist
+        sku: uniqueSku,
+        giaMua: variantForm.giaMua && Number(variantForm.giaMua) > 0 ? Number(variantForm.giaMua) : null,
+        giaBan: variantForm.giaBan && Number(variantForm.giaBan) > 0 ? Number(variantForm.giaBan) : 1000,
+        soLuongTon: 0,
+        mucTonToiThieu: 0,
+        trangThaiKho: "INACTIVE",
         thuocTinhGiaTriTuDo: mappings
       };
 
-      const created = await api.post(`/api/bien-the-san-pham/san-pham/${selectedProduct.id}`, { body: payload });
+      const created = await api.post(`/api/bien-the-san-pham/san-pham/${selectedProduct.id}`, payload);
+      
       setProductVariants(prev => [...prev, created]);
       setShowAddVariantModal(false);
       resetVariantForm();
 
-      // Update the product count in the main list
-      setProducts(prev => prev.map(p => p.id === selectedProduct.id ? { ...p, soLuongBienThe: p.soLuongBienThe + 1 } : p));
+      setProducts(prev => prev.map(p => p.id === selectedProduct.id ? { ...p, soLuongBienThe: (p.soLuongBienThe || 0) + 1 } : p));
       setVariantCountsMap(prev => ({ ...prev, [selectedProduct.id]: (Number(prev[selectedProduct.id] || selectedProduct.soLuongBienThe || 0) + 1) }));
 
     } catch (err) {
-      console.error('Create single variant error', err);
-      setError(err);
+        console.error('❌ Create single variant error', err);
+        console.error('❌ Error status:', err.status);
+        console.error('❌ Error data:', err.data);
+        console.error('❌ Error message:', err.message);
+      
+        // Display detailed error message
+        let errorMessage = 'Không thể tạo biến thể: ';
+        if (err.data) {
+          if (typeof err.data === 'string') {
+            errorMessage += err.data;
+          } else if (err.data.message) {
+            errorMessage += err.data.message;
+          } else if (err.data.error) {
+            errorMessage += err.data.error;
+          } else {
+            errorMessage += JSON.stringify(err.data);
+          }
+        } else {
+          errorMessage += err.message || 'Lỗi không xác định';
+        }
+      
+        alert(errorMessage);
+        setError(err);
     }
   };
 
 
   const handleEditVariant = (variant) => {
-    // Fetch the authoritative variant data from server to get thuocTinhGiaTriTuDo
     (async () => {
       try {
         const id = variant.id || variant.maBienThe || variant.ma;
         const full = await api.get(`/api/bien-the-san-pham/${id}`);
         const variantData = full || variant;
-        console.debug('[DEBUG] handleEditVariant - fetched variantData:', variantData);
         setSelectedVariant(variantData);
         setVariantForm({
-          tenBienThe: variantData.tenBienThe || '',
           sku: variantData.sku || '',
           giaMua: variantData.giaMua || '',
           giaBan: variantData.giaBan || '',
           soLuongTon: variantData.soLuongTon || '',
-          moTa: variantData.moTa || ''
+          mucTonToiThieu: variantData.mucTonToiThieu || '' // Ensure this field is populated
         });
-        // reset selections before prefill
         setVariantSelections({});
-        // Load attributes and pre-fill selections from the server-provided variant
         fetchAttributes(false, variantData);
       } catch (err) {
         console.warn('Failed to fetch full variant for edit, falling back to provided object', err?.message || err);
         setSelectedVariant(variant);
         setVariantForm({
-          tenBienThe: variant.tenBienThe || '',
           sku: variant.sku || '',
           giaMua: variant.giaMua || '',
           giaBan: variant.giaBan || '',
           soLuongTon: variant.soLuongTon || '',
-          moTa: variant.moTa || ''
+          mucTonToiThieu: variant.mucTonToiThieu || ''
         });
         fetchAttributes(false, variant);
       }
     })();
   };
 
-  // Renamed from handleSaveVariant to clarify it only handles updates
   const handleUpdateVariant = async () => {
     if (!selectedVariant) {
       console.error('No selected variant for update');
@@ -839,42 +874,30 @@ const ProductManagement = () => {
 
     try {
       const payload = {
-        tenBienThe: variantForm.tenBienThe, // Include optional fields in update payload
-        sku: variantForm.sku,
-        moTa: variantForm.moTa,
-        maSanPham: selectedProduct.id,
         giaMua: parseFloat(variantForm.giaMua) || 0,
-        giaBan: parseFloat(variantForm.giaBan) || 0,
-        soLuongTon: parseInt(variantForm.soLuongTon) || 0,
-        mucTonToiThieu: variantForm.mucTonToiThieu ? Number(variantForm.mucTonToiThieu) : undefined
+        giaBan: parseFloat(variantForm.giaBan) || 0
       };
 
-      // If explicitRows (free-text mappings) exist (we loaded them for edit), prefer sending them directly
       if (Array.isArray(explicitRows) && explicitRows.length > 0) {
         const mappings = explicitRows.map(r => ({ maThuocTinh: Number(r.maThuocTinh), giaTri: String(r.giaTri) }));
         payload.thuocTinhGiaTriTuDo = mappings;
       } else {
-        // If variantSelections contains textual (non-numeric) entries, send them as thuocTinhGiaTriTuDo
-        const allSelected = Object.values(variantSelections).flat();
-        const textual = allSelected.filter(v => isNaN(Number(v)) || String(v).trim() === '').map(v => String(v));
-        if (textual.length > 0) {
-          // build mappings from attributes state
-          const mappings = [];
-          for (const attr of attributes) {
-            const aKey = String(attr.id || attr.maThuocTinh);
-            const sel = variantSelections[aKey] || [];
-            for (const s of sel) {
-              if (String(s).trim() !== '') mappings.push({ maThuocTinh: attr.id || attr.maThuocTinh, giaTri: String(s).trim() });
-            }
+        const mappings = [];
+        for (const attr of attributes) {
+          const aKey = String(attr.id || attr.maThuocTinh);
+          const sel = variantSelections[aKey] || [];
+          for (const s of sel) {
+            if (String(s).trim() !== '') mappings.push({ maThuocTinh: attr.id || attr.maThuocTinh, giaTri: String(s).trim() });
           }
-          if (mappings.length > 0) payload.thuocTinhGiaTriTuDo = mappings;
+        }
+        if (mappings.length > 0) {
+          payload.thuocTinhGiaTriTuDo = mappings;
         } else {
-          // Otherwise preserve numeric ids for backward compatibility
+          // Fallback for numeric IDs (rare in modern system but for compatibility)
           payload.giaTriThuocTinhIds = Array.from(new Set(Object.values(variantSelections).flat().map(id => Number(id))));
         }
       }
 
-      // Determine variant id robustly (server may use different id field names)
       const variantId = selectedVariant?.id ?? selectedVariant?.maBienThe ?? selectedVariant?.ma ?? selectedVariant?.maBienTheId ?? null;
       if (!variantId) {
         console.error('Cannot determine variant id for update', selectedVariant);
@@ -882,9 +905,8 @@ const ProductManagement = () => {
         return;
       }
 
-      await api.put(`/api/bien-the-san-pham/${variantId}/variant`, { body: payload });
+      await api.patch(`/api/bien-the-san-pham/${variantId}`, { body: payload });
 
-      // Update the productVariants state with the new data (match by computed id)
       setProductVariants(prev => prev.map(v => (String(v.id) === String(variantId) || String(v.maBienThe) === String(variantId) ? { ...v, ...payload } : v)));
 
       setShowEditVariantModal(false);
@@ -916,14 +938,21 @@ const ProductManagement = () => {
       setProductVariants(prev => prev.filter(v => !(String(v.id) === String(delId) || String(v.maBienThe) === String(delId))));
       setShowDeleteVariantConfirm(false);
       setVariantToDelete(null);
+
+      // Decrease product variant count
+      if (selectedProduct && selectedProduct.id) {
+        setProducts(prev => prev.map(p => p.id === selectedProduct.id ? { ...p, soLuongBienThe: (p.soLuongBienThe || 0) - 1 } : p));
+        setVariantCountsMap(prev => ({ ...prev, [selectedProduct.id]: (Number(prev[selectedProduct.id] || selectedProduct.soLuongBienThe || 0) - 1) }));
+      }
     } catch (err) {
       console.error('Delete variant error', err);
       setError(err);
     }
   };
 
-  // --- End Variant Management Logic ---
+  // --- END VARIANT MANAGEMENT LOGIC ---
 
+  // --- FILTERING AND DISPLAY SETUP ---
   const filteredProducts = products.filter(product => {
     const q = searchTerm.trim().toLowerCase();
     if (q) {
@@ -934,35 +963,18 @@ const ProductManagement = () => {
       if (!match) return false;
     }
 
-    // category filter
-    if (filterCategory) {
-      const catId = String(filterCategory);
-      const prodCat = String(product.maDanhMuc || (product.danhMuc && (product.danhMuc.maDanhMuc || product.danhMuc.id)) || '');
-      if (prodCat !== catId) return false;
-    }
-
-    // collection filter
-    if (filterCollection) {
-      const colId = String(filterCollection);
-      const prodCol = String(product.maBoSuuTap || (product.boSuuTap && (product.boSuuTap.maBoSuuTap || product.boSuuTap.id)) || '');
-      if (prodCol !== colId) return false;
-    }
-
-    // supplier filter
-    if (filterSupplier) {
-      const supId = String(filterSupplier);
-      const prodSup = String(product.maNhaCungCap || (product.nhaCungCap && (product.nhaCungCap.maNhaCungCap || product.nhaCungCap.id)) || '');
-      if (prodSup !== supId) return false;
-    }
+    if (filterCategory && String(product.maDanhMuc || '') !== String(filterCategory)) return false;
+    if (filterCollection && String(product.maBoSuuTap || '') !== String(filterCollection)) return false;
+    if (filterSupplier && String(product.maNhaCungCap || '') !== String(filterSupplier)) return false;
 
     return true;
   });
 
   const columns = [
     { field: 'tenSanPham', header: 'Tên sản phẩm', sortable: true },
-    { field: (p) => (p.tenDanhMuc || (p.danhMuc && (p.danhMuc.tenDanhMuc || p.danhMuc.name || p.danhMuc.name)) || (p.category && (p.category.name || p.category.tenDanhMuc)) || ''), header: 'Danh mục', sortable: true },
-    { field: (p) => (p.tenNhaCungCap || (p.nhaCungCap && (p.nhaCungCap.tenNhaCungCap || p.nhaCungCap.name)) || (p.supplier && (p.supplier.name || p.supplier.tenNhaCungCap)) || ''), header: 'Nhà cung cấp', sortable: true },
-    { field: (p) => (p.tenBoSuuTap || (p.boSuuTap && (p.boSuuTap.tenBoSuuTap || p.boSuuTap.name)) || ''), header: 'Bộ sưu tập', sortable: true },
+    { field: (p) => (p.tenDanhMuc || (p.danhMuc && p.danhMuc.tenDanhMuc) || 'Chưa phân loại'), header: 'Danh mục', sortable: true },
+    { field: (p) => (p.tenNhaCungCap || (p.nhaCungCap && p.nhaCungCap.tenNhaCungCap) || 'Chưa phân loại'), header: 'Nhà cung cấp', sortable: true },
+    { field: (p) => (p.tenBoSuuTap || (p.boSuuTap && p.boSuuTap.tenBoSuuTap) || 'Chưa phân loại'), header: 'Bộ sưu tập', sortable: true },
     { field: (p) => computeVariantCount(p), header: 'Biến thể', sortable: true },
     {
       field: 'trangThai', header: 'Trạng thái', sortable: true, render: (value) => (
@@ -973,12 +985,13 @@ const ProductManagement = () => {
     }
   ];
 
+  // Modified tabs structure: Merged Info and Images
   const tabs = [
-    { id: 'info', label: '🏷️ Thông tin chung', icon: IoPricetag },
-    { id: 'images', label: '🖼️ Hình ảnh', icon: IoImage },
+    { id: 'info', label: '🏷️ Thông tin chung & Hình ảnh', icon: IoPricetag }, // Merged tab
     { id: 'variants', label: '🧬 Biến thể', icon: IoCube }
   ];
 
+  // --- RENDER BLOCK ---
   return (
     <div className="p-6">
       {error && (
@@ -1167,7 +1180,7 @@ const ProductManagement = () => {
         </div>
       )}
 
-      {/* Add Product Modal */}
+      {/* Add Product Modal (Updated to include images) */}
       <Modal
         isOpen={showAddModal}
         onClose={() => { setShowAddModal(false); resetForm(); }}
@@ -1231,32 +1244,34 @@ const ProductManagement = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Bộ sưu tập</label>
-            <select
-              value={productForm.maBoSuuTap}
-              onChange={(e) => setProductForm(prev => ({ ...prev, maBoSuuTap: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
-            >
-              <option value="">Chọn bộ sưu tập</option>
-              {collections.map(col => (
-                <option key={col.maBoSuuTap || col.id} value={col.maBoSuuTap || col.id}>
-                  {col.tenBoSuuTap || col.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Bộ sưu tập</label>
+              <select
+                value={productForm.maBoSuuTap}
+                onChange={(e) => setProductForm(prev => ({ ...prev, maBoSuuTap: e.target.value }))}
+                className="w-full p-2 border rounded-lg"
+              >
+                <option value="">Chọn bộ sưu tập</option>
+                {collections.map(col => (
+                  <option key={col.maBoSuuTap || col.id} value={col.maBoSuuTap || col.id}>
+                    {col.tenBoSuuTap || col.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Điểm thưởng (Diem thuong)</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={productForm.diemThuong ?? 0}
-              onChange={(e) => setProductForm(prev => ({ ...prev, diemThuong: Number(e.target.value) || 0 }))}
-              className="w-full p-2 border rounded-lg"
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Điểm thưởng (Diem thuong)</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={productForm.diemThuong ?? 0}
+                onChange={(e) => setProductForm(prev => ({ ...prev, diemThuong: Number(e.target.value) || 0 }))}
+                className="w-full p-2 border rounded-lg"
+              />
+            </div>
           </div>
 
           <div>
@@ -1289,7 +1304,7 @@ const ProductManagement = () => {
         </div>
       </Modal>
 
-      {/* Edit Product Modal */}
+      {/* Edit Product Modal (Updated to include images) */}
       <Modal
         isOpen={showEditModal}
         onClose={() => { setShowEditModal(false); setSelectedProduct(null); resetForm(); }}
@@ -1353,32 +1368,34 @@ const ProductManagement = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Bộ sưu tập</label>
-            <select
-              value={productForm.maBoSuuTap}
-              onChange={(e) => setProductForm(prev => ({ ...prev, maBoSuuTap: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
-            >
-              <option value="">Chọn bộ sưu tập</option>
-              {collections.map(col => (
-                <option key={col.maBoSuuTap || col.id} value={col.maBoSuuTap || col.id}>
-                  {col.tenBoSuuTap || col.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Bộ sưu tập</label>
+              <select
+                value={productForm.maBoSuuTap}
+                onChange={(e) => setProductForm(prev => ({ ...prev, maBoSuuTap: e.target.value }))}
+                className="w-full p-2 border rounded-lg"
+              >
+                <option value="">Chọn bộ sưu tập</option>
+                {collections.map(col => (
+                  <option key={col.maBoSuuTap || col.id} value={col.maBoSuuTap || col.id}>
+                    {col.tenBoSuuTap || col.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Điểm thưởng (Diem thuong)</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={productForm.diemThuong ?? 0}
-              onChange={(e) => setProductForm(prev => ({ ...prev, diemThuong: Number(e.target.value) || 0 }))}
-              className="w-full p-2 border rounded-lg"
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Điểm thưởng (Diem thuong)</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={productForm.diemThuong ?? 0}
+                onChange={(e) => setProductForm(prev => ({ ...prev, diemThuong: Number(e.target.value) || 0 }))}
+                className="w-full p-2 border rounded-lg"
+              />
+            </div>
           </div>
 
           <div>
@@ -1411,7 +1428,7 @@ const ProductManagement = () => {
         </div>
       </Modal>
 
-      {/* Detail Product Modal */}
+      {/* Detail Product Modal (Updated to merge images into info tab) */}
       <Modal
         isOpen={showDetailModal}
         onClose={() => { setShowDetailModal(false); setSelectedProduct(null); resetForm(); }}
@@ -1439,95 +1456,91 @@ const ProductManagement = () => {
 
           {/* Tab Content */}
           {activeTab === 'info' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Tên sản phẩm</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenSanPham}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Danh mục</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenDanhMuc || 'Chưa phân loại'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Nhà cung cấp</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenNhaCungCap}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Bộ sưu tập</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenBoSuuTap || 'Chưa phân loại'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Số lượng biến thể</label>
-                  <p className="mt-1 text-sm text-gray-900">{computeVariantCount(selectedProduct)}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Trạng thái</label>
-                  <p className="mt-1 text-sm text-gray-900">
-                    <span className={`px-2 py-1 rounded-full text-xs ${selectedProduct?.trangThai ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {selectedProduct?.trangThai ? 'Hoạt động' : 'Ngừng'}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Điểm thưởng</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedProduct?.diemThuong != null ? String(selectedProduct.diemThuong).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '0'}</p>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Mô tả</label>
-                <p className="mt-1 text-sm text-gray-900">{selectedProduct?.moTa || 'Không có mô tả'}</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'images' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Hình ảnh sản phẩm</h3>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => {
-                    // open edit modal pre-filled so user can upload/remove images
-                    if (selectedProduct) {
-                      setProductForm({
-                        tenSanPham: selectedProduct.tenSanPham || '',
-                        moTa: selectedProduct.moTa || '',
-                        maDanhMuc: selectedProduct.maDanhMuc || '',
-                        maNhaCungCap: selectedProduct.maNhaCungCap || '',
-                        maBoSuuTap: selectedProduct.maBoSuuTap || ''
-                      });
-                      setProductImages(selectedProduct.hinhAnhs || []);
-                      setShowEditModal(true);
-                    }
-                  }}
-                  className="px-3 py-1 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700"
-                >
-                  Sửa hình ảnh
-                </button>
-              </div>
-              {selectedProduct?.hinhAnhs && selectedProduct.hinhAnhs.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {selectedProduct.hinhAnhs.map((image, index) => (
-                    <div key={image.maHinhAnh || index} className="relative">
-                      <img
-                        src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'}${image.duongDanHinhAnh}`}
-                        alt={image.moTa || `Ảnh ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg"
-                      />
-                      {image.laAnhChinh && (
-                        <span className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                          Ảnh chính
-                        </span>
-                      )}
-                      <span className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                        Thứ tự: {image.thuTu}
+            <div className="space-y-6"> {/* Use a space-y-6 to separate info blocks */}
+              {/* Product Info Block */}
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <h3 className="text-lg font-medium mb-4">Thông tin chung</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Tên sản phẩm</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenSanPham}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Danh mục</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenDanhMuc || 'Chưa phân loại'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Nhà cung cấp</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenNhaCungCap}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Bộ sưu tập</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedProduct?.tenBoSuuTap || 'Chưa phân loại'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Số lượng biến thể</label>
+                    <p className="mt-1 text-sm text-gray-900">{computeVariantCount(selectedProduct)}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Trạng thái</label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      <span className={`px-2 py-1 rounded-full text-xs ${selectedProduct?.trangThai ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {selectedProduct?.trangThai ? 'Hoạt động' : 'Ngừng'}
                       </span>
-                    </div>
-                  ))}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Điểm thưởng</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedProduct?.diemThuong != null ? String(selectedProduct.diemThuong).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '0'}</p>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-gray-500">Chưa có hình ảnh nào</p>
-              )}
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700">Mô tả</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedProduct?.moTa || 'Không có mô tả'}</p>
+                </div>
+              </div>
+
+              {/* Images Block (Moved from separate tab) */}
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium">Hình ảnh sản phẩm</h3>
+                  <button
+                    onClick={() => {
+                      // Open image management modal (only for managing images)
+                      if (selectedProduct) {
+                        setProductImages(selectedProduct.hinhAnhs || []);
+                        setShowImageManagementModal(true);
+                      }
+                    }}
+                    className="px-3 py-1 bg-yellow-600 text-white rounded-lg text-sm hover:bg-yellow-700"
+                  >
+                    Quản lý hình ảnh
+                  </button>
+                </div>
+                {selectedProduct?.hinhAnhs && selectedProduct.hinhAnhs.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {selectedProduct.hinhAnhs.map((image, index) => (
+                      <div key={image.maHinhAnh || index} className="relative aspect-square">
+                        <img
+                          src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'}${image.duongDanHinhAnh}`}
+                          alt={image.moTa || `Ảnh ${index + 1}`}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                        {image.laAnhChinh && (
+                          <span className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            Ảnh chính
+                          </span>
+                        )}
+                        <span className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                          Thứ tự: {image.thuTu}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500">Chưa có hình ảnh nào</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -1542,21 +1555,6 @@ const ProductManagement = () => {
                   >
                     Thêm biến thể
                   </button>
-                  <button
-                    onClick={() => {
-                      // Open modal in rows mode for creating attribute rows
-                      setSelectedProduct(selectedProduct);
-                      setVariantMode('rows');
-                      setUseExplicitRows(true);
-                      setExplicitRows([{ maThuocTinh: '', giaTri: '' }]);
-                      setBulkVariantsPreview([]);
-                      setVariantSelections({});
-                      setShowAddVariantModal(true);
-                    }}
-                    className="bg-gray-100 text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-200 text-sm"
-                  >
-                    Tạo hàng thuộc tính
-                  </button>
                 </div>
               </div>
               {productVariants.length > 0 ? (
@@ -1565,18 +1563,14 @@ const ProductManagement = () => {
                     <div key={variant.id} className="border rounded-lg p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h4 className="font-medium">{variant.tenBienThe || `Biến thể ${variant.id}`}</h4>
-                          <p className="text-sm text-gray-600">SKU: {variant.sku}</p>
+                          <h4 className="font-medium">{variant.sku || `Biến thể ${variant.id}`}</h4>
+                          {!!variant.tenBienThe && (
+                            <p className="text-sm text-gray-600">Tên cũ: {variant.tenBienThe}</p>
+                          )}
                           <p className="text-sm text-gray-600">Giá bán: {variant.giaBan ? variant.giaBan.toLocaleString('vi-VN') + ' VNĐ' : 'Chưa thiết lập'}</p>
                           <p className="text-sm text-gray-600">Tồn kho: {variant.soLuongTon || 0}</p>
                         </div>
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => { setSelectedVariant(variant); setShowDetailModal(true); setActiveTab('variants'); }}
-                            className="text-gray-600 hover:text-gray-800 text-sm"
-                          >
-                            Xem
-                          </button>
                           <button
                             onClick={() => handleEditVariant(variant)}
                             className="text-blue-600 hover:text-blue-800 text-sm"
@@ -1602,13 +1596,14 @@ const ProductManagement = () => {
                               return <p className="text-gray-500 col-span-2">Chưa có thuộc tính nào</p>;
                             }
                             return mappings.map((m, idx) => {
-                              // m may be { id, thuocTinh: { maThuocTinh, tenThuocTinh }, giaTri }
                               const ma = m.maThuocTinh ?? (m.thuocTinh && (m.thuocTinh.maThuocTinh ?? m.thuocTinh.id)) ?? m.attributeId ?? m.ma ?? null;
                               const value = m.giaTri ?? (m.giaTri && typeof m.giaTri === 'object' ? (m.giaTri.giaTri ?? m.giaTri.value) : null) ?? m.tenGiaTri ?? m.value ?? m.name ?? '';
-                              const attrObj = attributes.find(a => String(a.id ?? a.maThuocTinh) === String(ma));
+                              const attrObj = Array.isArray(attributes)
+                                ? attributes.find(a => String(a.id ?? a.maThuocTinh) === String(ma))
+                                : null;
                               const attrName = attrObj ? (attrObj.tenThuocTinh || attrObj.name) : ((m.thuocTinh && (m.thuocTinh.tenThuocTinh || m.thuocTinh.name)) || m.tenThuocTinh || `Thuộc tính ${ma}`);
                               return (
-                                <div key={`${variant.id}-attr-${idx}`} className="p-2 border rounded-md bg-gray-50">
+                                <div key={`${variant.id}-attr-${idx}`} className="p-2 border rounded-md bg-gray-100">
                                   <div className="text-xs text-gray-600">{attrName}</div>
                                   <div className="text-sm font-medium">{String(value)}</div>
                                 </div>
@@ -1628,7 +1623,7 @@ const ProductManagement = () => {
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (Product) - No changes */}
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => { setShowDeleteConfirm(false); setProductToDelete(null); }}
@@ -1637,7 +1632,7 @@ const ProductManagement = () => {
       >
         <div className="space-y-4">
           <p className="text-gray-700">
-            Bạn có chắc muốn xóa sản phẩm "{productToDelete?.tenSanPham}"?
+            Bạn có chắc muốn xóa sản phẩm "<strong>{productToDelete?.tenSanPham}</strong>"?
           </p>
           <p className="text-sm text-gray-500">
             Hành động này không thể hoàn tác.
@@ -1659,6 +1654,148 @@ const ProductManagement = () => {
         </div>
       </Modal>
 
+      {/* Image Management Modal - For managing product images only */}
+      <Modal
+        isOpen={showImageManagementModal}
+        onClose={() => { setShowImageManagementModal(false); setProductImages([]); }}
+        title={`Quản lý hình ảnh - ${selectedProduct?.tenSanPham}`}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Bạn có thể thêm hình ảnh mới, xóa hình ảnh, sắp xếp thứ tự và đặt ảnh chính.
+          </p>
+          <div className="border rounded-lg p-4 bg-gray-50">
+            <label className="block text-sm font-medium mb-2">Hình ảnh sản phẩm</label>
+            <FileUpload
+              multiple={true}
+              accept="image/*"
+              onUpload={handleImageUpload}
+              files={productImages}
+              onRemove={handleImageRemove}
+              onToggleMain={handleToggleImageMain}
+            />
+          </div>
+          <div className="flex justify-end space-x-2 mt-4">
+            <button
+              onClick={() => { setShowImageManagementModal(false); setProductImages([]); }}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={async () => {
+                // Save images to the product
+                if (selectedProduct) {
+                  try {
+                    const productId = selectedProduct.id || selectedProduct.maSanPham;
+                    if (!productId) {
+                      setError('Không tìm thấy ID sản phẩm');
+                      return;
+                    }
+
+                    // If there are any local File objects, upload them first to get server URLs
+                    const fileIndexes = [];
+                    const fileObjects = [];
+                    productImages.forEach((img, idx) => {
+                      if (isFileLike(img)) {
+                        fileIndexes.push(idx);
+                        fileObjects.push(img.file || img);
+                      }
+                    });
+
+                    let uploadedResponses = [];
+                    if (fileObjects.length > 0) {
+                      const formData = new FormData();
+                      fileObjects.forEach(f => formData.append('images', f));
+                      // backend returns list of uploaded image DTOs
+                      try {
+                        const resp = await api.post(`/api/products/${productId}/images/upload`, { body: formData });
+                        // resp may be an array of created image DTOs
+                        uploadedResponses = Array.isArray(resp) ? resp : [];
+                      } catch (uploadErr) {
+                        console.error('Image upload failed:', uploadErr);
+                        setError('Không thể upload ảnh: ' + (uploadErr?.data || uploadErr.message || uploadErr));
+                        return;
+                      }
+                    }
+
+                    // Build final ordered imageData by iterating productImages
+                    // For File entries we consume uploadedResponses in FIFO order
+                    let uploadCursor = 0;
+                    const imageData = productImages.map((img, index) => {
+                      if (isFileLike(img)) {
+                        const uploaded = uploadedResponses[uploadCursor++] || null;
+                        return uploaded ? {
+                          maHinhAnh: uploaded.maHinhAnh || uploaded.id || null,
+                          duongDanHinhAnh: uploaded.duongDanHinhAnh || uploaded.url || uploaded.path || null,
+                          thuTu: index + 1,
+                          laAnhChinh: img.laAnhChinh || img._isMain || (index === 0),
+                          moTa: img.moTa || ''
+                        } : null;
+                      }
+
+                      // existing image object
+                      return {
+                        maHinhAnh: img.maHinhAnh || img.id || null,
+                        duongDanHinhAnh: img.duongDanHinhAnh || img.url || img.path || null,
+                        thuTu: index + 1,
+                        laAnhChinh: img.laAnhChinh || img._isMain || (index === 0),
+                        moTa: img.moTa || ''
+                      };
+                    }).filter(Boolean); // remove nulls for any failed uploads
+
+                    // Enforce exactly one main image flag
+                    if (imageData.length > 0) {
+                      let firstMain = imageData.findIndex(i => i.laAnhChinh === true);
+                      if (firstMain < 0) firstMain = 0;
+                      imageData.forEach((it, idx) => { it.laAnhChinh = idx === firstMain; });
+                    }
+
+                    // Call the backend images bulk-update endpoint
+                    await api.put(`/api/san-pham/${productId}/images`, imageData);
+
+                    alert('Lưu hình ảnh thành công!');
+
+                    // Refresh products list and selected product
+                    await fetchProducts();
+                    const refreshed = await api.get(`/api/san-pham/${productId}`);
+                    const mapped = mapProductFromApi(refreshed);
+                    // Fetch latest images explicitly (product detail may not include hinhAnhs)
+                    let latestImages = [];
+                    try {
+                      const imgs = await api.get(`/api/products/${productId}/images`);
+                      latestImages = Array.isArray(imgs) ? imgs : [];
+                    } catch (_) { }
+                    setSelectedProduct({ ...mapped, hinhAnhs: latestImages });
+                    // Also update local productImages to reflect server state
+                    const normalizedAfter = (latestImages || []).map((h, idx) => ({
+                      maHinhAnh: h.maHinhAnh || h.id,
+                      duongDanHinhAnh: h.duongDanHinhAnh || h.url || h.path,
+                      thuTu: h.thuTu != null ? h.thuTu : idx,
+                      laAnhChinh: !!h.laAnhChinh,
+                      moTa: h.moTa || ''
+                    }));
+                    setProductImages(normalizedAfter);
+
+                    // Close image management modal and show detail modal
+                    setShowImageManagementModal(false);
+                    setShowDetailModal(true);
+
+                  } catch (err) {
+                    console.error('Error saving images:', err);
+                    setError('Không thể lưu hình ảnh: ' + (err.response?.data?.message || err.message));
+                  }
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Lưu hình ảnh
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* --- NEW VARIANT CREATION MODAL (Selection & Bulk) --- */}
       <Modal
         isOpen={showAddVariantModal}
@@ -1667,24 +1804,23 @@ const ProductManagement = () => {
           resetVariantForm();
           setBulkVariantsPreview([]);
           setVariantSelections({});
+          setExplicitRows([]); // Clear explicit rows on close
         }}
         title={`Thêm biến thể mới cho: ${selectedProduct?.tenSanPham}`}
         size="xl"
       >
         <div className="space-y-4">
-          <p className="text-gray-600">Chọn giá trị thuộc tính để tạo biến thể. Bạn có thể tạo **biến thể đơn** (chọn tối đa 1 giá trị/thuộc tính) hoặc **biến thể hàng loạt** (tổ hợp).</p>
-
-          {/* Common Variant Fields for Single Creation (Optional for bulk) */}
+          {/* Common Variant Fields for Single Creation */}
           <div className="p-4 border rounded-lg bg-blue-50">
-            <h4 className="font-semibold text-blue-700 mb-2">Thông tin cơ bản (Áp dụng cho biến thể đơn hoặc làm giá trị mặc định cho hàng loạt)</h4>
-            <div className="grid grid-cols-4 gap-4">
+            <h4 className="font-semibold text-blue-700 mb-2">Thông tin cơ bản</h4>
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">SKU</label>
                 <input
                   type="text"
                   value={variantForm.sku}
-                  onChange={(e) => setVariantForm(prev => ({ ...prev, sku: e.target.value }))}
-                  className="w-full p-2 border rounded-lg"
+                  readOnly
+                  className="w-full p-2 border rounded-lg bg-gray-100 cursor-not-allowed"
                 />
               </div>
               <div>
@@ -1707,215 +1843,310 @@ const ProductManagement = () => {
                   min="0" step="1000"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Số lượng tồn</label>
-                <input
-                  type="number"
-                  value={variantForm.soLuongTon}
-                  onChange={(e) => setVariantForm(prev => ({ ...prev, soLuongTon: e.target.value }))}
-                  className="w-full p-2 border rounded-lg"
-                  min="0"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Mức tồn tối thiểu</label>
-                <input
-                  type="number"
-                  value={variantForm.mucTonToiThieu}
-                  onChange={(e) => setVariantForm(prev => ({ ...prev, mucTonToiThieu: e.target.value }))}
-                  className="w-full p-2 border rounded-lg"
-                  min="0"
-                />
-              </div>
             </div>
           </div>
 
           {/* Attributes Selection */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Chế độ thêm giá trị</h4>
+              <h4 className="font-medium">Chế độ thêm thuộc tính</h4>
               <div className="flex items-center gap-3">
-                <label className={`flex items-center gap-2 text-sm font-semibold`}>
-                  <input type="radio" name="variantMode" checked readOnly />
-                  <span>Biến thể đơn (chọn 1 giá trị / thuộc tính)</span>
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="variantMode"
+                    checked={variantMode === 'selection'}
+                    onChange={() => {
+                      setVariantMode('selection');
+                      setVariantSelections({});
+                      setAttributeSearchTerm('');
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <span>Chọn từ danh sách</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                  <input
+                    type="radio"
+                    name="variantMode"
+                    checked={variantMode === 'manual'}
+                    onChange={() => {
+                      setVariantMode('manual');
+                      setExplicitRows([{ maThuocTinh: '', giaTri: '' }]);
+                      setVariantSelections({});
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <span>Nhập thủ công</span>
                 </label>
               </div>
             </div>
+
             {attrLoading ? (
               <div className="py-4 text-center text-gray-600">Đang tải thuộc tính...</div>
             ) : attrError ? (
               <div className="p-4 bg-red-50 border rounded">
                 <p className="text-sm text-red-700 mb-2">Lỗi khi tải thuộc tính: {attrError}</p>
                 <div className="flex justify-end">
-                  <button onClick={fetchAttributes} className="px-3 py-1 bg-blue-600 text-white rounded">Tải lại</button>
+                  <button onClick={() => fetchAttributes(true)} className="px-3 py-1 bg-blue-600 text-white rounded">Tải lại</button>
                 </div>
               </div>
             ) : (!attributes || attributes.length === 0) ? (
               <div className="p-4 text-gray-600">Chưa có thuộc tính nào. Bạn có thể tạo thuộc tính trên backend hoặc thử tải lại.</div>
             ) : (
               <div className="space-y-3">
-                <h4 className="font-medium">Chọn giá trị thuộc tính</h4>
-                <div className="space-y-3">
-                  {/* Chế độ hàng đã bị xóa, chỉ cho phép tạo biến thể đơn */}
-                  {attributes.map((attr, ai) => {
-                    const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
-                    const isSelected = variantSelections[aKey] && variantSelections[aKey].length > 0;
+                {/* Selection Mode: Display all attributes with search */}
+                {variantMode === 'selection' && (
+                  <div className="space-y-3">
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm thuộc tính..."
+                        value={attributeSearchTerm}
+                        onChange={(e) => setAttributeSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                    </div>
 
-                    // SINGLE MODE: show known values as radios + an "Other" text input
-                    if (variantMode === 'single') {
-                      const selectedVal = (variantSelections[aKey] && variantSelections[aKey][0]) || '';
-                      return (
-                        <div key={`attr-panel-single-${attr.id ?? attr.maThuocTinh ?? ai}`} className="border-2 p-4 rounded-lg bg-gray-50">
-                          <div className="font-semibold text-gray-700 mb-2">{attr.tenThuocTinh}</div>
-                          <div className="flex flex-col space-y-2">
-                            {(attr.values || []).length > 0 ? (
-                              (attr.values || []).map((v, vi) => (
-                                <label key={`radio-${aKey}-${vi}`} className="inline-flex items-center gap-2">
-                                  <input
-                                    type="radio"
-                                    name={`single-${aKey}`}
-                                    value={v.tenGiaTri}
-                                    checked={String(selectedVal) === String(v.tenGiaTri)}
-                                    onChange={() => setVariantSelections(prev => ({ ...prev, [aKey]: [String(v.tenGiaTri)] }))}
-                                    className="w-4 h-4"
-                                  />
-                                  <span className="text-sm">{v.tenGiaTri}</span>
-                                </label>
-                              ))
-                            ) : (
-                              <div className="text-sm text-gray-500">Không có giá trị thể hiện sẵn</div>
+                    {/* Attributes List */}
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {(() => {
+                        const filteredAttrs = (Array.isArray(attributes) ? attributes : Object.values(attributes).flat())
+                          .filter(attr => {
+                            if (!attributeSearchTerm.trim()) return true;
+                            const searchLower = attributeSearchTerm.toLowerCase();
+                            const attrName = (attr.tenThuocTinh || '').toLowerCase();
+                            const attrValues = (attr.values || []).map(v => (v.tenGiaTri || '').toLowerCase()).join(' ');
+                            return attrName.includes(searchLower) || attrValues.includes(searchLower);
+                          });
+
+                        const filledAttrs = filteredAttrs.filter(attr => {
+                          const aKey = String(attr.id ?? attr.maThuocTinh);
+                          const isFilled = variantSelections[aKey] && variantSelections[aKey][0] && String(variantSelections[aKey][0]).trim() !== '';
+                          // Do not move the attribute currently being edited
+                          if (activeEditingAttrKey && aKey === String(activeEditingAttrKey)) return false;
+                          return !!isFilled;
+                        });
+
+                        const unfilledAttrs = filteredAttrs.filter(attr => {
+                          const aKey = String(attr.id ?? attr.maThuocTinh);
+                          const isFilled = variantSelections[aKey] && variantSelections[aKey][0] && String(variantSelections[aKey][0]).trim() !== '';
+                          // Keep the actively edited attribute in the unfilled section while typing
+                          if (activeEditingAttrKey && aKey === String(activeEditingAttrKey)) return true;
+                          return !isFilled;
+                        });
+
+                        return (
+                          <>
+                            {/* Filled Attributes Section */}
+                            {filledAttrs.length > 0 && (
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2 px-2 py-1 bg-green-100 rounded-lg">
+                                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  <span className="text-sm font-semibold text-green-700">Đã điền ({filledAttrs.length})</span>
+                                </div>
+                                {filledAttrs.map((attr, ai) => {
+                                  const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
+                                  const selectedVal = (variantSelections[aKey] && variantSelections[aKey][0]) || '';
+                                  
+                                  return (
+                                    <div key={`attr-panel-${aKey}`} className="border-2 border-green-300 p-4 rounded-lg bg-green-50">
+                                      <div className="font-semibold text-gray-700 mb-2">{attr.tenThuocTinh}</div>
+                                      <div className="flex flex-col space-y-2">
+                                        {(attr.values || []).length > 0 ? (
+                                          <div className="flex flex-wrap gap-2">
+                                            {(attr.values || []).map((v, vi) => (
+                                              <label 
+                                                key={`radio-${aKey}-${vi}`} 
+                                                className="inline-flex items-center gap-2 px-3 py-1 border rounded-lg cursor-pointer transition-colors hover:bg-white"
+                                                style={{
+                                                  backgroundColor: String(selectedVal) === String(v.tenGiaTri) ? '#D1E7FF' : 'white',
+                                                  borderColor: String(selectedVal) === String(v.tenGiaTri) ? '#3B82F6' : '#D1D5DB'
+                                                }}
+                                              >
+                                                <input
+                                                  type="radio"
+                                                  name={`attr-${aKey}`}
+                                                  value={v.tenGiaTri}
+                                                  checked={String(selectedVal) === String(v.tenGiaTri)}
+                                                  onChange={() => setVariantSelections(prev => ({ ...prev, [aKey]: [String(v.tenGiaTri)] }))}
+                                                  className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm">{v.tenGiaTri}</span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="text-sm text-gray-500">Không có giá trị sẵn</div>
+                                        )}
+
+                                        <div className="mt-1 pt-2 border-t border-gray-200">
+                                          <label className="text-xs text-gray-600">Hoặc nhập giá trị tùy chỉnh</label>
+                                          <input
+                                            type="text"
+                                            placeholder={`Nhập giá trị khác cho ${attr.tenThuocTinh}`}
+                                            value={(attr.values || []).some(v => String(v.tenGiaTri) === String(selectedVal)) ? '' : selectedVal}
+                                            onChange={(e) => setVariantSelections(prev => ({ ...prev, [aKey]: [e.target.value] }))}
+                                            onFocus={() => setActiveEditingAttrKey(aKey)}
+                                            onBlur={() => setActiveEditingAttrKey(null)}
+                                            className="w-full p-2 border rounded mt-1"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
 
-                            <div className="mt-1">
-                              <label className="text-xs text-gray-600">Khác (gõ để thêm)</label>
-                              <input
-                                type="text"
-                                placeholder={`Nhập giá trị khác cho ${attr.tenThuocTinh}`}
-                                value={variantSelections[aKey] ? String(variantSelections[aKey][0] || '') : ''}
-                                onChange={(e) => setVariantSelections(prev => ({ ...prev, [aKey]: [e.target.value] }))}
-                                className="w-full p-2 border rounded mt-1"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    // BULK / ROWS mode: preserve existing multi-value input UI
-                    return (
-                      <div key={`attr-panel-${attr.id ?? attr.maThuocTinh ?? ai}`} className="border-2 p-4 rounded-lg bg-gray-50">
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                // Chọn thuộc tính: khởi tạo với giá trị rỗng
-                                setVariantSelections(prev => ({ ...prev, [aKey]: [''] }));
-                              } else {
-                                // Bỏ chọn: xóa thuộc tính
-                                setVariantSelections(prev => {
-                                  const next = { ...prev };
-                                  delete next[aKey];
-                                  return next;
-                                });
-                              }
-                            }}
-                            className="w-5 h-5 mt-1 cursor-pointer"
-                          />
-                          <div className="flex-1">
-                            <label className="font-semibold text-gray-700 cursor-pointer select-none">
-                              {attr.tenThuocTinh}
-                            </label>
-                            {isSelected && (
-                              <div className="mt-2 space-y-2">
-                                {(variantSelections[aKey] || []).map((valText, index) => (
-                                  <div key={`val-${aKey}-${index}`} className="flex items-center gap-2">
-                                    {String(valText).trim() === '' ? (
-                                      <input
-                                        type="text"
-                                        value={valText}
-                                        onChange={(e) => {
-                                          const value = e.target.value;
-                                          setVariantSelections(prev => {
-                                            const next = { ...prev };
-                                            const arr = Array.isArray(next[aKey]) ? next[aKey].slice() : [];
-                                            arr[index] = value;
-                                            next[aKey] = arr;
-                                            return next;
-                                          });
-                                        }}
-                                        placeholder={`Nhập giá trị cho ${attr.tenThuocTinh} (VD: Đỏ, 120cm, v.v.)`}
-                                        className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                    ) : (
-                                      <div className="flex-1">
-                                        <span className="block p-2 border border-gray-200 rounded bg-gray-50 text-gray-800">{valText}</span>
-                                      </div>
-                                    )}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        // remove this specific input/value
-                                        setVariantSelections(prev => {
-                                          const next = { ...prev };
-                                          const arr = Array.isArray(next[aKey]) ? next[aKey].slice() : [];
-                                          arr.splice(index, 1);
-                                          if (arr.length === 0) delete next[aKey]; else next[aKey] = arr;
-                                          return next;
-                                        });
-                                      }}
-                                      className="px-2 py-1 bg-red-50 text-red-600 border rounded hover:bg-red-100"
-                                    >X</button>
-                                  </div>
-                                ))}
-
-                                <div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setVariantSelections(prev => {
-                                        const next = { ...prev };
-                                        const arr = Array.isArray(next[aKey]) ? next[aKey].slice() : [];
-                                        arr.push('');
-                                        next[aKey] = arr;
-                                        return next;
-                                      });
-                                    }}
-                                    className="mt-1 px-3 py-1 bg-green-50 text-green-700 border rounded hover:bg-green-100"
-                                  >+ Thêm giá trị</button>
+                            {/* Divider */}
+                            {filledAttrs.length > 0 && unfilledAttrs.length > 0 && (
+                              <div className="relative py-2">
+                                <div className="absolute inset-0 flex items-center">
+                                  <div className="w-full border-t-2 border-gray-300"></div>
                                 </div>
                               </div>
                             )}
-                          </div>
-                        </div>
+
+                            {/* Unfilled Attributes Section */}
+                            {unfilledAttrs.length > 0 && (
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2 px-2 py-1 bg-gray-100 rounded-lg">
+                                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span className="text-sm font-semibold text-gray-600">Chưa điền ({unfilledAttrs.length})</span>
+                                </div>
+                                {unfilledAttrs.map((attr, ai) => {
+                                  const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
+                                  const selectedVal = (variantSelections[aKey] && variantSelections[aKey][0]) || '';
+                                  
+                                  return (
+                                    <div key={`attr-panel-${aKey}`} className="border-2 p-4 rounded-lg bg-gray-50">
+                                      <div className="font-semibold text-gray-700 mb-2">{attr.tenThuocTinh}</div>
+                                      <div className="flex flex-col space-y-2">
+                                        {(attr.values || []).length > 0 ? (
+                                          <div className="flex flex-wrap gap-2">
+                                            {(attr.values || []).map((v, vi) => (
+                                              <label 
+                                                key={`radio-${aKey}-${vi}`} 
+                                                className="inline-flex items-center gap-2 px-3 py-1 border rounded-lg cursor-pointer transition-colors hover:bg-white"
+                                                style={{
+                                                  backgroundColor: String(selectedVal) === String(v.tenGiaTri) ? '#D1E7FF' : 'white',
+                                                  borderColor: String(selectedVal) === String(v.tenGiaTri) ? '#3B82F6' : '#D1D5DB'
+                                                }}
+                                              >
+                                                <input
+                                                  type="radio"
+                                                  name={`attr-${aKey}`}
+                                                  value={v.tenGiaTri}
+                                                  checked={String(selectedVal) === String(v.tenGiaTri)}
+                                                  onChange={() => setVariantSelections(prev => ({ ...prev, [aKey]: [String(v.tenGiaTri)] }))}
+                                                  className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm">{v.tenGiaTri}</span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <div className="text-sm text-gray-500">Không có giá trị sẵn</div>
+                                        )}
+
+                                        <div className="mt-1 pt-2 border-t border-gray-200">
+                                          <label className="text-xs text-gray-600">Hoặc nhập giá trị tùy chỉnh</label>
+                                          <input
+                                            type="text"
+                                            placeholder={`Nhập giá trị khác cho ${attr.tenThuocTinh}`}
+                                            value={(attr.values || []).some(v => String(v.tenGiaTri) === String(selectedVal)) ? '' : selectedVal}
+                                            onChange={(e) => setVariantSelections(prev => ({ ...prev, [aKey]: [e.target.value] }))}
+                                            onFocus={() => setActiveEditingAttrKey(aKey)}
+                                            onBlur={() => setActiveEditingAttrKey(null)}
+                                            className="w-full p-2 border rounded mt-1"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Manual Mode: Row-based input */}
+                {variantMode === 'manual' && (
+                  <div className="p-4 border-2 rounded-lg bg-white space-y-3">
+                    <h5 className="font-semibold text-gray-700">Danh sách thuộc tính/giá trị</h5>
+                    {explicitRows.map((r, idx) => (
+                      <div key={`row-${idx}`} className="flex items-center gap-2">
+                        <select
+                          value={r.maThuocTinh}
+                          onChange={(e) => {
+                            const ma = e.target.value;
+                            setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, maThuocTinh: ma } : row));
+                          }}
+                          className="p-2 border rounded min-w-[150px]"
+                        >
+                          <option value="">-- Thuộc tính --</option>
+                          {(Array.isArray(attributes) ? attributes : Object.values(attributes).flat()).map(a => (
+                            <option key={a.id || a.maThuocTinh} value={a.id || a.maThuocTinh}>{a.tenThuocTinh}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={r.giaTri || ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, giaTri: v } : row));
+                          }}
+                          placeholder="Giá trị (VD: Đỏ, 120cm)"
+                          className="flex-1 p-2 border rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setExplicitRows(prev => prev.filter((_, i) => i !== idx))}
+                          className="p-2 bg-red-50 text-red-600 border rounded hover:bg-red-100"
+                          disabled={explicitRows.length === 1}
+                        >
+                          X
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                    <div className="flex justify-start">
+                      <button
+                        type="button"
+                        onClick={() => setExplicitRows(prev => [...prev, { maThuocTinh: '', giaTri: '' }])}
+                        className="mt-1 px-3 py-1 bg-green-50 text-green-700 border rounded hover:bg-green-100"
+                      >
+                        + Thêm hàng
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-start space-x-2 border-t pt-3 mt-3">
                   <button
                     onClick={handleCreateSingleFromSelection}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    // Logic: Disable if NO attributes selected OR if ANY attribute has > 1 value selected
                     disabled={
-                      Object.values(variantSelections).every(arr => arr.length === 0) ||
-                      Object.values(variantSelections).some(arr => arr.length > 1)
+                      variantMode === 'manual' 
+                        ? (explicitRows.length === 0 || explicitRows.some(r => !r.maThuocTinh || String(r.giaTri).trim() === ''))
+                        : Object.values(variantSelections).every(arr => arr.length === 0 || arr.every(v => String(v).trim() === ''))
                     }
                   >
-                    Tạo biến thể đơn
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Switch to rows mode and ensure at least one empty explicit row is present
-                      setVariantMode('rows');
-                      setUseExplicitRows(true);
-                      if (!Array.isArray(explicitRows) || explicitRows.length === 0) setExplicitRows([{ maThuocTinh: '', giaTri: '' }]);
-                    }}
-                    className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-800"
-                  >
-                    Tạo hàng thuộc tính
+                    Tạo biến thể
                   </button>
                 </div>
               </div>
@@ -1927,33 +2158,23 @@ const ProductManagement = () => {
       {/* --- EDIT VARIANT MODAL (Details Only) --- */}
       <Modal
         isOpen={showEditVariantModal}
-        onClose={() => { setShowEditVariantModal(false); setSelectedVariant(null); resetVariantForm(); }}
-        title={`Chỉnh sửa biến thể: ${((selectedVariant?.tenBienThe && String(selectedVariant.tenBienThe).trim()) ? selectedVariant.tenBienThe : (selectedVariant?.sku || 'Không tên'))}`}
+        onClose={() => { setShowEditVariantModal(false); setSelectedVariant(null); resetVariantForm(); setExplicitRows([]); }}
+        title={`Chỉnh sửa biến thể: ${selectedVariant?.sku || 'Không tên'}`}
         size="md"
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Tên biến thể</label>
-            <input
-              type="text"
-              value={variantForm.tenBienThe}
-              onChange={(e) => setVariantForm(prev => ({ ...prev, tenBienThe: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">SKU *</label>
             <input
               type="text"
               value={variantForm.sku}
-              onChange={(e) => setVariantForm(prev => ({ ...prev, sku: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              readOnly
+              className="w-full p-2 border rounded-lg bg-gray-100 cursor-not-allowed"
               required
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Giá mua (VNĐ)</label>
               <input
@@ -1977,30 +2198,9 @@ const ProductManagement = () => {
                 step="1000"
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Số lượng tồn</label>
-              <input
-                type="number"
-                value={variantForm.soLuongTon}
-                onChange={(e) => setVariantForm(prev => ({ ...prev, soLuongTon: e.target.value }))}
-                className="w-full p-2 border rounded-lg"
-                min="0"
-              />
-            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Mô tả</label>
-            <textarea
-              value={variantForm.moTa}
-              onChange={(e) => setVariantForm(prev => ({ ...prev, moTa: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
-              rows={3}
-            />
-          </div>
-
-          {/* Editable attributes selection for editing a variant */}
+          {/* Editable attributes section */}
           {attrLoading ? (
             <div className="py-4 text-center text-gray-600">Đang tải thuộc tính...</div>
           ) : attrError ? (
@@ -2010,130 +2210,74 @@ const ProductManagement = () => {
                 <button onClick={() => fetchAttributes(false)} className="px-3 py-1 bg-blue-600 text-white rounded">Tải lại</button>
               </div>
             </div>
-          ) : (!attributes || attributes.length === 0) ? (
-            <div className="p-4 text-gray-600">Chưa có thuộc tính nào.</div>
           ) : (
-            // If explicitRows were loaded (editing a variant created via explicit rows), show a simplified editor
-            (Array.isArray(explicitRows) && explicitRows.length > 0) ? (
-              <div className="p-4 border-2 border-gray-200 rounded-lg bg-white space-y-3">
-                <h4 className="font-semibold">Chỉnh sửa giá trị thuộc tính đã gán</h4>
-                <div className="space-y-2">
-                  {explicitRows.map((r, idx) => {
-                    const meta = attributes.find(a => String(a.id ?? a.maThuocTinh) === String(r.maThuocTinh));
-                    const label = meta?.tenThuocTinh || `Thuộc tính ${r.maThuocTinh || ''}`;
-                    return (
-                      <div key={`edit-er-${idx}`} className="flex items-center gap-2">
-                        <div className="min-w-[200px] text-sm text-gray-700 font-medium">{label}</div>
-                        <input type="text" value={r.giaTri || ''} onChange={(e) => {
-                          const v = e.target.value;
-                          setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, giaTri: v } : row));
-                        }} placeholder="Giá trị (VD: Đỏ)" className="flex-1 p-2 border rounded" />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 border-2 border-gray-200 p-4 rounded-lg bg-gray-50">
-                <h4 className="font-semibold text-gray-700">Thuộc tính (chỉ sửa giá trị đã gán)</h4>
-                <div className="space-y-3">
-                  {(() => {
-                    // Only render attributes that are already mapped on this variant
-                    const mappedIds = new Set();
-                    const sv = selectedVariant || {};
-                    const mappings = sv.bienTheThuocTinhs || sv.thuocTinhGiaTriTuDo || sv.thuocTinhGiaTriTuDos || sv.thuocTinhMappings || sv.thuocTinh || sv.giaTriThuocTinhs || [];
-                    if (Array.isArray(mappings)) {
-                      for (const m of mappings) {
-                        const id = m?.maThuocTinh ?? m?.attributeId ?? m?.ma ?? m?.thuocTinh?.maThuocTinh ?? m?.thuocTinh?.id;
-                        if (id != null) mappedIds.add(String(id));
-                      }
-                    }
-                    const attrsToRender = (attributes || []).filter(a => mappedIds.has(String(a.id ?? a.maThuocTinh)));
-                    if (attrsToRender.length === 0) {
-                      return <div className="text-sm text-gray-500">Biến thể này chưa có thuộc tính nào để sửa.</div>;
-                    }
-                    return attrsToRender.map((attr, ai) => (
-                      <div key={attr.id ?? attr.maThuocTinh ?? `attr-panel-${ai}`} className="p-3 border-2 border-gray-300 rounded-lg bg-white">
-                        <div className="font-semibold text-gray-700 mb-3">{attr.tenThuocTinh}</div>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={attrLastAdded[String(attr.id || attr.maThuocTinh) || ''] || ''}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const k = String(attr.id || attr.maThuocTinh);
-                              setAttrLastAdded(prev => ({ ...prev, [k]: v }));
-                              setAttrTextInputs(prev => ({ ...prev, [k]: v }));
-                            }}
-                            className="p-2 border rounded flex-1"
-                          >
-                            <option value="">-- Chọn hoặc gõ giá trị --</option>
-                            {(attr.values || []).map((v, i) => (
-                              <option key={`attr-${attr.id ?? attr.maThuocTinh}-val-${String(v.id ?? i)}`} value={v.tenGiaTri}>{v.tenGiaTri}</option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            value={attrTextInputs[String(attr.id || attr.maThuocTinh)] || ''}
-                            onChange={(e) => {
-                              const k = String(attr.id || attr.maThuocTinh);
-                              const v = e.target.value;
-                              setAttrTextInputs(prev => ({ ...prev, [k]: v }));
-                              setAttrLastAdded(prev => ({ ...prev, [k]: v }));
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const key = String(attr.id || attr.maThuocTinh);
-                                const text = (attrTextInputs[key] || '').trim();
-                                if (!text) return;
-                                setVariantSelections(prev => {
-                                  const cur = Array.isArray(prev[key]) ? prev[key].slice() : [];
-                                  if (!cur.includes(String(text))) cur.push(String(text));
-                                  setBulkVariantsPreview([]);
-                                  return { ...prev, [key]: cur };
-                                });
-                                setAttributes(prev => (Array.isArray(prev) ? prev.map(a => {
-                                  const aId = String(a.id ?? a.maThuocTinh ?? '');
-                                  if (aId !== key) return a;
-                                  const exists = (a.values || []).some(v => String(v.tenGiaTri) === String(text) || String(v.id) === String(text));
-                                  if (exists) return a;
-                                  const newVal = { id: String(text), tenGiaTri: String(text), raw: { giaTri: text } };
-                                  return { ...a, values: [...(a.values || []), newVal] };
-                                }) : prev));
-                                setAttrTextInputs(prev => ({ ...prev, [key]: '' }));
-                                setAttrLastAdded(prev => ({ ...prev, [key]: '' }));
-                              }
-                            }}
-                            placeholder={`Gõ nhanh giá trị cho ${attr.tenThuocTinh}`}
-                            className="p-2 border rounded flex-1"
-                          />
-                        </div>
+            // Editable attribute editor for existing and new mappings
+            <div className="space-y-3 border-2 border-gray-200 p-4 rounded-lg bg-gray-50">
+              <h4 className="font-semibold text-gray-700">Thuộc tính (sửa hoặc thêm giá trị)</h4>
+              <div className="space-y-3">
+                {/* Existing explicitRows for editing */}
+                {Array.isArray(explicitRows) && explicitRows.length > 0 && explicitRows.map((r, idx) => {
+                  const meta = Array.isArray(attributes)
+                    ? attributes.find(a => String(a.id ?? a.maThuocTinh) === String(r.maThuocTinh))
+                    : (attributes && typeof attributes === 'object'
+                      ? Object.values(attributes).flat().find(a => String(a.id ?? a.maThuocTinh) === String(r.maThuocTinh))
+                      : null);
+                  const label = meta?.tenThuocTinh || `Thuộc tính ${r.maThuocTinh || ''}`;
+                  return (
+                    <div key={`edit-er-${idx}`} className="flex items-center gap-2">
+                      <div className="min-w-[150px] text-sm text-gray-700 font-medium">{label}</div>
+                      <input type="text" value={r.giaTri || ''} onChange={(e) => {
+                        const v = e.target.value;
+                        setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, giaTri: v } : row));
+                      }} placeholder="Giá trị (VD: Đỏ)" className="flex-1 p-2 border rounded" />
+                    </div>
+                  );
+                })}
 
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {(attr.values || []).map((val, vi) => {
-                            const valId = String(val.id ?? vi);
-                            const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
-                            const selected = (variantSelections[aKey] || []).includes(valId);
-                            return (
-                              <label key={`val-${aKey}-${valId}-${vi}`} className={`px-3 py-2 border-2 rounded-lg cursor-pointer transition-all flex items-center gap-2 select-none ${selected ? 'bg-blue-500 border-blue-600 text-white font-medium' : 'bg-white border-gray-300 hover:border-blue-400 hover:bg-blue-50'}`}>
-                                <input type="checkbox" checked={selected} onChange={() => toggleSelection(aKey, valId)} className="w-4 h-4 cursor-pointer" />
-                                <span>{val.tenGiaTri}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ));
-                  })()}
+                {/* Add new attribute-value pairs */}
+                <div className="flex items-center gap-2 mt-2">
+                  <select
+                    value={newAttr}
+                    onChange={e => setNewAttr(e.target.value)}
+                    className="p-2 border rounded min-w-[150px]"
+                  >
+                    <option value="">-- Chọn thuộc tính để thêm --</option>
+                    {(Array.isArray(attributes)
+                      ? attributes
+                      : Object.values(attributes).flat()
+                    ).filter(a => !explicitRows.some(r => String(r.maThuocTinh) === String(a.id ?? a.maThuocTinh))).map(a => (
+                      <option key={a.id || a.maThuocTinh} value={a.id || a.maThuocTinh}>{a.tenThuocTinh}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={newValue}
+                    onChange={e => setNewValue(e.target.value)}
+                    placeholder="Giá trị mới"
+                    className="flex-1 p-2 border rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newAttr && newValue) {
+                        setExplicitRows(prev => [...prev, { maThuocTinh: newAttr, giaTri: newValue }]);
+                        setNewAttr('');
+                        setNewValue('');
+                      }
+                    }}
+                    className="p-2 bg-green-50 text-green-700 border rounded hover:bg-green-100"
+                  >
+                    + Thêm thuộc tính
+                  </button>
                 </div>
               </div>
-            )
+            </div>
           )}
 
 
           <div className="flex justify-end space-x-2 pt-4 border-t">
             <button
-              onClick={() => { setShowEditVariantModal(false); setSelectedVariant(null); resetVariantForm(); }}
+              onClick={() => { setShowEditVariantModal(false); setSelectedVariant(null); resetVariantForm(); setExplicitRows([]); }}
               className="px-4 py-2 border rounded-lg hover:bg-gray-50"
             >
               Hủy
@@ -2149,7 +2293,7 @@ const ProductManagement = () => {
         </div>
       </Modal>
 
-      {/* Delete Variant Confirmation Modal */}
+      {/* Delete Variant Confirmation Modal - No changes */}
       <Modal
         isOpen={showDeleteVariantConfirm}
         onClose={() => { setShowDeleteVariantConfirm(false); setVariantToDelete(null); }}
@@ -2158,7 +2302,7 @@ const ProductManagement = () => {
       >
         <div className="space-y-4">
           <p className="text-gray-700">
-            Bạn có chắc muốn xóa biến thể "{variantToDelete?.tenBienThe}"?
+            Bạn có chắc muốn xóa biến thể "<strong>{variantToDelete?.tenBienThe || variantToDelete?.sku}</strong>"?
           </p>
           <p className="text-sm text-gray-500">
             Hành động này không thể hoàn tác.

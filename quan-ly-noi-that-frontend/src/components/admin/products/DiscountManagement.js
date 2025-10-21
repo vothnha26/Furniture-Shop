@@ -744,17 +744,8 @@ const DiscountManagement = () => {
           tongTietKiem: p.tongTietKiem || 0
         };
 
-        // Replace or append
+        // Replace or append - only update discountPrograms, let useEffect handle filteredPrograms
         setDiscountPrograms(prev => {
-          const idx = prev.findIndex(x => x.id === updatedProgram.id);
-          if (idx >= 0) {
-            const copy = [...prev];
-            copy[idx] = updatedProgram;
-            return copy;
-          }
-          return [updatedProgram, ...prev];
-        });
-        setFilteredPrograms(prev => {
           const idx = prev.findIndex(x => x.id === updatedProgram.id);
           if (idx >= 0) {
             const copy = [...prev];
@@ -779,8 +770,8 @@ const DiscountManagement = () => {
                 bienTheGiamGias: []
               };
             });
+          // Only update discountPrograms, let useEffect handle filteredPrograms
           setDiscountPrograms(mappedPrograms);
-          setFilteredPrograms(mappedPrograms);
         }
       }
 

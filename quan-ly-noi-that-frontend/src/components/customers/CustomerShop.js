@@ -1,259 +1,153 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IoSearch, IoCart, IoHeart, IoStar, IoGrid, IoList, IoEye, IoChevronDown, IoChevronForward, IoFunnel } from 'react-icons/io5';
-import CustomerProductDetail from './CustomerProductDetail';
+import { IoSearch, IoCart, IoHeart, IoStar, IoChevronDown, IoChevronForward, IoFunnel } from 'react-icons/io5';
 import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
-import { getFavoritesKey, readFavoritesLocal, writeFavoritesLocal, readFavoritesWithLegacy } from '../../utils/favorites';
 
-// --- (KHỞI TẠO VÀ LOGIC KHÔNG THAY ĐỔI) ---
+// Add custom checkbox style
+const checkboxStyle = `
+  .category-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.25rem;
+    background-color: white;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+  }
+  
+  .category-checkbox:checked {
+    background-color: #2563eb;
+    border-color: #2563eb;
+  }
+  
+  .category-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 0.25rem;
+    top: 0.05rem;
+    width: 0.35rem;
+    height: 0.6rem;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  
+  .supplier-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.25rem;
+    background-color: white;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+  }
+  
+  .supplier-checkbox:checked {
+    background-color: #9333ea;
+    border-color: #9333ea;
+  }
+  
+  .supplier-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 0.25rem;
+    top: 0.05rem;
+    width: 0.35rem;
+    height: 0.6rem;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  
+  .category-checkbox:focus,
+  .supplier-checkbox:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  }
+`;
 
 const CustomerShop = () => {
-  // GIỮ NGUYÊN TẤT CẢ STATE
   const [searchTerm, setSearchTerm] = useState('');
-  // multi-select categories: empty array means 'all'
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [sortBy, setSortBy] = useState('newest');
-  const [viewMode, setViewMode] = useState('grid');
-  const [favorites, setFavorites] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
   const { user } = useAuth();
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showProductDetail, setShowProductDetail] = useState(false);
   const { addToCart } = useCart();
   const [isLoading, setIsLoading] = useState(false);
-  const [, setError] = useState(null);
   const [apiCategories, setApiCategories] = useState([]);
   const [apiSuppliers, setApiSuppliers] = useState([]);
-  // Giá min/max mặc định
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(999999999);
-  const [categories, setCategories] = useState([
-    { id: 'all', name: 'Tất cả', count: 0 }
-  ]);
+  const [categories, setCategories] = useState([{ id: 'all', name: 'Tất cả', count: 0 }]);
   const [products, setProducts] = useState([]);
-  const productsRef = useRef(products);
-  useEffect(() => { productsRef.current = products; }, [products]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState([]);
   const navigate = useNavigate();
   const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(true);
   const [isSupplierFilterOpen, setIsSupplierFilterOpen] = useState(true);
   const [isPriceFilterOpen, setIsPriceFilterOpen] = useState(true);
 
-  // -----------------------------------------------------
-  // ********* GIỮ NGUYÊN CÁC HÀM LOGIC CŨ ************
-  // mapProductFromApi, resolveImageUrl, useEffects, toggleFavorite, 
-  // handleViewProduct, handleAddToCart, handleBackToShop, renderStars, 
-  // handlePriceRangeChange, filteredProducts, formatPrice, resetFilters
-  // (Logic được giữ nguyên từ phiên bản trước, chỉ tập trung vào JSX và CSS classes)
-  // -----------------------------------------------------
-
-  // Hàm mapProductFromApi (Giữ nguyên logic)
+  // Map product from API (ShopProductResponseDto)
   const mapProductFromApi = (product) => {
-    const rawPrice = product.giaBan ?? product.gia ?? product.price ?? product.gia_ban ?? 0;
-    const rawOriginal = product.giaGoc ?? product.gia_goc ?? product.originalPrice ?? 0;
-    const price = Number(rawPrice) || 0;
-    const originalPrice = Number(rawOriginal) || 0;
+    // Use lowestVariantPrice or fallback to minPrice/price
+    const price = product.lowestVariantPrice ?? product.minPrice ?? product.price ?? 0;
+    const originalPrice = product.lowestVariantOriginalPrice ?? product.maxPrice ?? product.originalPrice ?? 0;
+    
+    // Get main image
+    const rawImages = Array.isArray(product.images) ? product.images : [];
+    const images = rawImages.map(img => (typeof img === 'string' && img.startsWith('/') ? api.buildUrl(img) : img));
+    const image = images.length > 0 ? images[0] : 'https://via.placeholder.com/300';
 
-    // pick main image from many possible shapes
-    const rawImage = pickMainImage(product);
+    // Category and supplier
+    const categoryName = product.category?.name ?? '';
+    const supplierName = product.supplier?.name ?? '';
 
-    const rawDiscountPercent = product.phanTramGiamGia ?? product.discountPercent ?? null;
-    const explicitDiscountPercent = rawDiscountPercent != null ? Number(rawDiscountPercent) || 0 : null;
-    let lowestVariantOverall = null;
-    let lowestVariantDiscounted = null;
-    try {
-      const rawVariants = product.bienTheList ?? product.bienThe ?? product.variants ?? [];
-      if (Array.isArray(rawVariants) && rawVariants.length > 0) {
-        rawVariants.forEach(v => {
-          const vPrice = Number(v.giaBan ?? v.gia ?? v.price ?? v.priceAfterDiscount ?? 0) || 0;
-          const vOriginal = Number((v.giaGoc ?? v.gia_goc ?? v.originalPrice ?? originalPrice) || 0) || 0;
-          let vDiscountPercent = v.phanTramGiamGia ?? v.discountPercent ?? null;
-          vDiscountPercent = vDiscountPercent != null ? Number(vDiscountPercent) || 0 : 0;
-          if ((!v.phanTramGiamGia && !v.discountPercent) && vOriginal > 0 && vPrice < vOriginal) {
-            vDiscountPercent = Math.round(((vOriginal - vPrice) / vOriginal) * 100);
-          }
-          const vDiscountAmount = vOriginal > 0 && vPrice < vOriginal ? (vOriginal - vPrice) : 0;
-          const finalPrice = vPrice;
-
-          if (!lowestVariantOverall || finalPrice < lowestVariantOverall.finalPrice) {
-            lowestVariantOverall = {
-              id: v.maBienThe ?? v.id ?? v.variantId,
-              name: v.tenBienThe ?? v.ten ?? v.name ?? null,
-              price: vPrice,
-              originalPrice: vOriginal,
-              discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null,
-              discountAmount: vDiscountAmount,
-              finalPrice
-            };
-          }
-
-          const hasVariantDiscount = vDiscountAmount > 0 || (vDiscountPercent && vDiscountPercent > 0) || Boolean(v.priceAfterDiscount) || (vPrice < vOriginal && vOriginal > 0);
-          if (hasVariantDiscount) {
-            if (!lowestVariantDiscounted || finalPrice < lowestVariantDiscounted.finalPrice) {
-              lowestVariantDiscounted = {
-                id: v.maBienThe ?? v.id ?? v.variantId,
-                name: v.tenBienThe ?? v.ten ?? v.name ?? null,
-                price: vPrice,
-                originalPrice: vOriginal,
-                discountPercent: vDiscountPercent > 0 ? vDiscountPercent : null,
-                discountAmount: vDiscountAmount,
-                finalPrice
-              };
-            }
-          }
-        });
-      }
-    } catch (e) {
-      lowestVariantOverall = null;
-      lowestVariantDiscounted = null;
-    }
-
-    // If product itself has an originalPrice > price and no explicit discount percent,
-    // compute a top-level discount percent so the UI can show it even when there are no variants.
-    let topLevelDiscountPercent = explicitDiscountPercent;
-    let topLevelDiscountAmount = 0;
-    if ((topLevelDiscountPercent == null || topLevelDiscountPercent === 0) && originalPrice > 0 && price < originalPrice) {
-      topLevelDiscountPercent = Math.round(((originalPrice - price) / originalPrice) * 100);
-      topLevelDiscountAmount = Math.round(originalPrice - price);
-    }
-
-    // Normalize category (handle object returned as `category: { id, name }`)
-    const catObj = product.category && typeof product.category === 'object' ? product.category : (product.danhMuc && typeof product.danhMuc === 'object' ? product.danhMuc : null);
-    const normalizedCategoryId = catObj ? (catObj.id ?? catObj.maDanhMuc ?? catObj.maDanhMuc ?? null) : (product.maDanhMuc ?? product.danhMucId ?? null);
-    const normalizedCategoryName = catObj ? (catObj.name ?? catObj.tenDanhMuc ?? '') : (product.tenDanhMuc ?? product.category ?? '');
-
-    // Normalize supplier
-    const supObj = product.supplier && typeof product.supplier === 'object' ? product.supplier : (product.nhaCungCap && typeof product.nhaCungCap === 'object' ? product.nhaCungCap : null);
-    const normalizedSupplierId = supObj ? (supObj.id ?? supObj.maNhaCungCap ?? null) : (product.maNhaCungCap ?? product.supplierId ?? null);
-    const normalizedSupplierName = supObj ? (supObj.name ?? supObj.tenNhaCungCap ?? '') : (product.tenNhaCungCap ?? product.supplier ?? null);
-
+    // Discount
+    const discountPercent = product.lowestVariantDiscountPercent ?? product.discountPercent ?? 0;
+    
+    // Stock
+    const stockQuantity = product.totalStock ?? product.stockQuantity ?? 0;
+    
     return {
-      id: product.maSanPham ?? product.id ?? product.productId,
-      name: product.tenSanPham ?? product.ten ?? product.name ?? 'Sản phẩm',
-      categoryId: normalizedCategoryId,
-      category: normalizedCategoryName,
-  // createdAt: backend may return several possible date fields
-  createdAt: product.ngayTao || product.ngayTaoSanPham || product.createdAt || product.addedDate || product.created_at || null,
-  // supplier info (may be absent in some APIs)
-    supplierId: normalizedSupplierId,
-  supplier: normalizedSupplierName,
-      price,
-      originalPrice,
-      rating: Number(product.averageRating ?? product.danhGia ?? product.rating ?? product.review ?? product.reviews ?? 0) || 0,
-      reviews: Number(product.reviewCount ?? product.soLuotDanhGia ?? product.soLuongDanhGia ?? product.reviews ?? product.review ?? 0) || 0,
-      image: rawImage || null,
-      inStock: Number(product.stockQuantity ?? product.tonKho ?? product.soLuongTonKho ?? 0) > 0,
-      stockCount: Number(product.stockQuantity ?? product.tonKho ?? product.soLuongTonKho ?? 0) || 0,
+      id: product.maSanPham ?? product.id,
+      name: product.tenSanPham ?? product.name ?? 'Sản phẩm',
+      price: Number(price) || 0,
+      originalPrice: Number(originalPrice) || 0,
+      image,
+      images,
+      category: categoryName,
+      supplier: supplierName,
       description: product.moTa ?? product.description ?? '',
-      variants: (product.bienTheList || product.bienThe || []).map(variant => ({
-        id: variant.maBienThe ?? variant.id,
-        name: variant.tenBienThe ?? variant.ten ?? variant.name,
-        price: Number(variant.giaBan ?? variant.gia ?? variant.price) || 0,
-        inStock: Number(variant.tonKho ?? variant.soLuong ?? 0) > 0
-      })),
-      lowestVariantId: lowestVariantOverall?.id ?? null,
-      lowestVariantName: lowestVariantOverall?.name ?? null,
-      lowestVariantPrice: lowestVariantOverall?.price ?? null,
-      lowestVariantOriginalPrice: lowestVariantOverall?.originalPrice ?? null,
-      lowestVariantDiscountPercent: lowestVariantDiscounted?.discountPercent ?? null,
-      lowestVariantDiscountAmount: lowestVariantDiscounted?.discountAmount ?? 0,
-      lowestVariantFinalPrice: lowestVariantDiscounted?.finalPrice ?? null,
-      discount: Number(topLevelDiscountPercent ?? lowestVariantDiscounted?.discountPercent ?? 0) || 0,
-      discountPercent: (topLevelDiscountPercent ?? lowestVariantDiscounted?.discountPercent) > 0 ? (topLevelDiscountPercent ?? lowestVariantDiscounted?.discountPercent) : null,
-      discountAmount: lowestVariantDiscounted ? (lowestVariantDiscounted.discountAmount ?? 0) : (topLevelDiscountAmount && topLevelDiscountAmount > 0 ? topLevelDiscountAmount : 0),
-      isOnSale: Boolean(lowestVariantDiscounted) || ((topLevelDiscountPercent != null) && topLevelDiscountPercent > 0)
+      rating: Number(product.averageRating ?? product.rating) || 4.5,
+      reviews: Number(product.reviewCount) || 0,
+      inStock: stockQuantity > 0,
+      stockCount: stockQuantity,
+      discountPercent: Number(discountPercent) || 0,
+      isOnSale: originalPrice > 0 && price < originalPrice,
+      variantCount: product.availableVariantCount ?? product.soLuongBienThe ?? 0
     };
   };
 
-  // Hàm resolveImageUrl (Giữ nguyên logic)
-  const resolveImageUrl = (img) => {
-    if (!img) return null;
-    if (typeof img === 'string') {
-      const s = img.trim();
-      if (s === '/default-product.jpg' || s === 'default-product.jpg' || s === '/logo192.png' || s === 'logo192.png') return null;
-      if (s.startsWith('http://') || s.startsWith('https://')) return s;
-      return api.buildUrl(s);
-    }
-    if (img.duongDanHinhAnh) return resolveImageUrl(img.duongDanHinhAnh);
-    return null;
-  };
-
-    // Helper: pick the best main image from a product DTO with many possible shapes
-    const pickMainImage = (p) => {
-      if (!p) return null;
-
-      const tryArrayFirst = (arr) => {
-        if (!Array.isArray(arr) || arr.length === 0) return null;
-        const first = arr.find(x => x != null);
-        if (!first) return null;
-        if (typeof first === 'string') return first;
-        return first.duongDanHinhAnh ?? first.url ?? first.path ?? first.src ?? first;
-      };
-
-      let img = null;
-      img = tryArrayFirst(p.hinhAnhs) || tryArrayFirst(p.danh_sach_hinh_anh) || tryArrayFirst(p.images) || tryArrayFirst(p.photos) || img;
-      img = img || p.hinhAnh || p.image || p.coverImage || p.anhDaiDien || p.thumbnail || p.avatar || null;
-
-      if (!img && p.hinhAnh && typeof p.hinhAnh === 'object') img = p.hinhAnh.duongDanHinhAnh ?? p.hinhAnh.url ?? null;
-      if (!img && p.image && typeof p.image === 'object') img = p.image.url ?? p.image.path ?? null;
-
-      try {
-        const variants = p.bienTheList ?? p.bienThe ?? p.variants ?? [];
-        if (!img && Array.isArray(variants)) {
-          for (const v of variants) {
-            if (!v) continue;
-            const vImg = tryArrayFirst(v.hinhAnhs) || v.hinhAnh || v.image || (v.images && tryArrayFirst(v.images));
-            if (vImg) { img = vImg; break; }
-          }
-        }
-      } catch (e) { /* ignore */ }
-
-      return img || null;
-    };
-
-  // Các useEffect để fetch data (GIỮ NGUYÊN)
+  // Fetch products (use /shop endpoint for variant-aware prices)
   useEffect(() => {
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
         const response = await api.get('/api/products/shop');
-        const data = response?.data ?? response;
-        let items = [];
-        if (Array.isArray(data)) items = data;
-        else if (Array.isArray(data.content)) items = data.content;
-        else if (Array.isArray(data.items)) items = data.items;
-        const mapped = items.map(it => {
-          if (it && (it.giaBan != null || it.gia != null || it.price != null)) {
-            return mapProductFromApi(it);
-          }
-          // Logic mapping DTO...
-          // fallback minimal mapping; include originalPrice and discount calculation so UI can show discount
-          const fallbackPrice = Number(it.giaBan ?? it.price ?? 0) || 0;
-          const fallbackOriginal = Number(it.giaGoc ?? it.gia_goc ?? it.originalPrice ?? 0) || 0;
-          let fallbackDiscountPercent = null;
-          if (fallbackOriginal > 0 && fallbackPrice < fallbackOriginal) {
-            fallbackDiscountPercent = Math.round(((fallbackOriginal - fallbackPrice) / fallbackOriginal) * 100);
-          }
-          return {
-            id: it.maSanPham ?? it.id ?? it.productId,
-            name: it.tenSanPham ?? it.ten ?? it.name ?? 'Sản phẩm',
-            categoryId: it.maDanhMuc ?? it.danhMuc?.maDanhMuc ?? null,
-            category: it.tenDanhMuc ?? it.danhMuc?.tenDanhMuc ?? '',
-            price: fallbackPrice,
-            originalPrice: fallbackOriginal,
-            lowestVariantFinalPrice: fallbackPrice,
-            lowestVariantDiscountPercent: fallbackDiscountPercent,
-            image: (it.hinhAnhs && it.hinhAnhs[0]) ? (it.hinhAnhs[0].duongDanHinhAnh ?? it.hinhAnhs[0]) : (it.hinhAnh ?? null),
-            inStock: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? 0) > 0,
-            stockCount: Number(it.stockQuantity ?? it.tongSoLuong ?? it.totalStock ?? 0) || 0,
-            description: it.moTa ?? it.description ?? '',
-            variants: []
-          };
-        });
+        const data = response.data ?? response;
+        const productList = Array.isArray(data) ? data : (data.items ?? data.content ?? []);
+        const mapped = productList.map(mapProductFromApi);
+        console.log('Fetched products:', mapped); // Debug
         setProducts(mapped);
-        try { console.debug('[CustomerShop] mapped products (sample)', mapped.slice(0,20).map(p=>({ id: p.id, categoryId: p.categoryId, category: p.category, supplierId: p.supplierId, supplier: p.supplier, image: p.image }))); } catch(e){}
       } catch (err) {
-        setError(err);
+        console.error('Failed to fetch products:', err);
       } finally {
         setIsLoading(false);
       }
@@ -261,379 +155,300 @@ const CustomerShop = () => {
     fetchProducts();
   }, []);
 
+  // Load favorites from database
   useEffect(() => {
-    // ... loadFavorites logic ...
-    let mounted = true;
-    const loadFavorites = async () => {
-      // ... logic giữ nguyên ...
-      if (user) {
-        // If we previously detected favorites API is broken, skip network call and fallback to localStorage
-        if (window.__FAVORITES_API_BROKEN) {
-          try {
-            const arr = readFavoritesWithLegacy(user);
-            const ids = Array.isArray(arr) ? arr.map(f => f.id ?? f.maSanPham).filter(Boolean) : [];
-            if (mounted) {
-              setFavorites(ids);
-              try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: ids.length } })); } catch (e) {}
-            }
-            return;
-          } catch (le) { if (mounted) setFavorites([]); return; }
-        }
-
-        try {
-          const resp = await api.get('/favorites');
-          const data = resp?.data ?? resp;
-          if (!Array.isArray(data)) {
-            if (mounted) setFavorites([]);
-            return;
-          }
-          const ids = data.map(p => p.maSanPham ?? p.id ?? p.productId ?? p.productId ?? p.id).filter(Boolean);
-          // persist per-user fallback copy locally so we don't mix users
-          try { writeFavoritesLocal(user, ids.map(i=>({ id: i }))); } catch(e) {}
-          if (mounted) {
-            setFavorites(ids);
-            try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: ids.length } })); } catch (e) { }
-          }
-          return;
-        } catch (e) {
-          console.debug('Favorites API not available on load', e);
-          // mark global flag so other components fallback to localStorage
-          try { window.__FAVORITES_API_BROKEN = true; } catch (err) {}
-        }
+    const fetchFavorites = async () => {
+      if (!user) {
+        setFavoriteIds(new Set());
+        return;
       }
+      
       try {
-        const arr = readFavoritesLocal(user);
-        const ids = Array.isArray(arr) ? arr.map(f => f.id ?? f.maSanPham).filter(Boolean) : [];
-        if (mounted) {
-          setFavorites(ids);
-          try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: ids.length } })); } catch (e) { }
-        }
-      } catch (e) {
-        if (mounted) setFavorites([]);
+        console.log('🔄 [CustomerShop] Load danh sách yêu thích từ database...');
+        const response = await api.get('/api/v1/yeu-thich');
+        console.log('[CustomerShop] JSON response /api/v1/yeu-thich:', JSON.stringify(response.data));
+        const favoriteProducts = response.data || [];
+        const ids = new Set(favoriteProducts.map(p => p.maSanPham || p.id));
+        setFavoriteIds(ids);
+        console.log('✅ [CustomerShop] Đã load', ids.size, 'sản phẩm yêu thích');
+      } catch (error) {
+        console.error('❌ [CustomerShop] Lỗi khi load yêu thích:', error);
+        setFavoriteIds(new Set());
       }
     };
-    loadFavorites();
-    return () => { mounted = false; };
+    
+    fetchFavorites();
   }, [user]);
 
+  // Fetch categories
   useEffect(() => {
-    // ... fetchCategories logic ...
     const fetchCategories = async () => {
       try {
         const response = await api.get('/api/categories');
-        const data = response?.data ?? response;
-        if (Array.isArray(data)) {
-          const mappedCategories = data.map(cat => ({
-            id: cat.maDanhMuc ?? cat.id ?? cat._id ?? (cat.tenDanhMuc ?? cat.name ?? cat.ten ?? ''),
-            name: cat.tenDanhMuc ?? cat.name ?? cat.ten ?? '',
-            count: cat.soLuongSanPham ?? cat.count ?? cat.productCount ?? 0
-          }));
-          setApiCategories(mappedCategories);
-          try { console.debug('[CustomerShop] apiCategories', mappedCategories); } catch(e) {}
-          setCategories([{ id: 'all', name: 'Tất cả', count: mappedCategories.reduce((sum, cat) => sum + cat.count, 0) }, ...mappedCategories]);
-        }
+        const data = response.data ?? response;
+        const catList = Array.isArray(data) ? data : [];
+        setApiCategories(catList);
       } catch (err) {
-        console.error('Fetch categories error', err);
+        console.error('Failed to fetch categories:', err);
       }
     };
     fetchCategories();
   }, []);
 
-  // Fetch suppliers so the customer shop can filter by supplier
+  // Fetch suppliers
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const resp = await api.get('/api/suppliers');
-        const data = resp?.data ?? resp;
-        if (Array.isArray(data)) {
-          const mapped = data.map(s => ({
-            // Be tolerant: if there's no explicit id, fallback to the supplier name so filters can still match
-            id: s.maNhaCungCap ?? s.id ?? s.ma_nha_cung_cap ?? (s.tenNhaCungCap ?? s.name ?? s.ten_nha_cung_cap ?? ''),
-            name: s.tenNhaCungCap ?? s.name ?? s.ten_nha_cung_cap ?? ''
-          }));
-          setApiSuppliers(mapped);
-          try { console.debug('[CustomerShop] apiSuppliers', mapped); } catch(e) {}
-        }
+        const response = await api.get('/api/suppliers');
+        const data = response.data ?? response;
+        const supList = Array.isArray(data) ? data : [];
+        setApiSuppliers(supList);
       } catch (err) {
-        // ignore - suppliers endpoint may not exist on all deployments
-        console.debug('Fetch suppliers error', err);
+        console.error('Failed to fetch suppliers:', err);
       }
     };
     fetchSuppliers();
   }, []);
-  // multi-select suppliers: empty array means 'all'
-  const [selectedSuppliers, setSelectedSuppliers] = useState([]);
 
-  // Mounted marker to confirm bundle is the latest and component runs
+  // Update categories with count
   useEffect(() => {
-    try { console.debug('[CustomerShop] mounted'); } catch (e) { }
-  }, []);
-
-  useEffect(() => {
-    // ... update category counts logic ...
-    if (!products || products.length === 0) {
-      if (apiCategories && apiCategories.length > 0) {
-        const total = apiCategories.reduce((s, c) => s + (c.count || 0), 0);
-        setCategories([{ id: 'all', name: 'Tất cả', count: total }, ...apiCategories]);
-      } else {
-        setCategories([{ id: 'all', name: 'Tất cả', count: 0 }]);
-      }
-      return;
-    }
-
-    const countsById = {};
-    const countsByName = {};
+    const categoryCounts = {};
     products.forEach(p => {
-      const id = p.categoryId ?? null;
-      const name = (p.category && p.category !== '') ? p.category : 'Khác';
-      if (id) countsById[id] = (countsById[id] || 0) + 1;
-      countsByName[name] = (countsByName[name] || 0) + 1;
+      const cat = p.category || 'Khác';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     });
 
-    let merged = [];
-    if (apiCategories && apiCategories.length > 0) {
-      merged = apiCategories.map(ac => ({
-        id: ac.id,
-        name: ac.name,
-        count: countsById[ac.id] ?? ac.count ?? 0
-      }));
-      Object.keys(countsByName).forEach(name => {
-        const exists = merged.some(m => m.name === name);
-        if (!exists) merged.push({ id: name, name, count: countsByName[name] });
-      });
-    } else {
-      merged = Object.keys(countsByName).map(name => ({ id: name, name, count: countsByName[name] }));
-    }
-
-    const total = products.length;
-    setCategories([{ id: 'all', name: 'Tất cả', count: total }, ...merged]);
+    const updatedCategories = [
+      { id: 'all', name: 'Tất cả', count: products.length },
+      ...apiCategories.map(cat => ({
+        id: cat.maDanhMuc ?? cat.id,
+        name: cat.tenDanhMuc ?? cat.name,
+        count: categoryCounts[cat.tenDanhMuc ?? cat.name] || 0
+      }))
+    ];
+    setCategories(updatedCategories);
   }, [products, apiCategories]);
 
-  // Logic filter/sort (GIỮ NGUYÊN)
+  // Filter and sort products
   const filteredProducts = (() => {
-    try { console.debug('[CustomerShop] filters selectedCategories, selectedSuppliers', selectedCategories, selectedSuppliers); } catch(e){}
-    const term = (searchTerm || '').toString().toLowerCase();
-    const getPrice = (p) => Number(p.lowestVariantFinalPrice ?? p.price ?? (p.priceRange && p.priceRange.min) ?? 0) || 0;
+    let result = [...products];
 
-    const list = products.filter(product => {
-      const name = (product.name || '').toString().toLowerCase();
-      const matchesSearch = term === '' || name.includes(term);
+    if (searchTerm) {
+      result = result.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
 
-      // category multi-select: if none selected -> all pass
-        const selectedCats = Array.isArray(selectedCategories) ? selectedCategories.map(x => (x || '').toString().toLowerCase()).filter(Boolean) : [];
-        let matchesCategory = false;
-        if (selectedCats.length === 0) {
-          matchesCategory = true;
-        } else {
-          const prodCatId = (product.categoryId ?? '').toString().toLowerCase();
-          const prodCatName = (product.category ?? '').toString().toLowerCase();
-          matchesCategory = selectedCats.some(sc => (prodCatId && prodCatId === sc) || (prodCatName && prodCatName === sc) || (prodCatName && prodCatName.includes(sc)));
-        }
-
-      const price = getPrice(product);
-      const matchesPrice = (price >= minPrice) && (price <= maxPrice);
-
-      // Supplier filter
-      // supplier multi-select: empty => all
-      const selectedSups = Array.isArray(selectedSuppliers) ? selectedSuppliers.map(x => (x || '').toString().toLowerCase()).filter(Boolean) : [];
-      let matchesSupplier = false;
-      if (selectedSups.length === 0) {
-        matchesSupplier = true;
-      } else {
-        const prodSupplierId = product.supplierId ? String(product.supplierId).toLowerCase() : null;
-        const prodSupplierName = product.supplier ? String(product.supplier).toLowerCase() : '';
-        matchesSupplier = selectedSups.some(ss => (prodSupplierId && prodSupplierId === ss) || (prodSupplierName && prodSupplierName.includes(ss)));
-      }
-
-      return matchesSearch && matchesCategory && matchesPrice && matchesSupplier;
-    });
-
-    const by = sortBy;
-    if (by === 'name') {
-      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    } else if (by === 'price-low') {
-      list.sort((a, b) => getPrice(a) - getPrice(b));
-    } else if (by === 'price-high') {
-      list.sort((a, b) => getPrice(b) - getPrice(a));
-    } else if (by === 'rating') {
-      list.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
-    } else if (by === 'newest') {
-      list.sort((a, b) => {
-        const parseDate = (x) => {
-          if (!x) return 0;
-          const d = (typeof x === 'string' || typeof x === 'number') ? new Date(x) : x;
-          const t = d instanceof Date && !isNaN(d.getTime()) ? d.getTime() : 0;
-          return t;
-        };
-        const ta = parseDate(a.createdAt || a.addedDate || a.ngayTao || 0);
-        const tb = parseDate(b.createdAt || b.addedDate || b.ngayTao || 0);
-        return tb - ta;
+    if (selectedCategories.length > 0) {
+      result = result.filter(p => {
+        const catLower = (p.category || '').toLowerCase();
+        return selectedCategories.some(c => String(c).toLowerCase() === catLower);
       });
     }
 
-    return list;
+    if (selectedSuppliers.length > 0) {
+      result = result.filter(p => {
+        const supLower = (p.supplier || '').toLowerCase();
+        return selectedSuppliers.some(s => String(s).toLowerCase() === supLower);
+      });
+    }
+
+    result = result.filter(p => p.price >= minPrice && p.price <= maxPrice);
+
+    // Sort
+    switch (sortBy) {
+      case 'price-low':
+        result.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-high':
+        result.sort((a, b) => b.price - a.price);
+        break;
+      case 'rating':
+        result.sort((a, b) => b.rating - a.rating);
+        break;
+      case 'name':
+        result.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      default:
+        break;
+    }
+
+    return result;
   })();
 
-  // Định dạng giá (GIỮ NGUYÊN)
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(price).replace('₫', ' VNĐ');
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
 
-  // Hàm xử lý chọn khoảng giá (GIỮ NGUYÊN)
   const handlePriceRangeChange = (min, max) => {
     setMinPrice(min);
     setMaxPrice(max);
   };
 
-  // Hàm reset filter (GIỮ NGUYÊN)
   const resetFilters = () => {
-    setSearchTerm('');
     setSelectedCategories([]);
+    setSelectedSuppliers([]);
     setMinPrice(0);
     setMaxPrice(999999999);
-    setSortBy('newest');
+    setSearchTerm('');
   };
 
-  // Hàm xử lý actions (GIỮ NGUYÊN)
-  const toggleFavorite = async (productOrId) => {
-    // productOrId may be an object or id
-    const id = typeof productOrId === 'string' || typeof productOrId === 'number' ? productOrId : (productOrId && (productOrId.id ?? productOrId.maSanPham));
-    if (!id) return;
-
-    // require login
+  const toggleFavorite = async (productId) => {
     if (!user) {
-      // redirect to login page
-      window.location.href = '/login';
+      alert('Vui lòng đăng nhập để thêm vào yêu thích');
       return;
     }
-
-    // optimistic toggle locally (per-user)
-    setFavorites(prev => {
-      const exists = prev.includes(id);
-      const next = exists ? prev.filter(x => x !== id) : [...prev, id];
-      try { writeFavoritesLocal(user, next.map(i=>({ id: i }))); } catch (e) {}
-      try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: next.length } })); } catch (e) {}
-      return next;
-    });
-
-    // If favorites API is known broken, skip network call
-    if (window.__FAVORITES_API_BROKEN) return;
-
+    
     try {
-      // toggle via API if available
-      await api.post('/api/v1/yeu-thich/toggle', { maSanPham: id });
-    } catch (e) {
-      console.debug('Favorites toggle API failed, marking as broken', e);
-      try { window.__FAVORITES_API_BROKEN = true; } catch (err) {}
-      // ensure per-user copy is in localStorage
-      try { const existing = readFavoritesLocal(user); const exists = existing.find(f => String(f.id) === String(id)); let nextArr; if (exists) nextArr = existing.filter(f => String(f.id) !== String(id)); else nextArr = [...existing, { id }]; writeFavoritesLocal(user, nextArr); } catch(e) {}
+      const isFavorite = favoriteIds.has(productId);
+      console.log(`${isFavorite ? '🗑️' : '💝'} [CustomerShop] ${isFavorite ? 'Xóa' : 'Thêm'} yêu thích:`, productId);
+
+      if (isFavorite) {
+        // Remove from favorites
+        await api.delete(`/api/v1/yeu-thich/${productId}`);
+        console.log('✅ [CustomerShop] Đã xóa khỏi yêu thích:', productId);
+        
+        // Update favoriteIds
+        setFavoriteIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(productId);
+          return newSet;
+        });
+        
+        // Dispatch event to update favorites count
+        window.dispatchEvent(new CustomEvent('favorites:changed', { 
+          detail: { count: favoriteIds.size - 1 } 
+        }));
+      } else {
+        // Add to favorites
+        await api.post('/api/v1/yeu-thich', { productId: productId });
+        console.log('✅ [CustomerShop] Đã thêm vào yêu thích:', productId);
+        
+        // Update favoriteIds
+        setFavoriteIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(productId);
+          return newSet;
+        });
+        
+        // Dispatch event to update favorites count
+        window.dispatchEvent(new CustomEvent('favorites:changed', { 
+          detail: { count: favoriteIds.size + 1 } 
+        }));
+      }
+    } catch (error) {
+      console.error('❌ [CustomerShop] Lỗi khi thao tác yêu thích:', error);
+      alert('Có lỗi xảy ra. Vui lòng thử lại!');
     }
   };
 
   const handleViewProduct = (product) => {
-    if (!product) return;
-    setSelectedProduct(product);
-    setShowProductDetail(true);
+    // Navigate to product detail page
+    navigate(`/shop/products/${product.id}`);
   };
 
   const handleAddToCart = (product) => {
-    // Require login before allowing add to cart
-    if (!user) {
-      window.location.href = '/login';
-      return;
-    }
-    try {
-      // No explicit variant on listing page; add product as-is with default quantity 1
-      const ok = addToCart(product, null, 1);
-      if (ok !== false) {
-        alert(`Đã thêm ${product.name || product.tenSanPham || 'sản phẩm'} vào giỏ hàng!`);
-      }
-    } catch (e) {
-      console.error('Failed to add to cart', e);
-      alert('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
-    }
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      quantity: 1
+    });
   };
 
-  const handleBackToShop = () => {
-    setShowProductDetail(false);
-    setSelectedProduct(null);
+  const renderStars = (rating) => {
+    return [...Array(5)].map((_, i) => (
+      <IoStar key={i} className={`${i < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`} />
+    ));
   };
-  const renderStars = (rating) => { /* Logic giữ nguyên */ return Array.from({ length: 5 }, (_, i) => (<IoStar key={i} className={`w-4 h-4 ${i < Math.round(rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`} />)); };
-
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Bọc nội dung chính trong một container có width tối đa cố định (ví dụ: 1280px) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <>
+      <style>{checkboxStyle}</style>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* Breadcrumb */}
-        <div className="text-sm text-gray-500 mb-6 flex items-center gap-1">
-          <span className="hover:text-red-600 cursor-pointer transition-colors" onClick={() => navigate('/')}>Trang chủ</span>
-          <IoChevronForward className="w-3 h-3 text-gray-400" />
-          <span className="hover:text-red-600 cursor-pointer transition-colors">Danh mục</span>
-          <IoChevronForward className="w-3 h-3 text-gray-400" />
-          <span className="text-gray-900 font-medium">Tất cả sản phẩm</span>
+        <div className="mb-8 flex items-center gap-2 bg-white px-5 py-3 rounded-xl shadow-sm border border-gray-100">
+          <span className="text-sm font-medium text-gray-600 hover:text-blue-600 cursor-pointer transition-colors" onClick={() => navigate('/')}>
+            🏠 Trang chủ
+          </span>
+          <IoChevronForward className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-medium text-gray-600 hover:text-blue-600 cursor-pointer transition-colors">
+            📂 Danh mục
+          </span>
+          <IoChevronForward className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Tất cả sản phẩm
+          </span>
         </div>
 
-        {/* Main Content: Sidebar + Banner + Products */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-8">
 
-          {/* Sidebar (Filter Column) - CỐ ĐỊNH WIDTH */}
-          <aside className="lg:w-64 flex-shrink-0">
+          {/* Sidebar */}
+          <aside className="lg:w-72 flex-shrink-0 space-y-6">
 
-            {/* Search Bar (Di chuyển vào Sidebar) */}
-            <div className="relative mb-6">
-              <IoSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500 transition-shadow"
-              />
+            {/* Search Box */}
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl opacity-75 group-hover:opacity-100 blur transition duration-300"></div>
+              <div className="relative bg-white rounded-xl shadow-lg overflow-hidden">
+                <IoSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-blue-500 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="🔍 Tìm kiếm sản phẩm..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3.5 focus:outline-none text-gray-700 font-medium"
+                />
+              </div>
             </div>
 
-            {/* Danh mục sản phẩm - Collapsible */}
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
+            {/* Categories */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
               <div
-                className="p-4 border-b border-gray-200 flex justify-between items-center cursor-pointer select-none"
+                className="p-4 bg-gradient-to-r from-blue-500 to-blue-600 flex justify-between items-center cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all"
                 onClick={() => setIsCategoryFilterOpen(!isCategoryFilterOpen)}
               >
-                <h3 className="font-semibold text-gray-900">Danh mục sản phẩm</h3>
-                <IoChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isCategoryFilterOpen ? 'rotate-180' : 'rotate-0'}`} />
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  📦 Danh mục
+                  {selectedCategories.length > 0 && (
+                    <span className="ml-2 bg-white text-blue-600 text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+                      {selectedCategories.length}
+                    </span>
+                  )}
+                </h3>
+                <IoChevronDown className={`w-5 h-5 text-white transition-transform duration-300 ${isCategoryFilterOpen ? 'rotate-180' : ''}`} />
               </div>
               {isCategoryFilterOpen && (
-                <ul className="p-4 space-y-2 text-sm max-h-80 overflow-y-auto">
-                  {/* Các mục tĩnh */}
-                  <li className="text-gray-600 hover:text-red-600 cursor-pointer transition-colors">Được mua nhiều gần đây</li>
-                  <li className="text-gray-600 hover:text-red-600 cursor-pointer transition-colors">Sản phẩm mới</li>
-                  {/* Danh mục từ API */}
+                <ul className="p-4 space-y-2 max-h-80 overflow-y-auto">
                   {categories.map(cat => {
-                    const cid = String(cat.id ?? cat.name ?? '').toLowerCase();
+                    const cid = String(cat.id ?? cat.name).toLowerCase();
                     const isChecked = selectedCategories.map(x => String(x).toLowerCase()).includes(cid);
+                    const isAllSelected = cat.id === 'all' && selectedCategories.length === 0;
                     return (
-                      <li key={String(cat.id ?? cat.name)} className={`cursor-pointer py-0.5 transition-colors flex justify-between items-center ${cat.id === 'all' ? 'border-t pt-2 mt-2 border-gray-200 font-semibold' : 'ml-0'}`}>
-                        <label className="flex items-center gap-2 w-full cursor-pointer">
+                      <li key={cid}>
+                        <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 cursor-pointer transition-colors">
                           <input
                             type="checkbox"
-                            checked={cat.id === 'all' ? selectedCategories.length === 0 : isChecked}
+                            checked={isAllSelected || isChecked}
                             onChange={() => {
                               if (cat.id === 'all') {
                                 setSelectedCategories([]);
-                                return;
+                              } else {
+                                setSelectedCategories(prev => {
+                                  const lowered = prev.map(x => String(x).toLowerCase());
+                                  if (lowered.includes(cid)) return prev.filter(x => String(x).toLowerCase() !== cid);
+                                  return [...prev, cat.name];
+                                });
                               }
-                              setSelectedCategories(prev => {
-                                const lowered = prev.map(x => String(x).toLowerCase());
-                                if (lowered.includes(cid)) return prev.filter(x => String(x).toLowerCase() !== cid);
-                                return [...prev, cat.id ?? cat.name];
-                              });
                             }}
+                            className="category-checkbox"
                           />
-                          <span className="flex-1 text-left">{cat.name}</span>
-                          <span className="text-xs text-gray-500">({cat.count})</span>
+                          <span className="text-sm font-medium text-gray-700 flex-1">
+                            {cat.name}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {cat.count}
+                          </span>
                         </label>
                       </li>
                     );
@@ -642,79 +457,88 @@ const CustomerShop = () => {
               )}
             </div>
 
-            {/* Nhà cung cấp (Placeholder) - Collapsible */}
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
+            {/* Suppliers */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
               <div
-                className="p-4 border-b border-gray-200 flex justify-between items-center cursor-pointer select-none"
+                className="p-4 bg-gradient-to-r from-purple-500 to-purple-600 flex justify-between items-center cursor-pointer hover:from-purple-600 hover:to-purple-700 transition-all"
                 onClick={() => setIsSupplierFilterOpen(!isSupplierFilterOpen)}
               >
-                <h3 className="font-semibold text-gray-900">Nhà cung cấp</h3>
-                <IoChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isSupplierFilterOpen ? 'rotate-180' : 'rotate-0'}`} />
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  🏢 Nhà cung cấp
+                </h3>
+                <IoChevronDown className={`w-5 h-5 text-white transition-transform duration-300 ${isSupplierFilterOpen ? 'rotate-180' : ''}`} />
               </div>
               {isSupplierFilterOpen && (
-                <ul className="p-4 space-y-2 text-sm max-h-60 overflow-y-auto">
-                  <li className={`cursor-pointer py-0.5 transition-colors flex justify-between items-center ${selectedSuppliers.length === 0 ? 'text-red-600 font-bold' : 'text-gray-700 hover:text-red-600'}`}>
-                    <label className="flex items-center gap-2 w-full cursor-pointer">
-                      <input type="checkbox" checked={selectedSuppliers.length === 0} onChange={() => { setSelectedSuppliers([]); }} />
-                      <span className="flex-1 text-left">Tất cả</span>
+                <ul className="p-4 space-y-2 max-h-60 overflow-y-auto">
+                  <li>
+                    <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-purple-50 cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedSuppliers.length === 0}
+                        onChange={() => setSelectedSuppliers([])}
+                        className="supplier-checkbox"
+                      />
+                      <span className="text-sm font-medium text-gray-700">Tất cả</span>
                     </label>
                   </li>
-                  {apiSuppliers.length > 0 ? apiSuppliers.map(s => {
-                    const sid = String(s.id ?? s.name ?? '').toLowerCase();
+                  {apiSuppliers.map(s => {
+                    const sid = String(s.tenNhaCungCap ?? s.name).toLowerCase();
                     const isChecked = selectedSuppliers.map(x => String(x).toLowerCase()).includes(sid);
                     return (
-                      <li key={String(s.id ?? s.name)} className={`cursor-pointer py-0.5 transition-colors flex justify-between items-center ${isChecked ? 'text-red-600 font-bold' : 'text-gray-700 hover:text-red-600'}`}>
-                        <label className="flex items-center gap-2 w-full cursor-pointer">
-                          <input type="checkbox" checked={isChecked} onChange={() => {
-                            setSelectedSuppliers(prev => {
-                              const lowered = prev.map(x => String(x).toLowerCase());
-                              if (lowered.includes(sid)) return prev.filter(x => String(x).toLowerCase() !== sid);
-                              return [...prev, s.id ?? s.name];
-                            });
-                          }} />
-                          <span className="flex-1 text-left">{s.name || 'Không tên'}</span>
+                      <li key={s.maNhaCungCap ?? s.id}>
+                        <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-purple-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setSelectedSuppliers(prev => {
+                                const lowered = prev.map(x => String(x).toLowerCase());
+                                if (lowered.includes(sid)) return prev.filter(x => String(x).toLowerCase() !== sid);
+                                return [...prev, s.tenNhaCungCap ?? s.name];
+                              });
+                            }}
+                            className="supplier-checkbox"
+                          />
+                          <span className="text-sm font-medium text-gray-700">{s.tenNhaCungCap ?? s.name}</span>
                         </label>
                       </li>
                     );
-                  }) : (
-                    <li className="text-sm text-gray-500">Chưa có nhà cung cấp</li>
-                  )}
+                  })}
                 </ul>
               )}
             </div>
 
-            {/* Lọc theo Giá - Collapsible */}
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm mb-6">
+            {/* Price Range */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
               <div
-                className="p-4 border-b border-gray-200 flex justify-between items-center cursor-pointer select-none"
+                className="p-4 bg-gradient-to-r from-green-500 to-green-600 flex justify-between items-center cursor-pointer hover:from-green-600 hover:to-green-700 transition-all"
                 onClick={() => setIsPriceFilterOpen(!isPriceFilterOpen)}
               >
-                <h3 className="font-semibold text-gray-900">Giá</h3>
-                <IoChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isPriceFilterOpen ? 'rotate-180' : 'rotate-0'}`} />
+                <h3 className="font-bold text-white flex items-center gap-2">
+                  💰 Khoảng giá
+                </h3>
+                <IoChevronDown className={`w-5 h-5 text-white transition-transform duration-300 ${isPriceFilterOpen ? 'rotate-180' : ''}`} />
               </div>
               {isPriceFilterOpen && (
-                <div className="p-4 space-y-3 text-sm">
-                  {([
-                    { min: 0, max: 999999999, label: 'Tất cả giá', id: 'all' },
-                    { min: 0, max: 1000000, label: 'Dưới 1.000.000 VNĐ', id: 'range1' },
-                    { min: 1000000, max: 2000000, label: '1.000.000 - 2.000.000 VNĐ', id: 'range2' },
-                    { min: 2000000, max: 3000000, label: '2.000.000 - 3.000.000 VNĐ', id: 'range3' },
-                    { min: 3000000, max: 4000000, label: '3.000.000 - 4.000.000 VNĐ', id: 'range4' },
-                    { min: 4000001, max: 999999999, label: 'Trên 4.000.000 VNĐ', id: 'range5' },
-                  ]).map(range => (
-                    <div key={range.id} className="flex items-center">
+                <div className="p-4 space-y-3">
+                  {[
+                    { min: 0, max: 999999999, label: 'Tất cả', id: 'all' },
+                    { min: 0, max: 1000000, label: 'Dưới 1 triệu', id: 'range1' },
+                    { min: 1000000, max: 2000000, label: '1-2 triệu', id: 'range2' },
+                    { min: 2000000, max: 3000000, label: '2-3 triệu', id: 'range3' },
+                    { min: 3000000, max: 4000000, label: '3-4 triệu', id: 'range4' },
+                    { min: 4000001, max: 999999999, label: 'Trên 4 triệu', id: 'range5' },
+                  ].map(range => (
+                    <label key={range.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-green-50 cursor-pointer transition-colors">
                       <input
                         type="radio"
-                        id={`price-${range.id}`}
                         name="price-range"
                         checked={minPrice === range.min && maxPrice === range.max}
                         onChange={() => handlePriceRangeChange(range.min, range.max)}
-                        className="w-4 h-4 text-red-600 border-gray-300 rounded-full focus:ring-red-500 transition-colors"
+                        className="w-4 h-4 text-green-600 focus:ring-2 focus:ring-green-500"
                       />
-                      <label htmlFor={`price-${range.id}`} className="ml-3 text-gray-700 cursor-pointer hover:text-red-600 transition-colors">
-                        {range.label}
-                      </label>
-                    </div>
+                      <span className="text-sm font-medium text-gray-700">{range.label}</span>
+                    </label>
                   ))}
                 </div>
               )}
@@ -723,139 +547,139 @@ const CustomerShop = () => {
             {/* Reset Button */}
             <button
               onClick={resetFilters}
-              className="w-full flex items-center justify-center gap-1 p-2 border border-red-600 text-red-600 rounded-md hover:bg-red-600 hover:text-white transition-colors text-sm font-medium shadow-sm"
+              className="w-full flex items-center justify-center gap-2 p-3.5 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-xl hover:from-red-600 hover:to-pink-600 transition-all font-bold shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              <IoFunnel className="w-4 h-4" /> ĐẶT LẠI BỘ LỌC
+              <IoFunnel className="w-5 h-5" />
+              🔄 Đặt lại bộ lọc
             </button>
           </aside>
 
-          {/* Product List (Main Column) */}
-          <main className="flex-1 min-w-0">
+          {/* Main Content */}
+          <main className="flex-1 min-w-0 space-y-8">
 
-            {/* Banner LỚN - Giống hình ảnh cung cấp */}
-            <div className="mb-6 relative h-64 bg-gray-200 rounded-md overflow-hidden flex items-center justify-center">
-              {/* Đây là nơi Banner Lớn sẽ được đặt. Giả lập một banner sale. */}
-              <div className="text-center">
-                <p className="text-4xl font-extrabold text-red-600">SALE UP TO 80%</p>
-                <p className="text-xl text-gray-800 mt-1">TOÀN BỘ SẢN PHẨM NỘI THẤT VÀ TRANG TRÍ</p>
+            {/* Hero Banner */}
+            <div className="relative h-80 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl overflow-hidden shadow-2xl group">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxIDEuNzktNCA0LTRzNCAxLjc5IDQgNC0xLjc5IDQtNCA0LTQtMS43OS00LTR6bTAgMTBjMC0yLjIxIDEuNzktNCA0LTRzNCAxLjc5IDQgNC0xLjc5IDQtNCA0LTQtMS43OS00LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
+              <div className="relative h-full flex flex-col items-center justify-center text-center px-6 z-10">
+                <span className="inline-block bg-white/20 backdrop-blur-sm text-white px-6 py-2 rounded-full text-sm font-bold mb-4 animate-bounce">
+                  🔥 HOT SALE
+                </span>
+                <h2 className="text-6xl font-black text-white mb-4 drop-shadow-2xl transform group-hover:scale-110 transition-transform">
+                  SALE UP TO 80%
+                </h2>
+                <p className="text-2xl text-white/90 font-semibold drop-shadow-lg mb-6">
+                  ✨ TOÀN BỘ SẢN PHẨM NỘI THẤT VÀ TRANG TRÍ ✨
+                </p>
+                <button className="px-8 py-3 bg-white text-blue-600 font-bold rounded-full shadow-xl hover:shadow-2xl transform hover:scale-110 transition-all">
+                  🛍️ MUA NGAY
+                </button>
               </div>
             </div>
 
-            {/* Heading và Sort/View Mode */}
-            <div className="flex justify-between items-center mb-6">
-              <div className="text-xl font-bold text-gray-900 flex items-baseline gap-3">
-                <span>Tất cả sản phẩm</span>
-                <span className="text-base font-normal text-gray-500">({filteredProducts.length} sản phẩm)</span>
+            {/* Products Header */}
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-white p-5 rounded-xl shadow-md border border-gray-100">
+              <div className="flex items-center gap-4">
+                <h2 className="text-2xl font-black bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  🏪 Tất cả sản phẩm
+                </h2>
+                <span className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full text-sm font-bold shadow-lg">
+                  {filteredProducts.length} sản phẩm
+                </span>
               </div>
-
-              {/* Sort select box + View Mode */}
               <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-700">Sắp xếp:</span>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="pl-3 pr-8 py-2 border border-gray-300 rounded-md text-gray-700 text-sm appearance-none bg-white focus:outline-none focus:ring-1 focus:ring-red-600 cursor-pointer transition-shadow"
-                  >
-                    <option value="newest">Mới nhất</option>
-                    <option value="price-low">Giá thấp nhất</option>
-                    <option value="price-high">Giá cao nhất</option>
-                    <option value="rating">Đánh giá cao</option>
-                    <option value="name">Tên A-Z</option>
-                  </select>
-                  <IoChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                </div>
+                <span className="text-sm font-semibold text-gray-600">🔽 Sắp xếp:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="pl-4 pr-10 py-2.5 border-2 border-gray-200 rounded-xl text-gray-700 font-medium bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer hover:border-blue-400 shadow-sm transition-all"
+                >
+                  <option value="newest">🆕 Mới nhất</option>
+                  <option value="price-low">💸 Giá thấp nhất</option>
+                  <option value="price-high">💎 Giá cao nhất</option>
+                  <option value="rating">⭐ Đánh giá cao</option>
+                  <option value="name">🔤 Tên A-Z</option>
+                </select>
               </div>
             </div>
 
-            {/* Products Grid - Bố cục 4 cột linh hoạt */}
-            <div className="grid gap-6 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-              {isLoading ? (
-                <div className="col-span-full text-center py-20 text-gray-500 text-lg">Đang tải sản phẩm...</div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="col-span-full text-center py-20 text-gray-500 text-lg">Không tìm thấy sản phẩm nào phù hợp với bộ lọc.</div>
-              ) : (
-                filteredProducts.map((product) => (
+            {/* Products Grid */}
+            {isLoading ? (
+              <div className="text-center py-32">
+                <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-4"></div>
+                <p className="text-gray-600 text-lg font-semibold">⏳ Đang tải sản phẩm...</p>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-32 bg-white rounded-2xl shadow-lg">
+                <div className="text-6xl mb-4">🔍</div>
+                <p className="text-gray-600 text-xl font-semibold mb-2">Không tìm thấy sản phẩm</p>
+                <p className="text-gray-500">Hãy thử điều chỉnh bộ lọc của bạn</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredProducts.map(product => (
                   <div
                     key={product.id}
-                    className="bg-white rounded-md overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer relative group"
+                    className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-md hover:shadow-2xl transition-all duration-300 group transform hover:-translate-y-2"
                   >
-                    {/* Product Image & Actions */}
+                    {/* Product Image */}
                     <div
                       onClick={() => handleViewProduct(product)}
-                      className="relative w-full h-48 overflow-hidden bg-gray-100"
+                      className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 cursor-pointer"
                     >
-                      {(() => {
-                        const imgSrc = resolveImageUrl(product.image);
-                        return imgSrc ? (
-                          <img
-                            src={imgSrc}
-                            alt={product.name}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            loading="lazy"
-                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = ''; }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-400">No image</div>
-                        );
-                      })()}
-
-                      {/* Discount Tag */}
-                      {((product.lowestVariantDiscountPercent != null && product.lowestVariantDiscountPercent > 0) || (product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0)) && (
-                        <span className="absolute top-3 left-3 bg-red-600 text-white px-2 py-0.5 text-xs font-semibold rounded shadow-md">
-                          -{product.lowestVariantDiscountPercent ?? product.discountPercent ?? product.discount}%
+                      <img
+                        src={product.image || 'https://via.placeholder.com/300'}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      
+                      {/* Discount Badge */}
+                      {product.discountPercent > 0 && (
+                        <span className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1.5 text-xs font-bold rounded-lg shadow-lg animate-pulse">
+                          🔥 -{product.discountPercent}%
                         </span>
                       )}
-
-                      {/* Hover Actions: Heart (visible always) + Cart (on hover) */}
+                      
+                      {/* Favorite Button */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); toggleFavorite(product); }}
-                        className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-lg transition-colors hover:bg-red-50"
-                        aria-label="Thêm yêu thích"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(product.id);
+                        }}
+                        className="absolute top-3 right-3 p-2.5 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:scale-110 transition-all"
                       >
-                        <IoHeart className={`w-5 h-5 transition-colors ${favorites.includes(product.id) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`} />
+                        <IoHeart className={`w-5 h-5 ${favoriteIds.has(product.id) ? 'text-red-500' : 'text-gray-400'}`} />
                       </button>
                     </div>
 
                     {/* Product Info */}
-                    <div className="p-4 text-center">
-
-                      {/* Category Name/Brand */}
-                      <p className="text-xs text-gray-500 uppercase mb-1">{product.category || 'THƯƠNG HIỆU'}</p>
-
-                      {/* Name */}
+                    <div className="p-5">
+                      <p className="text-xs font-bold text-blue-600 uppercase mb-2 tracking-wide">
+                        📁 {product.category || 'Sản phẩm'}
+                      </p>
                       <h3
-                        className="font-semibold text-gray-900 mb-2 text-base h-10 overflow-hidden hover:text-red-600 transition-colors"
                         onClick={() => handleViewProduct(product)}
+                        className="font-bold text-gray-900 mb-3 text-base h-12 overflow-hidden hover:text-blue-600 transition-colors cursor-pointer line-clamp-2"
                         title={product.name}
                       >
                         {product.name}
                       </h3>
 
-                      {/* Rating and stock */}
-                      <div className="flex items-center justify-center gap-3 mb-2">
+                      {/* Rating & Stock */}
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-1">
                           {renderStars(product.rating)}
-                          <span className="text-xs text-gray-500">({product.reviews || 0})</span>
+                          <span className="text-xs text-gray-500 ml-1">({product.reviews})</span>
                         </div>
-                        <div className={`text-xs ${product.inStock ? 'text-green-600' : 'text-red-500'}`}>
-                          {product.inStock ? `Còn ${product.stockCount || 1}` : 'Hết hàng'}
-                        </div>
+                        <span className={`text-xs font-semibold ${product.inStock ? 'text-green-600' : 'text-red-500'}`}>
+                          {product.inStock ? `✓ Còn ${product.stockCount}` : '✗ Hết hàng'}
+                        </span>
                       </div>
 
                       {/* Price */}
-                      <div className="flex items-center justify-center gap-2 mb-4">
-                        {/* Giá khuyến mãi/Giá hiện tại (Màu ĐỎ) */}
-                        <span className="text-lg font-bold text-red-600">
-                          {product.lowestVariantFinalPrice != null ? (
-                            formatPrice(product.lowestVariantFinalPrice)
-                          ) : product.priceRange && product.priceRange.min != null && product.priceRange.max != null && product.priceRange.min !== product.priceRange.max
-                            ? `${formatPrice(product.priceRange.min)} - ${formatPrice(product.priceRange.max)}`
-                            : (product.price > 0 ? formatPrice(product.price) : 'Liên hệ')
-                          }
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xl font-bold text-blue-600">
+                          {formatPrice(product.price)}
                         </span>
-
-                        {/* Giá gốc (Màu XÁM, gạch ngang) */}
                         {product.originalPrice > 0 && product.isOnSale && (
                           <span className="text-sm text-gray-500 line-through">
                             {formatPrice(product.originalPrice)}
@@ -863,43 +687,45 @@ const CustomerShop = () => {
                         )}
                       </div>
 
-                      {/* Button Thêm vào giỏ hàng (Text) */}
+                      {/* Add to Cart Button */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
                         disabled={!product.inStock}
-                        className={`
-                          w-full flex items-center justify-center gap-2 p-3 rounded-md font-bold text-sm uppercase transition-all duration-300
-                          ${product.inStock
-                            ? 'bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg transform group-hover:scale-105'
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'}
-                        `}
+                        className={`w-full flex items-center justify-center gap-2 p-3.5 rounded-xl font-bold text-sm uppercase transition-all shadow-lg ${
+                          product.inStock
+                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 hover:shadow-2xl transform hover:scale-105 active:scale-95'
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
+                        }`}
                       >
-                        <IoCart className="w-4 h-4" />
-                        {product.inStock ? 'THÊM VÀO GIỎ' : 'HẾT HÀNG'}
+                        <IoCart className="w-5 h-5" />
+                        {product.inStock ? '🛒 Thêm vào giỏ' : '❌ Hết hàng'}
                       </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Pagination */}
-            <div className="mt-12 flex justify-center">
-              <div className="flex gap-1 text-sm">
-                <button className="px-3 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
-                  Trước
+            <div className="flex justify-center mt-12">
+              <div className="flex gap-2 bg-white rounded-2xl shadow-lg p-2">
+                <button className="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all font-semibold">
+                  ← Trước
                 </button>
-                <button className="px-4 py-2 bg-red-600 text-white font-bold rounded-md shadow-md">
+                <button className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-xl shadow-lg">
                   1
                 </button>
-                <button className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+                <button className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all font-semibold">
                   2
                 </button>
-                <button className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+                <button className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all font-semibold">
                   3
                 </button>
-                <button className="px-3 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
-                  Sau
+                <button className="px-4 py-2.5 border-2 border-gray-200 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 hover:text-white hover:border-transparent transition-all font-semibold">
+                  Sau →
                 </button>
               </div>
             </div>
@@ -907,36 +733,8 @@ const CustomerShop = () => {
           </main>
         </div>
       </div>
-
-      {/* Product Detail Modal - Giữ nguyên */}
-      {showProductDetail && selectedProduct && (
-        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-          <CustomerProductDetail
-            product={selectedProduct}
-            onBack={handleBackToShop}
-            onAddToCart={(cartItem) => {
-              // Ensure user is logged in before adding
-              if (!user) {
-                window.location.href = '/login';
-                return;
-              }
-              try {
-                const variant = cartItem.bienTheChon || cartItem.bienThe || cartItem.variant || null;
-                const qty = cartItem.soLuong || cartItem.quantity || 1;
-                const ok = addToCart(cartItem, variant, qty);
-                if (ok !== false) {
-                  alert(`Đã thêm ${cartItem.tenSanPham || cartItem.name || 'sản phẩm'} vào giỏ hàng!`);
-                }
-              } catch (e) {
-                console.error('Failed to add from modal', e);
-                alert('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
-              }
-            }}
-            onToggleFavorite={(productId) => toggleFavorite(productId)}
-          />
-        </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 };
 

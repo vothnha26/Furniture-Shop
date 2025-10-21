@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IoAdd, IoSearch, IoCreate, IoTrash, IoEye, IoPerson, IoMail, IoCall, IoLocation, IoStar, IoStarOutline } from 'react-icons/io5';
+import { IoAdd, IoSearch, IoCreate, IoTrash, IoEye, IoPerson, IoCall, IoLocation, IoStar } from 'react-icons/io5';
 import api from '../../../api';
 
 const CustomerManagement = () => {
@@ -12,25 +12,33 @@ const CustomerManagement = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedVipLevel, setSelectedVipLevel] = useState('all');
+  const [selectedVipLevel, setSelectedVipLevel] = useState('all'); // 'all' | tierId
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
     phone: '',
     address: '',
-    vipLevel: 'silver'
+    vipLevelId: ''
   });
 
-  const vipLevels = [
-    { value: 'silver', label: 'Bạc', color: 'bg-gray-100 text-gray-800' },
-    { value: 'gold', label: 'Vàng', color: 'bg-yellow-100 text-yellow-800' },
-    { value: 'platinum', label: 'Bạch kim', color: 'bg-purple-100 text-purple-800' },
-    { value: 'diamond', label: 'Kim cương', color: 'bg-blue-100 text-blue-800' }
-  ];
-
-  const getVipLevelInfo = (level) => {
-    return vipLevels.find(vip => vip.value === level) || vipLevels[0];
+  // Real membership tiers from API
+  const [tiers, setTiers] = useState([]); // {maHangThanhVien, tenHang, mauSac, diemToiThieu}
+  const getVipBadge = (name, color) => {
+    if (!name) return (
+      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">—</span>
+    );
+    const bg = (color || '#f3f4f6') + '22';
+    const fg = color || '#374151';
+    const border = color || '#e5e7eb';
+    return (
+      <span
+        className="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+        style={{ backgroundColor: bg, color: fg, border: `1px solid ${border}` }}
+      >
+        {name}
+      </span>
+    );
   };
 
   // Map API customer object -> UI shape
@@ -40,12 +48,14 @@ const CustomerManagement = () => {
     email: c.email || '',
     phone: c.soDienThoai || c.phone || '',
     address: c.diaChi || c.address || '',
-    totalOrders: c.tongSoDonHang || c.totalOrders || 0,
-    totalSpent: c.tongChiTieu || c.totalSpent || 0,
+    totalOrders: c.tongDonHang ?? c.tongSoDonHang ?? c.totalOrders ?? 0,
+    totalSpent: c.tongChiTieu ?? c.totalSpent ?? 0,
     lastOrder: c.donHangCuoi || c.lastOrder || '',
     status: c.trangThai === false ? 'inactive' : (c.trangThai || 'active'),
-    vipLevel: (c.maHangThanhVien && String(c.maHangThanhVien)) || c.vipLevel || 'silver',
-    joinDate: c.ngayTao || c.joinDate || ''
+    vipLevelId: c?.hangThanhVien?.maHangThanhVien ?? c?.maHangThanhVien ?? null,
+    vipLevelName: c?.hangThanhVien?.tenHang ?? null,
+    vipLevelColor: c?.hangThanhVien?.mauSac ?? null,
+    joinDate: c.ngayThamGia || c.ngayTao || c.joinDate || ''
   });
 
   // Map UI shape -> API payload for create/update (assumptions)
@@ -54,7 +64,7 @@ const CustomerManagement = () => {
     email: u.email,
     soDienThoai: u.phone,
     diaChi: u.address,
-    maHangThanhVien: u.vipLevel
+    maHangThanhVien: u.vipLevelId || u.vipLevel || null
   });
 
   useEffect(() => {
@@ -77,7 +87,24 @@ const CustomerManagement = () => {
         setIsLoading(false);
       }
     };
+    const fetchTiers = async () => {
+      try {
+        const res = await api.get('/api/hang-thanh-vien/all');
+        const list = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
+        // sort by diemToiThieu then name
+        const sorted = [...list].sort((a, b) => {
+          const da = a?.diemToiThieu ?? 0;
+          const db = b?.diemToiThieu ?? 0;
+          if (da !== db) return da - db;
+          return (a?.tenHang || '').localeCompare(b?.tenHang || '');
+        });
+        setTiers(sorted);
+      } catch (e) {
+        console.error('Fetch tiers error', e);
+      }
+    };
     fetchCustomers();
+    fetchTiers();
   }, []);
 
   const handleAddCustomer = () => {
@@ -92,7 +119,7 @@ const CustomerManagement = () => {
         console.error('Add customer error', err);
         setError(err);
       } finally {
-        setNewCustomer({ name: '', email: '', phone: '', address: '', vipLevel: 'silver' });
+        setNewCustomer({ name: '', email: '', phone: '', address: '', vipLevelId: '' });
         setShowAddModal(false);
       }
     };
@@ -144,9 +171,22 @@ const CustomerManagement = () => {
                          customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          customer.phone.includes(searchTerm);
     const matchesStatus = selectedStatus === 'all' || customer.status === selectedStatus;
-    const matchesVipLevel = selectedVipLevel === 'all' || customer.vipLevel === selectedVipLevel;
+    const matchesVipLevel = selectedVipLevel === 'all' || String(customer.vipLevelId) === String(selectedVipLevel);
     return matchesSearch && matchesStatus && matchesVipLevel;
   });
+
+  // Helpers for stats
+  const normalize = (s) => (s || '').toString().trim().toLowerCase();
+  const isGoldPlus = (name) => {
+    const n = normalize(name);
+    return n.includes('vàng') || n.includes('gold') || n.includes('bạch kim') || n.includes('platinum') || n.includes('kim cương') || n.includes('diamond');
+  };
+  const isPlatinumPlus = (name) => {
+    const n = normalize(name);
+    return n.includes('bạch kim') || n.includes('platinum') || n.includes('kim cương') || n.includes('diamond');
+  };
+  const goldPlusCount = customers.filter(c => isGoldPlus(c.vipLevelName)).length;
+  const platinumPlusCount = customers.filter(c => isPlatinumPlus(c.vipLevelName)).length;
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -190,9 +230,7 @@ const CustomerManagement = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">VIP Gold+</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {customers.filter(customer => ['gold', 'platinum', 'diamond'].includes(customer.vipLevel)).length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{goldPlusCount}</p>
               </div>
             </div>
           </div>
@@ -203,9 +241,7 @@ const CustomerManagement = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">VIP Platinum+</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {customers.filter(customer => ['platinum', 'diamond'].includes(customer.vipLevel)).length}
-                </p>
+                <p className="text-2xl font-bold text-gray-900">{platinumPlusCount}</p>
               </div>
             </div>
           </div>
@@ -240,11 +276,10 @@ const CustomerManagement = () => {
                 onChange={(e) => setSelectedVipLevel(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="all">Tất cả VIP</option>
-                <option value="silver">Bạc</option>
-                <option value="gold">Vàng</option>
-                <option value="platinum">Bạch kim</option>
-                <option value="diamond">Kim cương</option>
+                <option value="all">Tất cả hạng</option>
+                {tiers.map(t => (
+                  <option key={t.maHangThanhVien} value={t.maHangThanhVien}>{t.tenHang}</option>
+                ))}
               </select>
             </div>
 
@@ -258,6 +293,11 @@ const CustomerManagement = () => {
             </button>
           </div>
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">Đã xảy ra lỗi khi tải dữ liệu. Vui lòng thử lại.</div>
+        )}
 
         {/* Customers Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -289,8 +329,12 @@ const CustomerManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredCustomers.map((customer) => {
-                  const vipInfo = getVipLevelInfo(customer.vipLevel);
+                {isLoading && (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-6 text-center text-gray-500">Đang tải...</td>
+                  </tr>
+                )}
+                {!isLoading && filteredCustomers.map((customer) => {
                   return (
                     <tr key={customer.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -315,15 +359,13 @@ const CustomerManagement = () => {
                         <div className="text-sm text-gray-500">{customer.phone}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${vipInfo.color}`}>
-                          {vipInfo.label}
-                        </span>
+                        {getVipBadge(customer.vipLevelName, customer.vipLevelColor)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {customer.totalOrders}
+                        {Number(customer.totalOrders || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {customer.totalSpent.toLocaleString('vi-VN')}đ
+                        {Number(customer.totalSpent || 0).toLocaleString('vi-VN')}đ
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -420,18 +462,15 @@ const CustomerManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    VIP Level
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hạng thành viên</label>
                   <select
-                    value={newCustomer.vipLevel}
-                    onChange={(e) => setNewCustomer({...newCustomer, vipLevel: e.target.value})}
+                    value={newCustomer.vipLevelId}
+                    onChange={(e) => setNewCustomer({...newCustomer, vipLevelId: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    {vipLevels.map(level => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
-                      </option>
+                    <option value="">Chọn hạng</option>
+                    {tiers.map(t => (
+                      <option key={t.maHangThanhVien} value={t.maHangThanhVien}>{t.tenHang}</option>
                     ))}
                   </select>
                 </div>
@@ -480,10 +519,8 @@ const CustomerManagement = () => {
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <span className="text-sm text-gray-600">VIP Level: </span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getVipLevelInfo(selectedCustomer.vipLevel).color}`}>
-                      {getVipLevelInfo(selectedCustomer.vipLevel).label}
-                    </span>
+                    <span className="text-sm text-gray-600">Hạng thành viên: </span>
+                    {getVipBadge(selectedCustomer.vipLevelName, selectedCustomer.vipLevelColor)}
                   </div>
                   <div>
                     <span className="text-sm text-gray-600">Tổng đơn hàng: </span>
@@ -491,7 +528,7 @@ const CustomerManagement = () => {
                   </div>
                   <div>
                     <span className="text-sm text-gray-600">Tổng chi tiêu: </span>
-                    <span className="text-sm font-medium">{selectedCustomer.totalSpent.toLocaleString('vi-VN')}đ</span>
+                    <span className="text-sm font-medium">{Number(selectedCustomer.totalSpent || 0).toLocaleString('vi-VN')}đ</span>
                   </div>
                   <div>
                     <span className="text-sm text-gray-600">Đơn hàng cuối: </span>
@@ -571,18 +608,15 @@ const CustomerManagement = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      VIP Level
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Hạng thành viên</label>
                     <select
-                      value={selectedCustomer.vipLevel}
-                      onChange={(e) => setSelectedCustomer({...selectedCustomer, vipLevel: e.target.value})}
+                      value={selectedCustomer.vipLevelId || ''}
+                      onChange={(e) => setSelectedCustomer({...selectedCustomer, vipLevelId: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      {vipLevels.map(level => (
-                        <option key={level.value} value={level.value}>
-                          {level.label}
-                        </option>
+                      <option value="">Chọn hạng</option>
+                      {tiers.map(t => (
+                        <option key={t.maHangThanhVien} value={t.maHangThanhVien}>{t.tenHang}</option>
                       ))}
                     </select>
                   </div>

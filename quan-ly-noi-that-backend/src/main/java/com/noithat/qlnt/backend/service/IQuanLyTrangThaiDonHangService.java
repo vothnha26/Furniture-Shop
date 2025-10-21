@@ -10,9 +10,11 @@ public interface IQuanLyTrangThaiDonHangService {
     String CHO_XAC_NHAN = "CHO_XAC_NHAN";
     String XAC_NHAN = "XAC_NHAN";
     String DANG_CHUAN_BI = "DANG_CHUAN_BI";
-    String DANG_GIAO = "DANG_GIAO";
+    String DANG_GIAO_HANG = "DANG_GIAO_HANG"; // Đang giao hàng
+    String DA_GIAO_HANG = "DA_GIAO_HANG"; // Đã giao hàng
     String HOAN_THANH = "HOAN_THANH";
     String HUY_BO = "HUY_BO";
+    String DA_HUY = "DA_HUY";
     // Vietnamese-named method kept for backward compatibility
     void capNhatTrangThai(Integer maDonHang, String trangThai, String nguoiThayDoi, String ghiChu);
 

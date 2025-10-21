@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 @Entity
-@Table(name = "Voucher")
+@Table(name = "voucher")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,36 +15,46 @@ import java.util.Set;
 public class Voucher {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ma_voucher")
     private Integer maVoucher;
 
+    @Column(name = "ma_code")
     private String maCode;
     
+    @Column(name = "ten_voucher")
     private String tenVoucher;
     
+    @Column(name = "mo_ta")
     private String moTa;
 
-    @Column(name = "LoaiGiamGia", length = 20)
+    @Column(name = "loai_giam_gia", length = 20)
     private String loaiGiamGia; // 'PERCENTAGE' hoặc 'FIXED'
 
-    @Column(name = "GiaTriGiam", precision = 18, scale = 2)
+    @Column(name = "gia_tri_giam", precision = 18, scale = 2)
     private BigDecimal giaTriGiam;
     
-    @Column(name = "GiaTriDonHangToiThieu", precision = 18, scale = 2)
+    @Column(name = "gia_tri_don_hang_toi_thieu", precision = 18, scale = 2)
     private BigDecimal giaTriDonHangToiThieu = BigDecimal.ZERO;
     
-    @Column(name = "GiaTriGiamToiDa", precision = 18, scale = 2)
+    @Column(name = "gia_tri_giam_toi_da", precision = 18, scale = 2)
     private BigDecimal giaTriGiamToiDa;
 
+    @Column(name = "ngay_bat_dau")
     private LocalDateTime ngayBatDau;
+    @Column(name = "ngay_ket_thuc")
     private LocalDateTime ngayKetThuc;
     
+    @Column(name = "so_luong_toi_da")
     private Integer soLuongToiDa = 1000;
     
+    @Column(name = "so_luong_da_su_dung")
     private Integer soLuongDaSuDung = 0;
     
     // Voucher status: one of "CHUA_BAT_DAU", "DANG_HOAT_DONG", "DA_HET_HAN"
+    @Column(name = "trang_thai")
     private String trangThai = "DANG_HOAT_DONG";
 
+    @Column(name = "ap_dung_cho_moi_nguoi")
     private Boolean apDungChoMoiNguoi = true;
 
     @OneToMany(mappedBy = "voucher", cascade = CascadeType.ALL, orphanRemoval = true)

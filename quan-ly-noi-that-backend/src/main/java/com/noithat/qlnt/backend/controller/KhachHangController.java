@@ -272,9 +272,9 @@ public class KhachHangController {
                 return ResponseEntity.status(403).body("Bạn không có quyền xác nhận đơn hàng này");
             }
 
-            // Check if order is in "DA_GIAO_HANG" status
-            if (!"DA_GIAO_HANG".equals(donHang.getTrangThaiDonHang())) {
-                return ResponseEntity.status(400).body("Chỉ có thể xác nhận đơn hàng đã được giao");
+            // Check if transition to HOAN_THANH is allowed from current state
+            if (!quanLyTrangThaiService.canChangeStatus(maDonHang, IQuanLyTrangThaiDonHangService.HOAN_THANH)) {
+                return ResponseEntity.status(400).body("Trạng thái hiện tại của đơn không cho phép xác nhận hoàn thành");
             }
 
             // Update status to HOAN_THANH with customer confirmation

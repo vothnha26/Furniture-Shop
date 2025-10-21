@@ -45,9 +45,19 @@ public class DanhMucController {
         List<DanhMuc> list = danhMucService.getAll();
         List<DanhMucResponse> resp = list.stream().map(dm -> {
             Integer parentId = dm.getParent() != null ? dm.getParent().getMaDanhMuc() : null;
-            List<Integer> childrenIds = dm.getChildren() == null ? List.of() : dm.getChildren().stream().map(DanhMuc::getMaDanhMuc).collect(Collectors.toList());
+            String parentName = dm.getParent() != null ? dm.getParent().getTenDanhMuc() : null;
+            List<Integer> childrenIds = dm.getChildren() == null ? List.of()
+                    : dm.getChildren().stream().map(DanhMuc::getMaDanhMuc).collect(Collectors.toList());
             Long productCount = Long.valueOf(sanPhamRepository.countByDanhMuc_MaDanhMuc(dm.getMaDanhMuc()));
-            return new DanhMucResponse(dm.getMaDanhMuc(), dm.getTenDanhMuc(), dm.getMoTa(), parentId, childrenIds, productCount);
+            return new DanhMucResponse(
+                    dm.getMaDanhMuc(),
+                    dm.getTenDanhMuc(),
+                    dm.getMoTa(),
+                    parentId,
+                    parentId, // maDanhMucCha alias
+                    parentName, // tenDanhMucCha
+                    childrenIds,
+                    productCount);
         }).collect(Collectors.toList());
         return ResponseEntity.ok(resp);
     }

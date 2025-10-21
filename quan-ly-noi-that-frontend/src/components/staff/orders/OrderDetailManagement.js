@@ -15,49 +15,58 @@ const OrderDetailManagement = () => {
   const [editingDetail, setEditingDetail] = useState(null);
   const [deletingDetail, setDeletingDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [completing, setCompleting] = useState(false);
 
-  // Map order detail from API
-  const mapOrderDetailFromApi = (detail) => ({
-    maChiTiet: detail.maChiTiet || detail.id,
-    maDonHang: detail.donHang?.maDonHang || detail.orderId,
-    orderNumber: detail.donHang?.soDonHang || detail.orderNumber,
-    maBienThe: detail.bienTheSanPham?.maBienThe || detail.variantId,
-    productName: detail.bienTheSanPham?.sanPham?.tenSanPham || detail.productName,
-    variantName: detail.bienTheSanPham?.tenBienThe || detail.variantName,
-    soLuong: detail.soLuong || detail.quantity || 0,
-    donGiaGoc: detail.donGiaGoc || detail.originalPrice || 0,
-    donGiaThucTe: detail.donGia || detail.actualPrice || 0,
-    thanhTien: detail.thanhTien || detail.totalPrice || 0,
-    ghiChu: detail.ghiChu || detail.notes || ''
-  });
+  // Note: mapping helpers removed as not used in this component
 
-  const mapOrderDetailToApi = (detail) => ({
-    maDonHang: detail.maDonHang,
-    maBienThe: detail.maBienThe,
-    soLuong: detail.soLuong,
-    donGia: detail.donGiaThucTe,
-    ghiChu: detail.ghiChu
-  });
+  // Shared fetch function to reload lists
+  const fetchAll = async () => {
+    try {
+      const [ordersData, variantsData, detailsData] = await Promise.all([
+        api.get('/api/banhang/donhang').catch(() => []),
+        api.get('/api/products/variants').catch(() => []),
+        api.get('/api/banhang/chitietdonhang').catch(() => [])
+      ]);
 
-  // Fetch order details
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      setIsLoading(true);
-      try {
-        const data = await api.get('/api/banhang/donhang'); // Fixed: aligned with backend endpoint for orders
-        if (Array.isArray(data)) {
-          setOrderDetails(data.map(mapOrderDetailFromApi));
-        }
-      } catch (err) {
-        console.error('Fetch order details error', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
+      if (Array.isArray(ordersData)) {
+        setOrders(ordersData.map(order => ({
+          id: order.id || order.maDonHang,
+          maDonHang: order.maDonHang || order.soDonHang || order.id,
+          maKhachHang: order.khachHang?.maKhachHang || order.customerId || order.maKhachHang || null,
+          tenKhachHang: order.khachHang?.hoTen || order.customerName || '',
+          ngayDat: order.ngayTao || order.createdAt || '',
+          tongTien: order.tongTien || order.total || 0
+        })));
       }
-    };
-    fetchOrderDetails();
-  }, []);
+
+      if (Array.isArray(variantsData)) {
+        setProductVariants(variantsData.map(variant => ({
+          id: variant.maBienThe || variant.id,
+          maBienThe: variant.maBienThe || variant.variantCode,
+          tenSanPham: variant.sanPham?.tenSanPham || variant.productName || '',
+          thuocTinh: variant.thuocTinh || variant.attributes || '',
+          gia: variant.gia || variant.price || 0
+        })));
+      }
+
+      if (Array.isArray(detailsData)) {
+        const mapped = detailsData.map(detail => ({
+          id: detail.maChiTiet || detail.id,
+          maDonHang: detail.donHang?.maDonHang || detail.orderId,
+          maBienThe: detail.bienThe?.maBienThe || detail.variantId,
+          soLuong: detail.soLuong || detail.quantity || 0,
+          donGiaGoc: detail.donGiaGoc || detail.originalPrice || 0,
+          donGiaThucTe: detail.donGia || detail.actualPrice || 0,
+          donHang: detail.donHang || null,
+          bienThe: detail.bienThe || null
+        }));
+        setOrderDetails(mapped);
+        setFilteredDetails(mapped);
+      }
+    } catch (err) {
+      console.error('Fetch data error', err);
+    }
+  };
   const [formData, setFormData] = useState({
     maDonHang: '',
     maBienThe: '',
@@ -77,61 +86,8 @@ const OrderDetailManagement = () => {
 
   // Fetch data from APIs
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ordersData, variantsData, detailsData] = await Promise.all([
-          api.get('/api/banhang/donhang').catch(() => []),
-          api.get('/api/products/variants').catch(() => []),
-          api.get('/api/banhang/chitietdonhang').catch(() => [])
-        ]);
-
-        if (Array.isArray(ordersData)) {
-          setOrders(ordersData.map(order => ({
-            id: order.maDonHang || order.id,
-            maDonHang: order.maDonHang || order.soDonHang,
-            tenKhachHang: order.khachHang?.hoTen || order.customerName || '',
-            ngayDat: order.ngayTao || order.createdAt || '',
-            tongTien: order.tongTien || order.total || 0
-          })));
-        }
-
-        if (Array.isArray(variantsData)) {
-          setProductVariants(variantsData.map(variant => ({
-            id: variant.maBienThe || variant.id,
-            maBienThe: variant.maBienThe || variant.variantCode,
-            tenSanPham: variant.sanPham?.tenSanPham || variant.productName || '',
-            thuocTinh: variant.thuocTinh || variant.attributes || '',
-            gia: variant.gia || variant.price || 0
-          })));
-        }
-
-        if (Array.isArray(detailsData)) {
-          setOrderDetails(detailsData.map(detail => ({
-            id: detail.maChiTiet || detail.id,
-            maDonHang: detail.donHang?.maDonHang || detail.orderId,
-            maBienThe: detail.bienThe?.maBienThe || detail.variantId,
-            soLuong: detail.soLuong || detail.quantity || 0,
-            donGiaGoc: detail.donGiaGoc || detail.originalPrice || 0,
-            donGiaThucTe: detail.donGia || detail.actualPrice || 0,
-            donHang: detail.donHang || null,
-            bienThe: detail.bienThe || null
-          })));
-          setFilteredDetails(detailsData.map(detail => ({
-            id: detail.maChiTiet || detail.id,
-            maDonHang: detail.donHang?.maDonHang || detail.orderId,
-            maBienThe: detail.bienThe?.maBienThe || detail.variantId,
-            soLuong: detail.soLuong || detail.quantity || 0,
-            donGiaGoc: detail.donGiaGoc || detail.originalPrice || 0,
-            donGiaThucTe: detail.donGia || detail.actualPrice || 0,
-            donHang: detail.donHang || null,
-            bienThe: detail.bienThe || null
-          })));
-        }
-      } catch (err) {
-        console.error('Fetch data error', err);
-      }
-    };
-    fetchData();
+    setIsLoading(true);
+    fetchAll().finally(() => setIsLoading(false));
   }, []);
 
   // Filter and search functionality
@@ -143,17 +99,23 @@ const OrderDetailManagement = () => {
     }
 
     if (filters.searchTerm) {
-      filtered = filtered.filter(detail =>
-        detail.bienThe.tenSanPham.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        detail.bienThe.maBienThe.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        detail.donHang.maDonHang.toLowerCase().includes(filters.searchTerm.toLowerCase())
-      );
+      filtered = filtered.filter(detail => {
+        const productName = detail.bienThe?.tenSanPham || '';
+        const variantCode = detail.bienThe?.maBienThe || '';
+        const orderCode = detail.donHang?.maDonHang || '';
+        return (
+          productName.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+          variantCode.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+          orderCode.toString().toLowerCase().includes(filters.searchTerm.toLowerCase())
+        );
+      });
     }
 
     if (filters.orderCode) {
-      filtered = filtered.filter(detail =>
-        detail.donHang.maDonHang.toLowerCase().includes(filters.orderCode.toLowerCase())
-      );
+      filtered = filtered.filter(detail => {
+        const orderCode = detail.donHang?.maDonHang || '';
+        return orderCode.toString().toLowerCase().includes(filters.orderCode.toLowerCase());
+      });
     }
 
     if (filters.priceRange !== 'all') {
@@ -379,7 +341,7 @@ const OrderDetailManagement = () => {
             >
               <option value="">Tất cả đơn hàng</option>
               {orders.map(order => (
-                <option key={order.id} value={order.id}>
+                <option key={order.id} value={order.maDonHang}>
                   {order.maDonHang} - {order.tenKhachHang}
                 </option>
               ))}
@@ -412,6 +374,39 @@ const OrderDetailManagement = () => {
             >
               <IoAdd />
               Thêm chi tiết
+            </button>
+
+            <button
+              disabled={!selectedOrder || completing}
+              onClick={async () => {
+                if (!selectedOrder) return;
+                const order = orders.find(o => (o.maDonHang?.toString() || '') === selectedOrder);
+                if (!order) {
+                  showToast('Không tìm thấy đơn hàng đã chọn', 'error');
+                  return;
+                }
+                const customerId = order.maKhachHang || order.customerId || order.khachHang?.maKhachHang ||
+                  orderDetails.find(d => d.maDonHang?.toString() === selectedOrder)?.donHang?.khachHang?.maKhachHang;
+                if (!customerId) {
+                  showToast('Đơn hàng không có khách hàng. Không thể hoàn thành.', 'error');
+                  return;
+                }
+                try {
+                  setCompleting(true);
+                  await api.post(`/api/v1/khach-hang/${customerId}/don-hang/${order.maDonHang}/xac-nhan-nhan-hang`);
+                  showToast('Đã hoàn thành đơn hàng và cập nhật khách hàng');
+                  await fetchAll();
+                } catch (e) {
+                  console.error('Complete order error', e);
+                  showToast('Hoàn thành đơn thất bại', 'error');
+                } finally {
+                  setCompleting(false);
+                }
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${(!selectedOrder || completing) ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}`}
+            >
+              <IoCheckmarkCircle />
+              {completing ? 'Đang hoàn thành...' : 'Hoàn thành đơn'}
             </button>
           </div>
         </div>
@@ -505,24 +500,24 @@ const OrderDetailManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {detail.donHang.maDonHang}
+                          {detail.donHang?.maDonHang || 'N/A'}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {detail.donHang.tenKhachHang}
+                          {detail.donHang?.tenKhachHang || 'Khách lẻ'}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">
-                        {detail.bienThe.tenSanPham}
+                        {detail.bienThe?.tenSanPham || 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {detail.bienThe.maBienThe}
+                        {detail.bienThe?.maBienThe || 'N/A'}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">
-                        {detail.bienThe.thuocTinh}
+                        {detail.bienThe?.thuocTinh || 'N/A'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -740,7 +735,7 @@ const OrderDetailManagement = () => {
         onClose={() => setShowConfirmDialog(false)}
         onConfirm={confirmDelete}
         title="Xóa chi tiết đơn hàng"
-        message={`Bạn có chắc chắn muốn xóa sản phẩm "${deletingDetail?.bienThe?.tenSanPham}" khỏi đơn hàng "${deletingDetail?.donHang?.maDonHang}"?`}
+        message={deletingDetail ? `Bạn có chắc chắn muốn xóa sản phẩm "${deletingDetail.bienThe?.tenSanPham || 'N/A'}" khỏi đơn hàng "${deletingDetail.donHang?.maDonHang || 'N/A'}"?` : 'Bạn có chắc chắn muốn xóa?'}
       />
 
       {/* Toast */}

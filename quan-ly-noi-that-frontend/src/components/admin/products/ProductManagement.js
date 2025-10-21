@@ -1735,13 +1735,9 @@ const ProductManagement = () => {
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium">Chế độ thêm giá trị</h4>
               <div className="flex items-center gap-3">
-                <label className={`flex items-center gap-2 text-sm ${variantMode === 'single' ? 'font-semibold' : ''}`}>
-                  <input type="radio" name="variantMode" checked={variantMode === 'single'} onChange={() => { setVariantMode('single'); setUseExplicitRows(false); }} />
+                <label className={`flex items-center gap-2 text-sm font-semibold`}>
+                  <input type="radio" name="variantMode" checked readOnly />
                   <span>Biến thể đơn (chọn 1 giá trị / thuộc tính)</span>
-                </label>
-                <label className={`flex items-center gap-2 text-sm ${variantMode === 'rows' ? 'font-semibold' : ''}`}>
-                  <input type="radio" name="variantMode" checked={variantMode === 'rows'} onChange={() => { setVariantMode('rows'); setUseExplicitRows(true); }} />
-                  <span>Chế độ hàng (một hàng = một thuộc tính:giá trị)</span>
                 </label>
               </div>
             </div>
@@ -1760,35 +1756,7 @@ const ProductManagement = () => {
               <div className="space-y-3">
                 <h4 className="font-medium">Chọn giá trị thuộc tính</h4>
                 <div className="space-y-3">
-                  {useExplicitRows && variantMode === 'rows' && (
-                    <div className="p-3 border rounded bg-white">
-                      <h5 className="font-semibold mb-2">Danh sách hàng (một hàng = một thuộc tính:giá trị)</h5>
-                      <div className="space-y-2">
-                        {explicitRows.map((row, idx) => (
-                          <div key={`er-${idx}`} className="flex items-center gap-2">
-                            <select value={row.maThuocTinh || ''} onChange={(e) => {
-                              const v = e.target.value;
-                              setExplicitRows(prev => prev.map((r, i) => i === idx ? { ...r, maThuocTinh: v } : r));
-                            }} className="p-2 border rounded">
-                              <option value="">-- Chọn thuộc tính --</option>
-                              {attributes.map((a, ai) => (
-                                <option key={`attr-option-${a.id ?? a.maThuocTinh ?? ai}`} value={a.id ?? a.maThuocTinh}>{a.tenThuocTinh}</option>
-                              ))}
-                            </select>
-                            <input type="text" value={row.giaTri || ''} onChange={(e) => {
-                              const v = e.target.value;
-                              setExplicitRows(prev => prev.map((r, i) => i === idx ? { ...r, giaTri: v } : r));
-                            }} placeholder="Giá trị (VD: Đỏ)" className="p-2 border rounded flex-1" />
-                            <button type="button" onClick={() => setExplicitRows(prev => prev.filter((_, i) => i !== idx))} className="px-2 py-1 bg-red-50 text-red-600 rounded">X</button>
-                          </div>
-                        ))}
-
-                        <div>
-                          <button type="button" onClick={() => setExplicitRows(prev => [...prev, { maThuocTinh: '', giaTri: '' }])} className="px-3 py-1 bg-green-50 text-green-700 rounded">+ Thêm hàng</button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* Chế độ hàng đã bị xóa, chỉ cho phép tạo biến thể đơn */}
                   {attributes.map((attr, ai) => {
                     const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
                     const isSelected = variantSelections[aKey] && variantSelections[aKey].length > 0;
@@ -1960,7 +1928,7 @@ const ProductManagement = () => {
       <Modal
         isOpen={showEditVariantModal}
         onClose={() => { setShowEditVariantModal(false); setSelectedVariant(null); resetVariantForm(); }}
-        title={`Chỉnh sửa biến thể: ${selectedVariant?.tenBienThe || 'Không tên'}`}
+        title={`Chỉnh sửa biến thể: ${((selectedVariant?.tenBienThe && String(selectedVariant.tenBienThe).trim()) ? selectedVariant.tenBienThe : (selectedVariant?.sku || 'Không tên'))}`}
         size="md"
       >
         <div className="space-y-4">
@@ -2048,108 +2016,45 @@ const ProductManagement = () => {
             // If explicitRows were loaded (editing a variant created via explicit rows), show a simplified editor
             (Array.isArray(explicitRows) && explicitRows.length > 0) ? (
               <div className="p-4 border-2 border-gray-200 rounded-lg bg-white space-y-3">
-                <h4 className="font-semibold">Chỉnh sửa các cặp Thuộc tính:Giá trị</h4>
+                <h4 className="font-semibold">Chỉnh sửa giá trị thuộc tính đã gán</h4>
                 <div className="space-y-2">
-                  {explicitRows.map((r, idx) => (
-                    <div key={`edit-er-${idx}`} className="flex items-center gap-2">
-                      <select value={r.maThuocTinh || ''} onChange={(e) => {
-                        const v = e.target.value;
-                        setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, maThuocTinh: v } : row));
-                      }} className="p-2 border rounded">
-                        <option value="">-- Chọn thuộc tính --</option>
-                        {attributes.map((a, ai) => (
-                          <option key={a.id ?? a.maThuocTinh ?? `attr-${ai}`} value={a.id ?? a.maThuocTinh}>{a.tenThuocTinh}</option>
-                        ))}
-                      </select>
-                      <input type="text" value={r.giaTri || ''} onChange={(e) => {
-                        const v = e.target.value;
-                        setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, giaTri: v } : row));
-                      }} placeholder="Giá trị (VD: Đỏ)" className="flex-1 p-2 border rounded" />
-                      <button type="button" onClick={() => setExplicitRows(prev => prev.filter((_, i) => i !== idx))} className="px-2 py-1 bg-red-50 text-red-600 rounded">X</button>
-                    </div>
-                  ))}
-                  <div>
-                    <button type="button" onClick={() => setExplicitRows(prev => [...prev, { maThuocTinh: '', giaTri: '' }])} className="px-3 py-1 bg-green-50 text-green-700 rounded">+ Thêm mapping</button>
-                  </div>
+                  {explicitRows.map((r, idx) => {
+                    const meta = attributes.find(a => String(a.id ?? a.maThuocTinh) === String(r.maThuocTinh));
+                    const label = meta?.tenThuocTinh || `Thuộc tính ${r.maThuocTinh || ''}`;
+                    return (
+                      <div key={`edit-er-${idx}`} className="flex items-center gap-2">
+                        <div className="min-w-[200px] text-sm text-gray-700 font-medium">{label}</div>
+                        <input type="text" value={r.giaTri || ''} onChange={(e) => {
+                          const v = e.target.value;
+                          setExplicitRows(prev => prev.map((row, i) => i === idx ? { ...row, giaTri: v } : row));
+                        }} placeholder="Giá trị (VD: Đỏ)" className="flex-1 p-2 border rounded" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
               <div className="space-y-3 border-2 border-gray-200 p-4 rounded-lg bg-gray-50">
-                <h4 className="font-semibold text-gray-700">Thuộc tính</h4>
+                <h4 className="font-semibold text-gray-700">Thuộc tính (chỉ sửa giá trị đã gán)</h4>
                 <div className="space-y-3">
-                  {attributes.map((attr, ai) => (
-                    <div key={attr.id ?? attr.maThuocTinh ?? `attr-panel-${ai}`} className="p-3 border-2 border-gray-300 rounded-lg bg-white">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="font-semibold text-gray-700">{attr.tenThuocTinh}</div>
-                        <div>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                // compute attribute key the same way other code uses it
-                                const aKey = String(attr.id ?? attr.maThuocTinh ?? attr.ma ?? '');
-                                if (!aKey) return;
-
-                                // If we have a selectedVariant with mapping entries, try to delete those mapping rows by id
-                                const variantId = selectedVariant?.id ?? selectedVariant?.maBienThe ?? selectedVariant?.ma ?? null;
-                                if (variantId && selectedVariant && Array.isArray(selectedVariant.bienTheThuocTinhs)) {
-                                  const mappingsForAttr = selectedVariant.bienTheThuocTinhs.filter(btt => {
-                                    const tId = btt?.thuocTinh?.maThuocTinh ?? btt?.thuocTinh?.id ?? btt?.thuocTinh;
-                                    return String(tId) === String(attr.id ?? attr.maThuocTinh);
-                                  });
-                                  // delete each mapping row by its id if available
-                                  for (const m of mappingsForAttr) {
-                                    const mappingId = m?.id;
-                                    if (mappingId) {
-                                      await api.del(`/api/bien-the-san-pham/thuoc-tinh/${mappingId}`);
-                                    }
-                                  }
-                                }
-
-                                // remove from variantSelections locally
-                                setVariantSelections(prev => {
-                                  const next = { ...prev };
-                                  if (next[aKey]) delete next[aKey];
-                                  return next;
-                                });
-                                // also remove explicit rows that reference this attribute
-                                setExplicitRows(prev => (Array.isArray(prev) ? prev.filter(r => String(r.maThuocTinh) !== aKey) : prev));
-
-                                // If selectedVariant exists, refresh its detail DTO from server to reflect DB state
-                                if (selectedVariant && (selectedVariant.id || selectedVariant.maBienThe || selectedVariant.ma)) {
-                                  const id = selectedVariant.id || selectedVariant.maBienThe || selectedVariant.ma;
-                                  try {
-                                    // Use the detail endpoint which returns the ThuocTinhBienTheResponse list
-                                    const freshDetail = await api.get(`/api/bien-the-san-pham/${id}/chi-tiet`);
-                                    if (freshDetail) {
-                                      // replace selectedVariant with the authoritative DTO
-                                      setSelectedVariant(freshDetail);
-                                      // re-run attribute prefill using fetched variant detail so UI lists update
-                                      try {
-                                        await fetchAttributes(false, freshDetail);
-                                      } catch (prefillErr) {
-                                        console.warn('Failed to re-prefill attributes after mapping delete', prefillErr);
-                                      }
-                                    }
-                                  } catch (refreshErr) {
-                                    // ignore refresh errors but log a warning
-                                    console.warn('Failed to refresh variant detail after deleting mapping', refreshErr);
-                                  }
-                                }
-                              } catch (err) {
-                                console.error('Failed to delete variant attribute mapping', err);
-                                alert('Không thể xóa thuộc tính trên server: ' + (err?.message || 'Lỗi'));
-                              }
-                            }}
-                            className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded hover:bg-red-100"
-                            title={`Xóa thuộc tính ${attr.tenThuocTinh} khỏi biến thể`}
-                          >
-                            Xóa thuộc tính
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-col space-y-2">
-                        {/* Always show input + datalist to allow typing or selecting existing values */}
+                  {(() => {
+                    // Only render attributes that are already mapped on this variant
+                    const mappedIds = new Set();
+                    const sv = selectedVariant || {};
+                    const mappings = sv.bienTheThuocTinhs || sv.thuocTinhGiaTriTuDo || sv.thuocTinhGiaTriTuDos || sv.thuocTinhMappings || sv.thuocTinh || sv.giaTriThuocTinhs || [];
+                    if (Array.isArray(mappings)) {
+                      for (const m of mappings) {
+                        const id = m?.maThuocTinh ?? m?.attributeId ?? m?.ma ?? m?.thuocTinh?.maThuocTinh ?? m?.thuocTinh?.id;
+                        if (id != null) mappedIds.add(String(id));
+                      }
+                    }
+                    const attrsToRender = (attributes || []).filter(a => mappedIds.has(String(a.id ?? a.maThuocTinh)));
+                    if (attrsToRender.length === 0) {
+                      return <div className="text-sm text-gray-500">Biến thể này chưa có thuộc tính nào để sửa.</div>;
+                    }
+                    return attrsToRender.map((attr, ai) => (
+                      <div key={attr.id ?? attr.maThuocTinh ?? `attr-panel-${ai}`} className="p-3 border-2 border-gray-300 rounded-lg bg-white">
+                        <div className="font-semibold text-gray-700 mb-3">{attr.tenThuocTinh}</div>
                         <div className="flex items-center gap-2">
                           <select
                             value={attrLastAdded[String(attr.id || attr.maThuocTinh) || ''] || ''}
@@ -2166,8 +2071,6 @@ const ProductManagement = () => {
                               <option key={`attr-${attr.id ?? attr.maThuocTinh}-val-${String(v.id ?? i)}`} value={v.tenGiaTri}>{v.tenGiaTri}</option>
                             ))}
                           </select>
-
-                          {/* Quick text input so admin can type a value directly */}
                           <input
                             type="text"
                             value={attrTextInputs[String(attr.id || attr.maThuocTinh)] || ''}
@@ -2189,7 +2092,6 @@ const ProductManagement = () => {
                                   setBulkVariantsPreview([]);
                                   return { ...prev, [key]: cur };
                                 });
-                                // add the new value into the attribute's values list so it appears immediately
                                 setAttributes(prev => (Array.isArray(prev) ? prev.map(a => {
                                   const aId = String(a.id ?? a.maThuocTinh ?? '');
                                   if (aId !== key) return a;
@@ -2205,42 +2107,9 @@ const ProductManagement = () => {
                             placeholder={`Gõ nhanh giá trị cho ${attr.tenThuocTinh}`}
                             className="p-2 border rounded flex-1"
                           />
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const key = String(attr.id || attr.maThuocTinh);
-                              const text = (attrTextInputs[key] || '').trim();
-                              if (!text) return;
-                              // mark selection for this attribute (do not mutate attributes list)
-                              setVariantSelections(prev => {
-                                const cur = Array.isArray(prev[key]) ? prev[key].slice() : [];
-                                // avoid duplicate
-                                if (!cur.includes(String(text))) cur.push(String(text));
-                                setBulkVariantsPreview([]);
-                                return { ...prev, [key]: cur };
-                              });
-                              // also add to attributes list so it appears immediately
-                              setAttributes(prev => (Array.isArray(prev) ? prev.map(a => {
-                                const aId = String(a.id ?? a.maThuocTinh ?? '');
-                                if (aId !== key) return a;
-                                const exists = (a.values || []).some(v => String(v.tenGiaTri) === String(text) || String(v.id) === String(text));
-                                if (exists) return a;
-                                const newVal = { id: String(text), tenGiaTri: String(text), raw: { giaTri: text } };
-                                return { ...a, values: [...(a.values || []), newVal] };
-                              }) : prev));
-                              // clear input and lastSelected
-                              setAttrTextInputs(prev => ({ ...prev, [key]: '' }));
-                              setAttrLastAdded(prev => ({ ...prev, [key]: '' }));
-                            }}
-                            className="px-3 py-1 bg-green-50 text-green-700 rounded"
-                          >
-                            Thêm
-                          </button>
                         </div>
 
-                        {/* Render existing values as selectable checkboxes */}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 mt-2">
                           {(attr.values || []).map((val, vi) => {
                             const valId = String(val.id ?? vi);
                             const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
@@ -2254,8 +2123,8 @@ const ProductManagement = () => {
                           })}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
             )

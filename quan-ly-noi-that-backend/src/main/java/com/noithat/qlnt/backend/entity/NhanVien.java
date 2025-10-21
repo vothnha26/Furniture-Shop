@@ -20,4 +20,7 @@ public class NhanVien {
 
     @Column(name = "ChucVu")
     private String chucVu;
+
+    @OneToOne(mappedBy = "staff", fetch = FetchType.LAZY)
+    private com.noithat.qlnt.backend.entity.chat.StaffSession staffSession;
 }

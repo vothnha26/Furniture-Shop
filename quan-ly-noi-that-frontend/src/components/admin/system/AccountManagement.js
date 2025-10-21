@@ -15,7 +15,13 @@ const AccountManagement = () => {
       try {
         const response = await api.get('/api/accounts');
         if (Array.isArray(response)) {
-          setAccounts(response.map(account => ({
+          // Filter to only show STAFF, MANAGER, and ADMIN accounts (exclude CUSTOMER)
+          const staffAccounts = response.filter(account => {
+            const role = normalizeRole(account.vaiTro || account.role);
+            return role === 'STAFF' || role === 'MANAGER' || role === 'ADMIN';
+          });
+          
+          setAccounts(staffAccounts.map(account => ({
             id: account.maTaiKhoan || account.id,
             username: account.tenDangNhap || account.username,
             fullName: account.hoTen || account.fullName,
@@ -90,7 +96,13 @@ const AccountManagement = () => {
       // Refresh data
       const response = await api.get('/api/accounts');
       if (Array.isArray(response)) {
-        setAccounts(response.map(account => ({
+        // Filter to only show STAFF, MANAGER, and ADMIN accounts
+        const staffAccounts = response.filter(account => {
+          const role = normalizeRole(account.vaiTro || account.role);
+          return role === 'STAFF' || role === 'MANAGER' || role === 'ADMIN';
+        });
+        
+        setAccounts(staffAccounts.map(account => ({
           id: account.maTaiKhoan || account.id,
           username: account.tenDangNhap || account.username,
           fullName: account.hoTen || account.fullName,
@@ -124,7 +136,13 @@ const AccountManagement = () => {
       // Refresh data
       const response = await api.get('/api/accounts');
       if (Array.isArray(response)) {
-          setAccounts(response.map(account => ({
+        // Filter to only show STAFF, MANAGER, and ADMIN accounts
+        const staffAccounts = response.filter(account => {
+          const role = normalizeRole(account.vaiTro || account.role);
+          return role === 'STAFF' || role === 'MANAGER' || role === 'ADMIN';
+        });
+        
+          setAccounts(staffAccounts.map(account => ({
           id: account.maTaiKhoan || account.id,
           username: account.tenDangNhap || account.username,
           fullName: account.hoTen || account.fullName,
@@ -167,7 +185,13 @@ const AccountManagement = () => {
       // Refresh data
       const response = await api.get('/api/accounts');
       if (Array.isArray(response)) {
-        setAccounts(response.map(account => ({
+        // Filter to only show STAFF, MANAGER, and ADMIN accounts
+        const staffAccounts = response.filter(account => {
+          const role = normalizeRole(account.vaiTro || account.role);
+          return role === 'STAFF' || role === 'MANAGER' || role === 'ADMIN';
+        });
+        
+        setAccounts(staffAccounts.map(account => ({
           id: account.maTaiKhoan || account.id,
           username: account.tenDangNhap || account.username,
           fullName: account.hoTen || account.fullName,
@@ -187,19 +211,24 @@ const AccountManagement = () => {
     }
   };
 
-  const filteredAccounts = accounts.filter(account =>
-    account.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAccounts = accounts.filter(account => {
+    const searchLower = searchTerm.toLowerCase();
+    const username = (account.username || '').toLowerCase();
+    const fullName = (account.fullName || '').toLowerCase();
+    const email = (account.email || '').toLowerCase();
+    
+    return username.includes(searchLower) || 
+           fullName.includes(searchLower) || 
+           email.includes(searchLower);
+  });
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý Tài khoản</h1>
-          <p className="text-gray-600">Quản lý tài khoản người dùng trong hệ thống</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý Tài khoản Nhân viên</h1>
+          <p className="text-gray-600">Quản lý tài khoản nhân viên và quản trị viên trong hệ thống</p>
         </div>
 
         {/* Action Bar */}

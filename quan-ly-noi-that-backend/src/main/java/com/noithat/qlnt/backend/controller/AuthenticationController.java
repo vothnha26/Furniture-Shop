@@ -3,6 +3,8 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.dto.request.*;
 import com.noithat.qlnt.backend.dto.response.*;
 import com.noithat.qlnt.backend.service.AuthenticationService;
+import com.noithat.qlnt.backend.repository.NhanVienRepository;
+import com.noithat.qlnt.backend.entity.NhanVien;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthenticationController {
 
     private final AuthenticationService service;
+    private final NhanVienRepository nhanVienRepository;
 
     // Đăng ký tài khoản mới
     @PostMapping("/register")
@@ -62,6 +65,19 @@ public class AuthenticationController {
         out.put("email", t.getEmail());
         out.put("vaiTro", t.getVaiTro() != null ? t.getVaiTro().getTenVaiTro() : null);
         out.put("trangThai", t.isEnabled());
+        
+        // If user is staff, fetch and add staff ID
+        String role = t.getVaiTro() != null ? t.getVaiTro().getTenVaiTro() : null;
+        if (role != null && (role.equalsIgnoreCase("STAFF") || role.equalsIgnoreCase("ADMIN"))) {
+            java.util.Optional<NhanVien> staffOpt = nhanVienRepository.findByTaiKhoan(t);
+            if (staffOpt.isPresent()) {
+                NhanVien nv = staffOpt.get();
+                out.put("maNhanVien", nv.getMaNhanVien());
+                out.put("hoTen", nv.getHoTen());
+                out.put("chucVu", nv.getChucVu());
+            }
+        }
+        
         return ResponseEntity.ok(out);
     }
 

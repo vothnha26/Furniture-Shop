@@ -23,8 +23,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -38,7 +36,6 @@ public class ThanhToanServiceImpl implements ThanhToanService {
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final com.noithat.qlnt.backend.service.CauHinhService cauHinhService;
     private final HoaDonService hoaDonService;
-    private final com.noithat.qlnt.backend.service.IThongBaoService thongBaoService;
 
     @Override
     public ThongKeThanhToanResponse getThongKe() {
@@ -176,28 +173,55 @@ public class ThanhToanServiceImpl implements ThanhToanService {
 
     @Override
     public List<Voucher> getApplicableVouchers(Integer maKhachHang, BigDecimal tongTienDonHang) {
-        List<Voucher> vouchers = new ArrayList<>();
-        String sql = "{call dbo.sp_GetApplicableVouchers_ForCheckout(?, ?)}";
+        // Sử dụng VoucherService thay vì stored procedure để tránh lỗi tên bảng
+        try {
+            // Lấy khách hàng để kiểm tra hạng thành viên
+            KhachHang khachHang = khachHangRepository.findById(maKhachHang).orElse(null);
 
-        try (Connection conn = dataSource.getConnection();
-                CallableStatement cstmt = conn.prepareCall(sql)) { // Không cần unwrap ở đây
+            // Lấy tất cả voucher đang hoạt động
+            List<Voucher> allVouchers = voucherRepository.findAll();
+            List<Voucher> eligibleVouchers = new ArrayList<>();
 
-            cstmt.setInt(1, maKhachHang);
-            cstmt.setBigDecimal(2, tongTienDonHang);
+            LocalDateTime now = LocalDateTime.now();
 
-            try (ResultSet rs = cstmt.executeQuery()) {
-                while (rs.next()) {
-                    Voucher v = new Voucher();
-                    v.setMaVoucher(rs.getInt("ma_voucher"));
-                    v.setMaCode(rs.getString("ma_code"));
-                    v.setTenVoucher(rs.getString("ten_voucher"));
-                    vouchers.add(v);
+            for (Voucher v : allVouchers) {
+                // Kiểm tra trạng thái và thời gian
+                if (!"DANG_HOAT_DONG".equals(v.getTrangThai()))
+                    continue;
+                if (v.getNgayBatDau() != null && v.getNgayBatDau().isAfter(now))
+                    continue;
+                if (v.getNgayKetThuc() != null && v.getNgayKetThuc().isBefore(now))
+                    continue;
+
+                // Kiểm tra số lượng
+                if (v.getSoLuongDaSuDung() != null && v.getSoLuongToiDa() != null
+                        && v.getSoLuongDaSuDung() >= v.getSoLuongToiDa())
+                    continue;
+
+                // Kiểm tra giá trị đơn hàng tối thiểu
+                if (v.getGiaTriDonHangToiThieu() != null
+                        && tongTienDonHang.compareTo(v.getGiaTriDonHangToiThieu()) < 0)
+                    continue;
+
+                // Kiểm tra hạn chế hạng thành viên
+                if (v.getApDungChoMoiNguoi() != null && v.getApDungChoMoiNguoi()) {
+                    eligibleVouchers.add(v);
+                } else if (khachHang != null && khachHang.getHangThanhVien() != null
+                        && v.getHanCheHangThanhVien() != null) {
+                    // Kiểm tra xem hạng của khách hàng có trong danh sách hạn chế không
+                    boolean isEligible = v.getHanCheHangThanhVien().stream()
+                            .anyMatch(link -> link.getHangThanhVien().getMaHangThanhVien()
+                                    .equals(khachHang.getHangThanhVien().getMaHangThanhVien()));
+                    if (isEligible) {
+                        eligibleVouchers.add(v);
+                    }
                 }
             }
-        } catch (SQLException ex) {
-            throw new RuntimeException("Lỗi khi gọi sp_GetApplicableVouchers_ForCheckout: " + ex.getMessage(), ex);
+
+            return eligibleVouchers;
+        } catch (Exception ex) {
+            throw new RuntimeException("Lỗi khi lấy danh sách voucher: " + ex.getMessage(), ex);
         }
-        return vouchers;
     }
 
     @Override
@@ -333,6 +357,12 @@ public class ThanhToanServiceImpl implements ThanhToanService {
             khachHang.setDiemThuong(diemHienCo - diemSuDung);
         }
 
+        // 6b. Cộng điểm thưởng cho khách hàng từ đơn hàng này (nếu có)
+        if (summary.getDiemThuongNhanDuoc() != null && summary.getDiemThuongNhanDuoc().intValue() > 0) {
+            int diemCong = summary.getDiemThuongNhanDuoc().intValue();
+            donHang.setDiemThuongNhanDuoc(diemCong);
+        }
+
         // 7. Lấy lại chi tiết giỏ hàng để có giá thực tế của từng sản phẩm
         List<CartDetailItemResponse> cartDetails = this.getCartDetails(request.getChiTietDonHangList());
 
@@ -371,31 +401,10 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         }
         donHang.setChiTietDonHangs(chiTietList);
 
-        // 10. Gửi thông báo đơn hàng mới (dành cho admin)
-        // Persist order first
+        // 10. Persist order
         DonHang savedDonHang = donHangRepository.save(donHang);
-
-        // Schedule creation/publish of notification after transaction commit
-        final Integer maDonHangForNotif = savedDonHang != null ? savedDonHang.getMaDonHang() : null;
-        try {
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            if (maDonHangForNotif != null) thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif);
-                        } catch (Exception ex) {
-                            System.err.println("[ThanhToanService] Lỗi khi tạo thông báo sau commit: " + ex.getMessage());
-                        }
-                    }
-                });
-            } else {
-                // no active transaction - create immediately
-                if (maDonHangForNotif != null) thongBaoService.taoThongBaoDonHangMoi(maDonHangForNotif);
-            }
-        } catch (Exception ex) {
-            System.err.println("[ThanhToanService] Không thể đăng ký hoặc thực hiện thông báo: " + ex.getMessage());
-        }
+        // Notifications are now handled by database triggers; no programmatic create
+        // here
 
         // 10. Tạo hóa đơn
         TaoHoaDonRequest taoHoaDonRequest = new TaoHoaDonRequest();

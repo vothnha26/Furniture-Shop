@@ -49,4 +49,7 @@ public interface IProductService {
 
     // API mới: Lấy chi tiết sản phẩm đầy đủ với biến thể, thuộc tính và giá giảm
     com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto getProductDetailWithVariants(Integer id);
+
+    // API mới: Lấy danh sách sản phẩm cơ bản cho category assignment UI
+    java.util.List<com.noithat.qlnt.backend.dto.response.ProductBasicResponse> getBasicProducts();
 }

@@ -6,6 +6,13 @@ import { navigation } from '../../data';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import NavMobile from './NavMobile';
+import NotificationPopup from './NotificationPopup';
+
+// Simple currency formatter used in several components
+const formatPrice = (price) => {
+	const n = Number(price) || 0;
+	return n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+};
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -246,6 +253,13 @@ const Header = () => {
 												</span>
 											)}
 										</button>
+
+										{/* Notifications */}
+										{isLoggedIn && (
+											<div className='h-20 flex items-center'>
+												<NotificationPopup />
+											</div>
+										)}
               
 										{/* Cart Icon */}
 										<button

@@ -49,9 +49,10 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
     static {
         VALID_TRANSITIONS.put(CHO_XU_LY, Arrays.asList(XAC_NHAN, DANG_CHUAN_BI, DANG_GIAO_HANG, DA_HUY));
         VALID_TRANSITIONS.put(XAC_NHAN, Arrays.asList(DANG_CHUAN_BI, DA_HUY));
-        VALID_TRANSITIONS.put(DANG_CHUAN_BI, Arrays.asList(DANG_GIAO_HANG, DA_HUY));
-        VALID_TRANSITIONS.put(DANG_GIAO_HANG, Arrays.asList(DA_GIAO_HANG, DA_HUY));
-        VALID_TRANSITIONS.put(DA_GIAO_HANG, Arrays.asList(HOAN_THANH)); // Customer can confirm delivery
+    VALID_TRANSITIONS.put(DANG_CHUAN_BI, Arrays.asList(DANG_GIAO_HANG, DA_HUY));
+    // Cho phép hoàn thành trực tiếp từ trạng thái đang giao hàng (staff hoàn tất tại quầy)
+    VALID_TRANSITIONS.put(DANG_GIAO_HANG, Arrays.asList(DA_GIAO_HANG, HOAN_THANH, DA_HUY));
+    VALID_TRANSITIONS.put(DA_GIAO_HANG, Arrays.asList(HOAN_THANH)); // Customer can confirm delivery
         VALID_TRANSITIONS.put(HOAN_THANH, Collections.emptyList());
         VALID_TRANSITIONS.put(DA_HUY, Collections.emptyList());
     }
@@ -83,11 +84,15 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
 
         // Update order status
         donHang.setTrangThaiDonHang(trangThaiMoi);
+
+        // Nếu trạng thái mới là HOAN_THANH thì auto-mark payment là PAID
+        if (IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiMoi)) {
+            donHang.setTrangThaiThanhToan("PAID");
+        }
+
         donHangRepository.save(donHang);
 
         // Record history
-        // Record history using the raw existing status (so we keep original DB value
-        // readable in history)
         LichSuTrangThaiDonHang lichSu = new LichSuTrangThaiDonHang(
                 donHang,
                 trangThaiCuRaw,
@@ -98,26 +103,50 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
 
         // --- Side-effects: award/refund points, rollback voucher usage, restore stock ---
         try {
-            // When order becomes HOAN_THANH: award points to customer (if any)
-            if (IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiMoi)) {
+            // Khi trạng thái chuyển sang HOAN_THANH hoặc DA_GIAO_HANG thì cộng thống kê cho khách hàng
+            boolean shouldUpdateStats = false;
+            if ((IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiMoi) && !IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiCu))
+                || (DA_GIAO_HANG.equals(trangThaiMoi) && !DA_GIAO_HANG.equals(trangThaiCu))) {
+                shouldUpdateStats = true;
+            }
+            if (shouldUpdateStats) {
                 KhachHang kh = donHang.getKhachHang();
                 if (kh != null) {
-                    Integer toAward = donHang.getDiemThuongNhanDuoc() != null ? donHang.getDiemThuongNhanDuoc() : 0;
-                    if (toAward > 0) {
-                        int current = kh.getDiemThuong() != null ? kh.getDiemThuong() : 0;
-                        kh.setDiemThuong(current + toAward);
-                        khachHangRepository.save(kh);
+                    // Award loyalty points (chỉ khi HOAN_THANH)
+                    if (IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiMoi)) {
+                        Integer toAward = donHang.getDiemThuongNhanDuoc() != null ? donHang.getDiemThuongNhanDuoc() : 0;
+                        if (toAward > 0) {
+                            int current = kh.getDiemThuong() != null ? kh.getDiemThuong() : 0;
+                            kh.setDiemThuong(current + toAward);
 
-                        LichSuDiemThuong ls = new LichSuDiemThuong();
-                        ls.setKhachHang(kh);
-                        ls.setDiemThayDoi(toAward);
-                        ls.setLyDo("Cộng điểm khi hoàn thành đơn " + donHang.getMaDonHang());
-                        lichSuDiemThuongRepository.save(ls);
+                            LichSuDiemThuong ls = new LichSuDiemThuong();
+                            ls.setKhachHang(kh);
+                            ls.setDiemThayDoi(toAward);
+                            ls.setLyDo("Cộng điểm khi hoàn thành đơn " + donHang.getMaDonHang());
+                            lichSuDiemThuongRepository.save(ls);
+                        }
                     }
+                    // Update total spending and order count (payment is PAID)
+                    if ("PAID".equals(donHang.getTrangThaiThanhToan())) {
+                        Integer currentOrderCount = kh.getTongDonHang() != null ? kh.getTongDonHang() : 0;
+                        kh.setTongDonHang(currentOrderCount + 1);
+
+                        java.math.BigDecimal currentSpending = kh.getTongChiTieu() != null ? kh.getTongChiTieu()
+                                : java.math.BigDecimal.ZERO;
+                        java.math.BigDecimal orderTotal = donHang.getThanhTien() != null ? donHang.getThanhTien()
+                                : java.math.BigDecimal.ZERO;
+                        kh.setTongChiTieu(currentSpending.add(orderTotal));
+
+                        System.out.println("✅ Updated customer stats for order " + donHang.getMaDonHang()
+                                + ": tongDonHang=" + kh.getTongDonHang()
+                                + ", tongChiTieu=" + kh.getTongChiTieu());
+                    }
+                    khachHangRepository.save(kh);
                 }
             }
 
-            // When order is cancelled (DA_HUY / HUY_BO): refund used points, rollback voucher usage, restore inventory
+            // When order is cancelled (DA_HUY / HUY_BO): refund used points, rollback
+            // voucher usage, restore inventory
             if (DA_HUY.equals(trangThaiMoi) || HUY_BO.equals(trangThaiMoi)) {
                 // Refund points used
                 KhachHang kh = donHang.getKhachHang();
@@ -156,7 +185,8 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
             // Log but do not fail the status update; side-effect failures should be
             // investigated separately. In a future change we may want to make these
             // operations more robust and transactional across services.
-            System.out.println("Warning: side-effect during status change failed for order " + maDonHang + ": " + ex.getMessage());
+            System.out.println(
+                    "Warning: side-effect during status change failed for order " + maDonHang + ": " + ex.getMessage());
         }
 
         return true;
@@ -277,12 +307,14 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
 
     @Override
     public List<DonHang> getShippingOrders() {
-        return donHangRepository.findByTrangThaiDonHang(DANG_GIAO);
+        // Query both DANG_GIAO and DANG_GIAO_HANG for backward compatibility
+        return donHangRepository.findByTrangThaiDonHangIn(Arrays.asList(DANG_GIAO, DANG_GIAO_HANG));
     }
 
     @Override
     public List<DonHang> getOrdersNeedingAttention() {
-        return donHangRepository.findByTrangThaiDonHangIn(Arrays.asList(XAC_NHAN, DANG_CHUAN_BI, DANG_GIAO));
+        return donHangRepository
+                .findByTrangThaiDonHangIn(Arrays.asList(XAC_NHAN, DANG_CHUAN_BI, DANG_GIAO, DANG_GIAO_HANG));
     }
 
     @Override
@@ -297,7 +329,9 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
         statusCounts.put(CHO_XAC_NHAN, (long) donHangRepository.findByTrangThaiDonHang(CHO_XAC_NHAN).size());
         statusCounts.put(XAC_NHAN, (long) donHangRepository.findByTrangThaiDonHang(XAC_NHAN).size());
         statusCounts.put(DANG_CHUAN_BI, (long) donHangRepository.findByTrangThaiDonHang(DANG_CHUAN_BI).size());
-        statusCounts.put(DANG_GIAO, (long) donHangRepository.findByTrangThaiDonHang(DANG_GIAO).size());
+        // Count both DANG_GIAO and DANG_GIAO_HANG for backward compatibility
+        statusCounts.put("DANG_GIAO_HANG",
+                (long) donHangRepository.findByTrangThaiDonHangIn(Arrays.asList(DANG_GIAO, DANG_GIAO_HANG)).size());
         statusCounts.put(HOAN_THANH, (long) donHangRepository.findByTrangThaiDonHang(HOAN_THANH).size());
         statusCounts.put(HUY_BO, (long) donHangRepository.findByTrangThaiDonHang(HUY_BO).size());
 

@@ -98,6 +98,15 @@ public class BanHangController {
     return ResponseEntity.ok("Cập nhật trạng thái thành công");
 }
 
+    @PutMapping("/donhang/{id}/thanh-toan/trang-thai")
+    public ResponseEntity<?> capNhatTrangThaiThanhToan(
+            @PathVariable Integer id,
+            @RequestBody Map<String, String> body) {
+        String trangThaiThanhToan = body.get("trangThaiThanhToan");
+        donHangService.capNhatTrangThaiThanhToan(id, trangThaiThanhToan);
+        return ResponseEntity.ok("Cập nhật trạng thái thanh toán thành công");
+    }
+
 
     // ✅ Thống kê bán hàng (4 mục)
     @GetMapping("/thongke")

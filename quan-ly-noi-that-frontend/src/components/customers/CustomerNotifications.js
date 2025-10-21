@@ -1,61 +1,48 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IoNotifications, IoCheckmarkCircle, IoTime, IoStar, IoGift, IoCart, IoClose, IoSearch } from 'react-icons/io5';
+import api from '../../api';
+import { useNavigate } from 'react-router-dom';
 
 const CustomerNotifications = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'order',
-      title: 'Đơn hàng #ORD001 đã được giao',
-      message: 'Đơn hàng của bạn đã được giao thành công. Cảm ơn bạn đã mua sắm!',
-      timestamp: '2024-01-15 14:30:00',
-      isRead: false,
-      priority: 'high',
-      action: 'Xem chi tiết đơn hàng'
-    },
-    {
-      id: 2,
-      type: 'promotion',
-      title: 'Khuyến mãi 20% cho tất cả sản phẩm',
-      message: 'Giảm giá 20% cho tất cả sản phẩm nội thất. Áp dụng đến hết tháng 1.',
-      timestamp: '2024-01-14 09:00:00',
-      isRead: false,
-      priority: 'medium',
-      action: 'Xem khuyến mãi'
-    },
-    {
-      id: 3,
-      type: 'review',
-      title: 'Đánh giá sản phẩm',
-      message: 'Bạn có muốn đánh giá sản phẩm "Ghế gỗ cao cấp" không?',
-      timestamp: '2024-01-13 16:45:00',
-      isRead: true,
-      priority: 'low',
-      action: 'Đánh giá ngay'
-    },
-    {
-      id: 4,
-      type: 'stock',
-      title: 'Sản phẩm yêu thích có hàng trở lại',
-      message: 'Sản phẩm "Giường ngủ gỗ" đã có hàng trở lại. Đặt ngay để không bỏ lỡ!',
-      timestamp: '2024-01-12 11:20:00',
-      isRead: true,
-      priority: 'medium',
-      action: 'Xem sản phẩm'
-    },
-    {
-      id: 5,
-      type: 'shipping',
-      title: 'Đơn hàng #ORD002 đang được giao',
-      message: 'Đơn hàng của bạn đang được vận chuyển. Dự kiến giao trong 2-3 ngày.',
-      timestamp: '2024-01-11 08:15:00',
-      isRead: false,
-      priority: 'high',
-      action: 'Theo dõi vận chuyển'
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Normalize backend response (ThongBaoResponse) to UI model
+  const normalize = (n) => ({
+    id: n.id,
+    type: n.loai || 'info',
+    title: n.tieu_de || n.tieuDe || '',
+    message: n.noi_dung || n.noiDung || '',
+    timestamp: n.thoi_gian || n.ngay_tao || '',
+    isRead: Boolean(n.da_doc),
+    priority: (n.do_uu_tien || 'normal').toLowerCase().includes('high') ? 'high' : (n.do_uu_tien || 'normal'),
+    action: n.duong_dan_hanh_dong ? 'Xem chi tiết' : '',
+    actionPath: n.duong_dan_hanh_dong || ''
+  });
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await api.get('/api/v1/thong-bao/me');
+      const list = Array.isArray(data) ? data : (data?.data || []);
+      setNotifications(list.map(normalize));
+    } catch (e) {
+      console.error('[CustomerNotifications] Fetch error', e);
+      setError('Không thể tải thông báo');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getTypeIcon = (type) => {
     const icons = {
@@ -99,18 +86,34 @@ const CustomerNotifications = () => {
     return colors[priority] || 'text-gray-600';
   };
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, isRead: true } : notif
-    ));
+  const markAsRead = async (id) => {
+    try {
+      await api.put(`/api/v1/thong-bao/${id}/danh-dau-da-doc`, {});
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (e) {
+      console.error('[CustomerNotifications] markAsRead error', e);
+      alert('Không thể đánh dấu đã đọc');
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+  const markAllAsRead = async () => {
+    try {
+      await api.put('/api/v1/thong-bao/danh-dau-tat-ca-da-doc', {});
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    } catch (e) {
+      console.error('[CustomerNotifications] markAllAsRead error', e);
+      alert('Không thể đánh dấu tất cả đã đọc');
+    }
   };
 
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter(notif => notif.id !== id));
+  const deleteNotification = async (id) => {
+    try {
+      await api.delete(`/api/v1/thong-bao/${id}`);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (e) {
+      console.error('[CustomerNotifications] delete error', e);
+      alert('Không thể xóa thông báo');
+    }
   };
 
   const filteredNotifications = notifications.filter(notif => {
@@ -131,8 +134,11 @@ const CustomerNotifications = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Thông báo</h1>
               <p className="text-gray-600">
-                {unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'Tất cả thông báo đã được đọc'}
+                {loading ? 'Đang tải...' : (unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'Tất cả thông báo đã được đọc')}
               </p>
+              {error && (
+                <p className="text-red-600 text-sm mt-1">{error}</p>
+              )}
             </div>
             {unreadCount > 0 && (
               <button
@@ -250,7 +256,18 @@ const CustomerNotifications = () => {
                     {/* Action Button */}
                     {notif.action && (
                       <div className="mt-4">
-                        <button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium">
+                        <button
+                          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 text-sm font-medium"
+                          onClick={() => {
+                            if (notif.actionPath) {
+                              if (notif.actionPath.startsWith('http')) {
+                                window.open(notif.actionPath, '_blank');
+                              } else {
+                                navigate(notif.actionPath);
+                              }
+                            }
+                          }}
+                        >
                           {notif.action}
                         </button>
                       </div>
@@ -263,7 +280,7 @@ const CustomerNotifications = () => {
         </div>
 
         {/* Empty State */}
-        {filteredNotifications.length === 0 && (
+        {filteredNotifications.length === 0 && !loading && (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <IoNotifications className="w-12 h-12 text-gray-400" />

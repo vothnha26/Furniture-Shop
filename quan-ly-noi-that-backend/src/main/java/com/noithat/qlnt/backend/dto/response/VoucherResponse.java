@@ -39,4 +39,5 @@ public class VoucherResponse {
     private String moTa;
     private Boolean apDungChoMoiNguoi;
     private List<String> tenHangThanhVienApDung;
+    private List<Integer> maHangThanhVienIds; // IDs of membership tiers for this voucher
 }

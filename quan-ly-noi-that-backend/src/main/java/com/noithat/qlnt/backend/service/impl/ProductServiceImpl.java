@@ -1028,4 +1028,21 @@ public class ProductServiceImpl implements IProductService {
                                 .sanPhamLienQuan(relatedProducts)
                                 .build();
         }
+
+        @Override
+        @Transactional(readOnly = true)
+        public java.util.List<com.noithat.qlnt.backend.dto.response.ProductBasicResponse> getBasicProducts() {
+                return sanPhamRepository.findAll().stream()
+                        .map(sp -> {
+                                Integer maDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getMaDanhMuc() : null;
+                                String tenDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getTenDanhMuc() : null;
+                                return new com.noithat.qlnt.backend.dto.response.ProductBasicResponse(
+                                        sp.getMaSanPham(),
+                                        sp.getTenSanPham(),
+                                        maDanhMuc,
+                                        tenDanhMuc
+                                );
+                        })
+                        .collect(java.util.stream.Collectors.toList());
+        }
 }

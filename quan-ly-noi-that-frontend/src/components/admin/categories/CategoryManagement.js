@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { IoAdd } from 'react-icons/io5';
+import React, { useState, useEffect } from 'react';
 import api from '../../../api';
 import DataTable from '../../shared/DataTable';
 import Modal from '../../shared/Modal';
@@ -9,117 +8,102 @@ const CategoryManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [categoryToDelete, setCategoryToDelete] = useState(null);
-
+  // Form state
   const [categoryForm, setCategoryForm] = useState({
     tenDanhMuc: '',
     moTa: '',
     maDanhMucCha: ''
   });
 
-  // Map API category object -> UI shape
-  const mapCategoryFromApi = (c) => ({
-    id: c.maDanhMuc || c.id,
-    tenDanhMuc: c.tenDanhMuc || '',
-    moTa: c.moTa || '',
-    maDanhMucCha: c.maDanhMucCha || null,
-    tenDanhMucCha: c.tenDanhMucCha || '',
-    trangThai: c.trangThai !== false,
-    ngayTao: c.ngayTao || '',
-    ngayCapNhat: c.ngayCapNhat || ''
-  });
+  // Modal states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
-  // Map UI shape -> API payload
-  const mapCategoryToApi = (c) => ({
-    tenDanhMuc: c.tenDanhMuc,
-    moTa: c.moTa,
-    maDanhMucCha: c.maDanhMucCha ? parseInt(c.maDanhMucCha) : null
-  });
+  // Fetch categories
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const data = await api.get('/api/categories');
-      if (Array.isArray(data)) {
-        setCategories(data.map(mapCategoryFromApi));
-      } else if (data && data.content) {
-        setCategories(data.content.map(mapCategoryFromApi));
-      } else {
-        setCategories([]);
-      }
+      const categoryList = Array.isArray(data) ? data : (data?.content || []);
+      setCategories(categoryList);
     } catch (err) {
-      setError(err);
-      console.error('Fetch categories error', err);
+      setError(err.message || 'Không thể tải danh sách danh mục');
+      console.error('Error fetching categories:', err);
     } finally {
       setIsLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+  };
 
   const handleAddCategory = async () => {
     try {
-      const payload = mapCategoryToApi(categoryForm);
-      const created = await api.post('/api/categories', { body: payload });
-      const createdMapped = mapCategoryFromApi(created);
-      setCategories(prev => [...prev, createdMapped]);
+      const payload = {
+        tenDanhMuc: categoryForm.tenDanhMuc,
+        moTa: categoryForm.moTa,
+        maDanhMucCha: categoryForm.maDanhMucCha ? parseInt(categoryForm.maDanhMucCha) : null
+      };
+      await api.post('/api/categories', { body: payload });
+      await fetchCategories();
       setShowAddModal(false);
       resetForm();
     } catch (err) {
-      console.error('Add category error', err);
-      setError(err);
+      alert('Lỗi thêm danh mục: ' + (err.message || 'Unknown error'));
+      console.error('Add category error:', err);
     }
   };
 
   const handleEditCategory = async () => {
+    if (!selectedCategory?.maDanhMuc) return;
     try {
-      const payload = mapCategoryToApi(categoryForm);
-      await api.put(`/api/categories/${selectedCategory.id}`, { body: payload });
-      setCategories(prev => prev.map(c => c.id === selectedCategory.id ? { ...c, ...categoryForm } : c));
+      const payload = {
+        tenDanhMuc: categoryForm.tenDanhMuc,
+        moTa: categoryForm.moTa,
+        maDanhMucCha: categoryForm.maDanhMucCha ? parseInt(categoryForm.maDanhMucCha) : null
+      };
+      await api.put(`/api/categories/${selectedCategory.maDanhMuc}`, { body: payload });
+      await fetchCategories();
       setShowEditModal(false);
       setSelectedCategory(null);
       resetForm();
     } catch (err) {
-      console.error('Edit category error', err);
-      setError(err);
+      alert('Lỗi cập nhật danh mục: ' + (err.message || 'Unknown error'));
+      console.error('Edit category error:', err);
     }
   };
 
-  const handleDeleteCategory = (id) => {
-    const category = categories.find(c => c.id === id);
-    setCategoryToDelete(category);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteCategory = async () => {
-    if (!categoryToDelete) return;
-
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete?.maDanhMuc) return;
     try {
-      await api.del(`/api/categories/${categoryToDelete.id}`);
-      setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
+      await api.del(`/api/categories/${categoryToDelete.maDanhMuc}`);
+      await fetchCategories();
       setShowDeleteConfirm(false);
       setCategoryToDelete(null);
     } catch (err) {
-      console.error('Delete category error', err);
-      setError(err);
+      alert('Lỗi xóa danh mục: ' + (err.message || 'Unknown error'));
+      console.error('Delete category error:', err);
     }
   };
 
-  const handleEditClick = (category) => {
+  const openEditModal = (category) => {
     setSelectedCategory(category);
     setCategoryForm({
-      tenDanhMuc: category.tenDanhMuc,
-      moTa: category.moTa,
-      maDanhMucCha: category.maDanhMucCha
+      tenDanhMuc: category.tenDanhMuc || '',
+      moTa: category.moTa || '',
+      maDanhMucCha: category.maDanhMucCha || ''
     });
     setShowEditModal(true);
+  };
+
+  const openDeleteConfirm = (category) => {
+    setCategoryToDelete(category);
+    setShowDeleteConfirm(true);
   };
 
   const resetForm = () => {
@@ -130,59 +114,105 @@ const CategoryManagement = () => {
     });
   };
 
-  const filteredCategories = categories.filter(category =>
-    category.tenDanhMuc.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.tenDanhMucCha.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+  // Table columns
   const columns = [
-    { key: 'tenDanhMuc', label: 'Tên danh mục', sortable: true },
-    { key: 'tenDanhMucCha', label: 'Danh mục cha', sortable: true, render: (value) => value || 'Danh mục gốc' },
-    { key: 'trangThai', label: 'Trạng thái', sortable: true, render: (value) => (
-      <span className={`px-2 py-1 rounded-full text-xs ${value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-        {value ? 'Hoạt động' : 'Ngừng'}
-      </span>
-    )}
+    {
+      key: 'maDanhMuc',
+      label: 'Mã',
+      render: (value) => <span>#{value}</span>
+    },
+    {
+      key: 'tenDanhMuc',
+      label: 'Tên danh mục',
+      render: (value, row) => (
+        <div>
+          <div className="font-medium">{value}</div>
+          {row.tenDanhMucCha && (
+            <div className="text-xs text-gray-500">Thuộc: {row.tenDanhMucCha}</div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'moTa',
+      label: 'Mô tả',
+      render: (value) => value || <span className="text-gray-400">—</span>
+    },
+    {
+      key: 'trangThai',
+      label: 'Trạng thái',
+      render: (value) => (
+        <span className={`px-2 py-1 text-xs rounded ${
+          value ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+        }`}>
+          {value ? 'Hoạt động' : 'Không hoạt động'}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      label: 'Thao tác',
+      render: (_, row) => (
+        <div className="flex gap-2">
+          <button
+            onClick={() => openEditModal(row)}
+            className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded"
+          >
+            Sửa
+          </button>
+          <button
+            onClick={() => openDeleteConfirm(row)}
+            className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded"
+          >
+            Xóa
+          </button>
+        </div>
+      )
+    }
   ];
-
-  // Get available parent categories (exclude current category and its children)
-  const getAvailableParents = (excludeId = null) => {
-    return categories.filter(cat => {
-      if (excludeId && cat.id === excludeId) return false;
-      // In a real implementation, you'd check for circular references
-      // For now, just exclude self
-      return true;
-    });
-  };
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Quản lý danh mục</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-        >
-          <IoAdd className="w-5 h-5" />
-          <span>Thêm danh mục</span>
-        </button>
+      <div className="bg-white rounded shadow">
+        {/* Header */}
+        <div className="p-4 border-b flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Quản lý danh mục</h2>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Thêm danh mục
+          </button>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="m-4 p-3 bg-red-50 text-red-600 rounded">
+            {error}
+          </div>
+        )}
+
+        {/* Table */}
+        <div className="p-4">
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Đang tải...</div>
+          ) : (
+            <DataTable
+              data={categories}
+              columns={columns}
+              emptyMessage="Chưa có danh mục nào"
+            />
+          )}
+        </div>
       </div>
 
-      <DataTable
-        data={filteredCategories}
-        columns={columns}
-        onEdit={handleEditClick}
-        onDelete={handleDeleteCategory}
-        searchable={true}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        isLoading={isLoading}
-      />
-
-      {/* Add Category Modal */}
+      {/* Add Modal */}
       <Modal
         isOpen={showAddModal}
-        onClose={() => { setShowAddModal(false); resetForm(); }}
+        onClose={() => {
+          setShowAddModal(false);
+          resetForm();
+        }}
         title="Thêm danh mục mới"
       >
         <div className="space-y-4">
@@ -191,8 +221,9 @@ const CategoryManagement = () => {
             <input
               type="text"
               value={categoryForm.tenDanhMuc}
-              onChange={(e) => setCategoryForm(prev => ({ ...prev, tenDanhMuc: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              onChange={(e) => setCategoryForm({ ...categoryForm, tenDanhMuc: e.target.value })}
+              className="w-full border rounded px-3 py-2"
+              placeholder="Nhập tên danh mục"
               required
             />
           </div>
@@ -201,9 +232,10 @@ const CategoryManagement = () => {
             <label className="block text-sm font-medium mb-1">Mô tả</label>
             <textarea
               value={categoryForm.moTa}
-              onChange={(e) => setCategoryForm(prev => ({ ...prev, moTa: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
-              rows={3}
+              onChange={(e) => setCategoryForm({ ...categoryForm, moTa: e.target.value })}
+              className="w-full border rounded px-3 py-2"
+              placeholder="Nhập mô tả"
+              rows="3"
             />
           </div>
 
@@ -211,40 +243,47 @@ const CategoryManagement = () => {
             <label className="block text-sm font-medium mb-1">Danh mục cha</label>
             <select
               value={categoryForm.maDanhMucCha}
-              onChange={(e) => setCategoryForm(prev => ({ ...prev, maDanhMucCha: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              onChange={(e) => setCategoryForm({ ...categoryForm, maDanhMucCha: e.target.value })}
+              className="w-full border rounded px-3 py-2"
             >
-              <option value="">Danh mục gốc</option>
-              {getAvailableParents().map(cat => (
-                <option key={cat.id} value={cat.id}>
+              <option value="">-- Không có --</option>
+              {categories.map((cat) => (
+                <option key={cat.maDanhMuc} value={cat.maDanhMuc}>
                   {cat.tenDanhMuc}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4">
             <button
-              onClick={() => { setShowAddModal(false); resetForm(); }}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              onClick={() => {
+                setShowAddModal(false);
+                resetForm();
+              }}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
             >
               Hủy
             </button>
             <button
               onClick={handleAddCategory}
               disabled={!categoryForm.tenDanhMuc}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Thêm danh mục
+              Thêm
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* Edit Category Modal */}
+      {/* Edit Modal */}
       <Modal
         isOpen={showEditModal}
-        onClose={() => { setShowEditModal(false); setSelectedCategory(null); resetForm(); }}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedCategory(null);
+          resetForm();
+        }}
         title="Chỉnh sửa danh mục"
       >
         <div className="space-y-4">
@@ -253,8 +292,9 @@ const CategoryManagement = () => {
             <input
               type="text"
               value={categoryForm.tenDanhMuc}
-              onChange={(e) => setCategoryForm(prev => ({ ...prev, tenDanhMuc: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              onChange={(e) => setCategoryForm({ ...categoryForm, tenDanhMuc: e.target.value })}
+              className="w-full border rounded px-3 py-2"
+              placeholder="Nhập tên danh mục"
               required
             />
           </div>
@@ -263,9 +303,10 @@ const CategoryManagement = () => {
             <label className="block text-sm font-medium mb-1">Mô tả</label>
             <textarea
               value={categoryForm.moTa}
-              onChange={(e) => setCategoryForm(prev => ({ ...prev, moTa: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
-              rows={3}
+              onChange={(e) => setCategoryForm({ ...categoryForm, moTa: e.target.value })}
+              className="w-full border rounded px-3 py-2"
+              placeholder="Nhập mô tả"
+              rows="3"
             />
           </div>
 
@@ -273,31 +314,37 @@ const CategoryManagement = () => {
             <label className="block text-sm font-medium mb-1">Danh mục cha</label>
             <select
               value={categoryForm.maDanhMucCha}
-              onChange={(e) => setCategoryForm(prev => ({ ...prev, maDanhMucCha: e.target.value }))}
-              className="w-full p-2 border rounded-lg"
+              onChange={(e) => setCategoryForm({ ...categoryForm, maDanhMucCha: e.target.value })}
+              className="w-full border rounded px-3 py-2"
             >
-              <option value="">Danh mục gốc</option>
-              {getAvailableParents(selectedCategory?.id).map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.tenDanhMuc}
-                </option>
-              ))}
+              <option value="">-- Không có --</option>
+              {categories
+                .filter((cat) => cat.maDanhMuc !== selectedCategory?.maDanhMuc)
+                .map((cat) => (
+                  <option key={cat.maDanhMuc} value={cat.maDanhMuc}>
+                    {cat.tenDanhMuc}
+                  </option>
+                ))}
             </select>
           </div>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4">
             <button
-              onClick={() => { setShowEditModal(false); setSelectedCategory(null); resetForm(); }}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              onClick={() => {
+                setShowEditModal(false);
+                setSelectedCategory(null);
+                resetForm();
+              }}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
             >
               Hủy
             </button>
             <button
               onClick={handleEditCategory}
               disabled={!categoryForm.tenDanhMuc}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Lưu thay đổi
+              Cập nhật
             </button>
           </div>
         </div>
@@ -306,26 +353,29 @@ const CategoryManagement = () => {
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={showDeleteConfirm}
-        onClose={() => { setShowDeleteConfirm(false); setCategoryToDelete(null); }}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setCategoryToDelete(null);
+        }}
         title="Xác nhận xóa"
       >
         <div className="space-y-4">
-          <p className="text-gray-700">
-            Bạn có chắc muốn xóa danh mục "{categoryToDelete?.tenDanhMuc}"?
-          </p>
-          <p className="text-sm text-gray-500">
-            Hành động này không thể hoàn tác.
-          </p>
-          <div className="flex justify-end space-x-2">
+          <p>Bạn có chắc chắn muốn xóa danh mục <strong>{categoryToDelete?.tenDanhMuc}</strong>?</p>
+          <p className="text-sm text-gray-500">Hành động này không thể hoàn tác.</p>
+
+          <div className="flex justify-end gap-2 pt-4">
             <button
-              onClick={() => { setShowDeleteConfirm(false); setCategoryToDelete(null); }}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setCategoryToDelete(null);
+              }}
+              className="px-4 py-2 border rounded hover:bg-gray-50"
             >
               Hủy
             </button>
             <button
-              onClick={confirmDeleteCategory}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              onClick={handleDeleteCategory}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
               Xóa
             </button>

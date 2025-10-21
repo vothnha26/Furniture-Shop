@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Outlet } from 'react-router-dom';
-import { IoLogOut, IoMenu, IoClose, IoNotifications } from 'react-icons/io5';
+import { IoLogOut, IoMenu, IoClose } from 'react-icons/io5';
 import StaffDashboard from './StaffDashboard';
+import StaffNotificationPopup from './StaffNotificationPopup';
 import WarehouseDashboard from '../shared/WarehouseDashboard';
 import CustomerManagement from '../admin/customers/CustomerManagement';
 import OrderManagement from './orders/OrderManagement';
 import InventoryManagement from './inventory/InventoryManagement';
-import CustomerSupport from './support/CustomerSupport';
 import LiveChat from '../shared/LiveChat';
 // PromotionManagement replaced by DiscountManagement in menus
-import SalesManagement from './orders/SalesManagement';
 import InventoryAlerts from './inventory/InventoryAlerts';
 import SupplierManagement from '../shared/SupplierManagement';
 import ShippingTracking from './orders/ShippingTracking';
@@ -24,7 +23,6 @@ import NewItemsSlider from '../shared/NewItemsSlider';
 import ProductSlider from '../shared/ProductSlider';
 import TestimonialSlider from '../shared/TestimonialSlider';
 import Newsletter from '../shared/Newsletter';
-import Footer from '../shared/Footer';
 
 // Import CSS files
 import '../../slider.css';
@@ -54,19 +52,17 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
 
   // Organized by category
   const staffCategories = {
-    'Quản lý': [
-      { id: 'customers', name: '👤 Khách hàng', component: CustomerManagement },
+    'Khách hàng': [
+      { id: 'customers', name: '👤 Quản lý khách hàng', component: CustomerManagement },
+    ],
+    'Đơn hàng': [
       { id: 'orders', name: '📋 Đơn hàng', component: OrderManagement },
     ],
     'Kho': [
-      { id: 'inventory', name: '📦 Kho', component: InventoryManagement },
+      { id: 'inventory', name: '📦 Tồn kho', component: InventoryManagement },
       { id: 'alerts', name: '⚠️ Cảnh báo', component: InventoryAlerts }
     ],
-    'Bán hàng': [
-      { id: 'sales', name: '💰 Bán hàng', component: SalesManagement },
-    ],
     'Hỗ trợ': [
-      { id: 'support', name: '🎧 Hỗ trợ', component: CustomerSupport },
       { id: 'livechat', name: '💬 Live Chat', component: LiveChat }
     ]
   };
@@ -185,7 +181,6 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
           <ProductSlider />
           <TestimonialSlider />
           <Newsletter />
-          <Footer />
         </div>
       );
     }
@@ -247,13 +242,8 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-4">
-              {/* Notifications */}
-              <button className="relative p-2 text-gray-600 hover:text-gray-900">
-                <IoNotifications className="w-6 h-6" />
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  3
-                </span>
-              </button>
+              {/* Notifications - Using StaffNotificationPopup */}
+              <StaffNotificationPopup user={{ maNhanVien: 1 }} />
 
               {/* User Menu */}
               <div className="flex items-center gap-3">
@@ -311,6 +301,23 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
           <aside className="hidden md:block md:col-span-1">
             <div className="sticky top-20 bg-white border border-gray-200 rounded-lg p-4 space-y-4">
               <div className="text-sm font-semibold text-gray-700">Menu</div>
+              
+              {/* System Views (Home, Dashboard) */}
+              <div className="space-y-1">
+                {systemViews.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => navTo(item.id, null)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                      activeItem === item.id ? 'bg-primary text-white' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category Groups */}
               {Object.keys(categories).map((group) => (
                 <div key={group} className="">
                   <div className="text-xs font-medium text-gray-500 mt-2 mb-1">{group}</div>
@@ -339,38 +346,7 @@ const StaffLayout = ({ userRole = 'staff', children }) => {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-4">FurniShop</h3>
-              <p className="text-gray-400 text-sm">
-                Hệ thống quản lý bán hàng và kho hàng chuyên nghiệp.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Hỗ trợ</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>Hướng dẫn sử dụng</li>
-                <li>Liên hệ IT</li>
-                <li>Báo cáo lỗi</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Thông tin</h4>
-              <div className="space-y-2 text-sm text-gray-400">
-                <p>📞 Hotline: 1900 1234</p>
-                <p>✉️ support@furnishop.com</p>
-                <p>📍 123 Đường ABC, TP.HCM</p>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2024 FurniShop. Tất cả quyền được bảo lưu.</p>
-          </div>
-        </div>
-      </footer>
+      {/* Footer removed for staff interface per request */}
     </div>
   );
 };

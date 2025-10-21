@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { IoChatbubbles, IoTime, IoCheckmarkCircle, IoClose, IoAdd, IoEye, IoCreate, IoTrash, IoCall, IoMail, IoPerson } from 'react-icons/io5';
 import api from '../../../api';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Mapping functions for Vietnamese API field names
 const mapTicketFromApi = (ticket) => ({
@@ -38,6 +41,8 @@ const CustomerSupport = () => {
   const [showEditTicketModal, setShowEditTicketModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const stompRef = useRef(null);
+  const { user } = useAuth();
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterAssignedTo, setFilterAssignedTo] = useState('all');
@@ -69,6 +74,16 @@ const CustomerSupport = () => {
 
   useEffect(() => {
     fetchTickets();
+    // connect STOMP for staff notifications
+    // connectStomp is stable here and we intentionally don't include it in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    connectStomp();
+
+    return () => {
+      if (stompRef.current) {
+        try { stompRef.current.deactivate(); } catch (e) {}
+      }
+    };
   }, []);
 
   const statusConfig = {
@@ -153,10 +168,110 @@ const CustomerSupport = () => {
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
-      console.log('Sending message:', newMessage);
-      // Trong thực tế, đây sẽ là API call để lưu tin nhắn vào database
+      // If a ticket is selected and we have a sessionId for it, send via STOMP
+      const text = newMessage.trim();
+      if (selectedTicket && stompRef.current && stompRef.current.connected && selectedTicket.sessionId) {
+        const payload = {
+          senderType: 'staff',
+          senderId: user?.maNhanVien || user?.ma_nhan_vien || user?.id || null,
+          content: text
+        };
+        try {
+          stompRef.current.publish({ destination: `/app/chat.send/${selectedTicket.sessionId}`, body: JSON.stringify(payload) });
+        } catch (e) {
+          console.error('STOMP publish failed', e);
+        }
+        // Do not optimistically append when STOMP is connected; server will broadcast the saved message
+        setNewMessage('');
+        return;
+      }
+
+      // fallback: local UI update and API call
+      console.log('Sending message (fallback):', newMessage);
       setNewMessage('');
     }
+  };
+
+  const connectStomp = () => {
+    if (stompRef.current && stompRef.current.connected) return;
+
+    const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
+    const sockUrl = base.replace(/\/$/, '') + '/ws-notifications';
+
+    const client = new Client({
+      webSocketFactory: () => new SockJS(sockUrl),
+      reconnectDelay: 5000,
+      debug: () => {}
+    });
+
+    client.onConnect = () => {
+      // subscribe to staff personal topic
+      const staffId = user?.maNhanVien || user?.ma_nhan_vien || user?.id || null;
+      if (staffId) {
+        client.subscribe(`/topic/staff/${staffId}`, (msg) => {
+          try {
+            const body = JSON.parse(msg.body);
+            if (body.type === 'assigned' && body.sessionId) {
+              // Map sessionId to ticket by customerId (khach_hang_id)
+              const customerId = body.customerId;
+              setTickets(prev => prev.map(t => {
+                if (t.customerId && customerId && String(t.customerId) === String(customerId)) {
+                  // attach sessionId to ticket
+                  const updated = { ...t, sessionId: body.sessionId };
+                  // subscribe to session topic for live messages
+                  try {
+                    client.subscribe(`/topic/chat/session-${body.sessionId}`, (m) => {
+                      try {
+                        const b = JSON.parse(m.body);
+                        const incoming = { id: b.id || Date.now(), senderType: b.senderType, sender: b.senderType === 'staff' ? 'NV' : 'KH', message: b.content || b.text, sentAt: b.sentAt || new Date().toLocaleString() };
+                        // dedupe
+                        setTickets(prev2 => prev2.map(tt => {
+                          if (tt.id !== updated.id) return tt;
+                          const exists = (tt.messages || []).some(mm => String(mm.id) === String(incoming.id));
+                          if (exists) return tt;
+                          return { ...tt, messages: [...(tt.messages||[]), incoming] };
+                        }));
+                      } catch (ee) { console.warn('Failed to parse incoming session msg', ee); }
+                    });
+                  } catch (e) { console.warn('Failed to subscribe to session topic', e); }
+
+                  // add a small system message to indicate a session is active
+                  updated.messages = [...(updated.messages || []), { id: `sys-${Date.now()}`, senderType: 'system', sender: 'system', message: 'Phiên chat đã được tạo/được gán cho bạn.', sentAt: new Date().toLocaleString() }];
+                  return updated;
+                }
+                return t;
+              }));
+            }
+          } catch (e) { console.warn('Failed to parse staff topic message', e); }
+        });
+      }
+
+      // subscribe to all session topics present in loaded tickets
+      tickets.forEach(t => {
+        if (t.sessionId) {
+          client.subscribe(`/topic/chat/session-${t.sessionId}`, (msg) => {
+            try {
+              const body = JSON.parse(msg.body);
+              const incoming = { id: body.id || Date.now(), senderType: body.senderType, sender: body.senderType === 'staff' ? 'NV' : 'KH', message: body.content || body.text, sentAt: body.sentAt || new Date().toLocaleString() };
+              // dedupe per ticket
+              setTickets(prev => prev.map(tt => {
+                if (tt.id !== t.id) return tt;
+                const exists = (tt.messages || []).some(mm => String(mm.id) === String(incoming.id));
+                if (exists) return tt;
+                return { ...tt, messages: [...(tt.messages||[]), incoming] };
+              }));
+            } catch (e) { console.warn('Failed to parse session message', e); }
+          });
+        }
+      });
+    };
+
+    client.onStompError = (frame) => {
+      console.error('STOMP error', frame);
+    };
+
+    stompRef.current = client;
+    client.activate();
   };
 
   const getTicketResponses = (ticketId) => {

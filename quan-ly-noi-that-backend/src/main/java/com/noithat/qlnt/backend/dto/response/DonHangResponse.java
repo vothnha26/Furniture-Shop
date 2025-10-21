@@ -30,6 +30,9 @@ public class DonHangResponse {
     private String trangThai;
     private String diaChiGiaoHang; // Shipping address, expose for frontend
     private String voucherCode;
+    // Payment info for UI
+    private String phuongThucThanhToan;
+    private String trangThaiThanhToan;
     private List<ChiTietDonHangResponse> chiTietDonHangList;
     private List<DonHangDichVuResponse> donHangDichVuList; // Danh sách dịch vụ
 }

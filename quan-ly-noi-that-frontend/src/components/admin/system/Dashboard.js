@@ -36,7 +36,7 @@ const Dashboard = () => {
 
   const quickActions = useMemo(() => [
     { title: 'Tạo đơn hàng mới', icon: IoCheckmarkCircle, color: 'bg-green-600', action: 'route', route: '/admin/orders' },
-    { title: 'Nhập hàng', icon: IoStorefront, color: 'bg-blue-600', action: 'route', route: '/admin/inventory/alerts' },
+    { title: 'Quản lý tài khoản', icon: IoPeople, color: 'bg-cyan-600', action: 'route', route: '/admin/accounts' },
     { title: 'Thêm khách hàng', icon: IoPeople, color: 'bg-purple-600', action: 'route', route: '/admin/customers' },
     { title: 'Tạo khuyến mãi', icon: IoCalendar, color: 'bg-orange-600', action: 'route', route: '/admin/promotions' }
   ], []);

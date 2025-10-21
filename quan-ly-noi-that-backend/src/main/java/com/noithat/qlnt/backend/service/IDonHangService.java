@@ -13,5 +13,11 @@ public interface IDonHangService {
     List<DonHangResponse> getTatCaDonHang();
     List<DonHangResponse> getDonHangByKhachHang(Integer maKhachHang);
     void capNhatTrangThai(Integer id, String trangThai);
+    /**
+     * Cập nhật trạng thái thanh toán cho đơn hàng.
+     * Chấp nhận cả giá trị nội bộ (PAID/UNPAID/PENDING/FAILED) và bản dịch UI
+     * (DA_THANH_TOAN/CHUA_THANH_TOAN). Giá trị sẽ được chuẩn hoá trước khi lưu.
+     */
+    void capNhatTrangThaiThanhToan(Integer id, String trangThaiThanhToan);
     ThongKeBanHangResponse thongKeBanHang();
 }

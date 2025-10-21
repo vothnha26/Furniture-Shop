@@ -41,6 +41,9 @@ public class SecurityConfig {
                 // 1. Allow authentication endpoints
                 .requestMatchers("/api/v1/auth/**").permitAll()
 
+                // WebSocket SockJS handshake endpoints
+                .requestMatchers("/ws-notifications/**").permitAll()
+
                 // 2. Admin-only routes
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 

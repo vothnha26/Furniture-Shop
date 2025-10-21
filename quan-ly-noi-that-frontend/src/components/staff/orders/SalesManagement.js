@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { IoAdd, IoSearch, IoTrash, IoEye, IoCart, IoReceipt, IoTime, IoCheckmark } from 'react-icons/io5';
 import api from '../../../api';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const SalesManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -76,19 +76,21 @@ const SalesManagement = () => {
     if (!s) return 'pending';
     // map common variants and backend constants
     if (['pending', 'cho xac nhan', 'chờ xác nhận', 'chờ xử lý', 'cho xu ly', 'cho-xac-nhan', 'cho_xac_nhan', 'cho_xu_ly'].includes(s)) return 'pending';
-    if (['processing', 'dang xu ly', 'đang xử lý', 'dang-xu-ly', 'xac_nhan', 'xac-nhan', 'xacnhan', 'xac nhan', 'xác nhận', 'xacnhan', 'xác nhận'].includes(s)) return 'processing';
+    if (['processing', 'dang xu ly', 'đang xử lý', 'dang-xu-ly', 'dang_xu_ly', 'xac_nhan', 'xac-nhan', 'xacnhan', 'xac nhan', 'xác nhận'].includes(s)) return 'processing';
     if (['preparing', 'dang_chuan_bi', 'dang chuan bi', 'đang chuẩn bị', 'dang-chuan-bi', 'dang chuan bi'].includes(s)) return 'processing';
-    if (['shipping', 'dang giao', 'đang giao', 'dang-giao', 'dang_giao', 'dang giao'].includes(s) || s === 'dang_giao' || s === 'dang giao') return 'shipping';
+    if (
+      ['shipping', 'dang giao', 'đang giao', 'dang-giao', 'dang_giao', 'dang giao', 'dang_giao_hang', 'đang giao hàng'].includes(s)
+      || s === 'dang_giao' || s === 'dang giao' || s === 'dang_giao_hang'
+    ) return 'shipping';
     if (['completed', 'hoan thanh', 'hoàn thành', 'completed', 'hoan_thanh', 'hoan-thanh', 'hoant hanh'].includes(s)) return 'completed';
-    if (['cancelled', 'huy', 'hủy', 'da huy', 'đã hủy', 'huy_bo', 'huy-bo', 'huybo'].includes(s)) return 'cancelled';
-    // backend constant names
-    if (s === 'cho_xac_nhan' || s === 'xac_nhan' || s === 'dang_chuan_bi' || s === 'dang_giao' || s === 'hoan_thanh' || s === 'huy_bo') {
-      if (s === 'dang_giao') return 'shipping';
-      if (s === 'hoan_thanh') return 'completed';
-      if (s === 'huy_bo') return 'cancelled';
-      if (s === 'cho_xac_nhan') return 'pending';
-      return 'processing';
-    }
+    if (['cancelled', 'huy', 'hủy', 'da huy', 'đã hủy', 'huy_bo', 'huy-bo', 'huybo', 'da_huy'].includes(s)) return 'cancelled';
+    // backend constant names - explicit mappings
+    if (s === 'cho_xu_ly') return 'pending';
+    if (s === 'dang_xu_ly') return 'processing';
+    if (s === 'dang_giao_hang') return 'shipping';
+    if (s === 'da_giao_hang') return 'delivered';
+    if (s === 'hoan_thanh') return 'completed';
+    if (s === 'da_huy') return 'cancelled';
     return 'pending';
   };
 
@@ -137,10 +139,11 @@ const SalesManagement = () => {
     return response;
   };
 
-  const updateOrder = async (id, orderData) => {
-    const response = await api.put(`/api/banhang/donhang/${id}`, orderData);
-    return response;
-  };
+  // NOTE: legacy helper not used anymore after switching to unified endpoints
+  // const updateOrder = async (id, orderData) => {
+  //   const response = await api.put(`/api/banhang/donhang/${id}`, orderData);
+  //   return response;
+  // }
 
   const deleteOrder = async (id) => {
     const response = await api.delete(`/api/banhang/donhang/${id}`);
@@ -150,7 +153,7 @@ const SalesManagement = () => {
   const [orders, setOrders] = useState([]);
 
   // get logged-in user (staff) from AuthContext to identify who updates statuses
-  const { user } = useAuth();
+  // removed AuthContext usage for status updates; backend endpoint only needs trangThai
 
   const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
   const [createStep, setCreateStep] = useState(1); // 1 = chọn sản phẩm, 2 = thông tin & review
@@ -182,7 +185,8 @@ const SalesManagement = () => {
     fetchVariants('');
     return () => { active = false; };
   }, [showCreateOrderModal]);
-  const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+  const navigate = useNavigate();
+  // detail modal no longer used; we navigate to /staff/orders/:id instead
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -216,6 +220,7 @@ const SalesManagement = () => {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'processing': return 'bg-blue-100 text-blue-800';
       case 'shipping': return 'bg-purple-100 text-purple-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
       case 'completed': return 'bg-green-100 text-green-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -225,12 +230,42 @@ const SalesManagement = () => {
   const getStatusText = (status) => {
     switch (status) {
       case 'pending': return 'Chờ xử lý';
-      case 'processing': return 'Đang xử lý';
+      case 'processing': return 'Sẵn sàng';
       case 'shipping': return 'Đang giao';
+      case 'delivered': return 'Đã giao hàng';
       case 'completed': return 'Hoàn thành';
       case 'cancelled': return 'Đã hủy';
       default: return 'Không xác định';
     }
+  };
+
+  // Step-by-step transition rules
+  const getAllowedStatuses = (current) => {
+    switch (current) {
+      case 'pending':
+        return ['pending', 'processing', 'cancelled'];
+      case 'processing':
+        return ['processing', 'shipping', 'cancelled'];
+      case 'shipping':
+        return ['shipping', 'delivered', 'cancelled'];
+      case 'delivered':
+        return ['delivered', 'completed', 'cancelled'];
+      case 'completed':
+        return ['completed'];
+      case 'cancelled':
+        return ['cancelled'];
+      default:
+        return ['pending', 'cancelled'];
+    }
+  };
+
+  const statusOptionDefs = {
+    pending: 'Chờ xử lý',
+    processing: 'Sẵn sàng',
+    shipping: 'Đang giao',
+    delivered: 'Đã giao hàng',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy'
   };
 
   const formatDate = (value) => {
@@ -434,8 +469,8 @@ const SalesManagement = () => {
   };
 
   const handleViewOrder = (order) => {
-    setSelectedOrder(order);
-    setShowOrderDetailModal(true);
+    const id = order?.id ?? order?.orderNumber;
+    if (id) navigate(`/staff/orders/${id}`);
   };
 
   const handleProcessPayment = (order) => {
@@ -445,16 +480,19 @@ const SalesManagement = () => {
 
   const handleCompletePayment = async () => {
     try {
-      await updateOrder(selectedOrder.id, { trangThai: 'completed' });
-      // Refresh orders data
+      // Đánh dấu thanh toán là PAID cho đơn hàng đã chọn
+      await api.put(`/api/banhang/donhang/${selectedOrder.id}/thanh-toan/trang-thai`, { trangThaiThanhToan: 'PAID' });
+      // Làm mới danh sách đơn hàng
       const ordersData = await api.get('/api/banhang/donhang');
       if (Array.isArray(ordersData)) {
         setOrders(ordersData.map(mapSalesFromApi));
       }
       setShowPaymentModal(false);
+      showToast('Đã đánh dấu đơn hàng là đã thanh toán.');
     } catch (err) {
       console.error('Complete payment error', err);
       setError(err);
+      alert(`Không thể cập nhật thanh toán: ${err?.data?.message || err.message || 'Lỗi không xác định'}`);
     }
   };
 
@@ -473,20 +511,17 @@ const SalesManagement = () => {
       }
     }
   };
-  const callStatusEndpoint = async (orderId, action, payload = {}) => {
-    switch (action) {
-      case 'confirm':
-        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/confirm`, { body: payload });
-      case 'prepare':
-        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/prepare`, { body: payload });
-      case 'ship':
-        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/ship`, { body: payload });
-      case 'complete':
-        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/complete`, { body: payload });
-      case 'cancel':
-        return api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/cancel`, { body: payload });
-      default:
-        return api.put(`/api/v1/quan-ly-trang-thai-don-hang/cap-nhat-trang-thai/${orderId}`, { body: payload });
+  // Map UI status -> backend enum constant
+  const toBackendStatus = (uiStatus) => {
+    switch (uiStatus) {
+      case 'pending': return 'CHO_XU_LY';
+      // Map UI "Sẵn sàng" to backend "ĐANG CHUẨN BỊ" to satisfy transition rules
+      case 'processing': return 'DANG_CHUAN_BI';
+      case 'shipping': return 'DANG_GIAO_HANG';
+      case 'delivered': return 'DA_GIAO_HANG';
+      case 'completed': return 'HOAN_THANH';
+      case 'cancelled': return 'DA_HUY';
+      default: return 'CHO_XU_LY';
     }
   };
 
@@ -496,64 +531,37 @@ const SalesManagement = () => {
       return;
     }
 
-    // Optimistic UI: update the order status locally first so the select reflects the change immediately
+    // Determine allowed transition based on current status
     const prevOrders = [...orders];
+    const currentOrder = prevOrders.find(o => o.id === orderId);
+    const currentStatus = currentOrder?.status ?? 'pending';
+    const allowed = getAllowedStatuses(currentStatus);
+    if (newStatus === currentStatus) return;
+    if (!allowed.includes(newStatus)) {
+      alert('Vui lòng chuyển trạng thái theo từng bước.');
+      return;
+    }
+
+    // Optimistic UI: update the order status locally first so the select reflects the change immediately
     const updated = prevOrders.map(o => o.id === orderId ? { ...o, status: newStatus } : o);
     setOrders(updated);
 
     try {
       console.log('Updating status for order', orderId, '->', newStatus);
-      // Prefer sending staff's display name, fall back to id or 'admin'
-      const staffName = user?.hoTen ?? user?.name ?? user?.username ?? (user?.maNhanVien ? String(user.maNhanVien) : (user?.id ? String(user.id) : 'admin'));
-      // Include maNhanVien when available (backend may accept it) so Postman-like payloads match
-      const payload = { nguoiThayDoi: staffName, ghiChu: '', maNhanVien: user?.maNhanVien ?? user?.id };
-      console.log('Status change payload:', payload);
-      // Determine previous status from local prevOrders
-      const prev = prevOrders.find(o => o.id === orderId);
-      const prevStatus = prev?.status ?? 'pending';
-
-      // If moving from pending -> processing, backend expects confirm first.
-      // capture the response from the endpoint so we can update the specific order locally
-      let resp = null;
-      if (prevStatus === 'pending' && newStatus === 'processing') {
-        console.log('Sequencing confirm -> prepare for pending -> processing');
-        // call confirm endpoint first
-        const confirmResp = await callStatusEndpoint(orderId, 'confirm', payload);
-        console.log('Confirm response:', confirmResp);
-        // then call prepare and capture its response
-        resp = await callStatusEndpoint(orderId, 'prepare', payload);
-      } else if (newStatus === 'pending') {
-        resp = await callStatusEndpoint(orderId, 'confirm', payload);
-      } else if (newStatus === 'processing') {
-        resp = await callStatusEndpoint(orderId, 'prepare', payload);
-      } else if (newStatus === 'shipping') {
-        resp = await callStatusEndpoint(orderId, 'ship', payload);
-      } else if (newStatus === 'completed') {
-        resp = await callStatusEndpoint(orderId, 'complete', payload);
-      } else if (newStatus === 'cancelled') {
-        resp = await callStatusEndpoint(orderId, 'cancel', payload);
+      if (newStatus === 'completed') {
+        // Use service-backed complete endpoint to ensure all side-effects (PAID, points, stats)
+        await api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/complete`);
       } else {
-        resp = await callStatusEndpoint(orderId, 'generic', { trangThaiMoi: newStatus, nguoiCapNhat: staffName, maNhanVien: user?.maNhanVien ?? user?.id });
+        // Build payload for unified endpoint for other transitions
+        const backendStatus = toBackendStatus(newStatus);
+        console.log('Status change payload:', { trangThai: backendStatus });
+        await api.put(`/api/banhang/donhang/${orderId}/trangthai`, { trangThai: backendStatus });
       }
 
-      // If backend returns the updated order, apply it locally to avoid full refetch
-      // Note: backend includes `order` in the JSON response (controller added it).
-      if (resp && resp.order) {
-        try {
-          const updatedOrder = mapSalesFromApi(resp.order);
-          setOrders(prev => prev.map(o => (o.id === updatedOrder.id ? updatedOrder : o)));
-        } catch (e) {
-          // fallback to full refresh on mapping error
-          const ordersData = await api.get('/api/banhang/donhang');
-          if (Array.isArray(ordersData)) {
-            setOrders(ordersData.map(mapSalesFromApi));
-          }
-        }
-      } else {
-        const ordersData = await api.get('/api/banhang/donhang');
-        if (Array.isArray(ordersData)) {
-          setOrders(ordersData.map(mapSalesFromApi));
-        }
+      // Refresh orders data
+      const ordersData = await api.get('/api/banhang/donhang');
+      if (Array.isArray(ordersData)) {
+        setOrders(ordersData.map(mapSalesFromApi));
       }
     } catch (err) {
       // Log richer error details to help compare with Postman
@@ -673,6 +681,7 @@ const SalesManagement = () => {
                 <option value="pending">Chờ xử lý</option>
                 <option value="processing">Đang xử lý</option>
                 <option value="shipping">Đang giao</option>
+                <option value="delivered">Đã giao hàng</option>
                 <option value="completed">Hoàn thành</option>
                 <option value="cancelled">Đã hủy</option>
               </select>
@@ -774,11 +783,9 @@ const SalesManagement = () => {
                           onChange={(e) => handleChangeStatus(order.id, e.target.value)}
                           className="ml-2 px-2 py-1 border border-gray-200 rounded text-sm"
                         >
-                          <option value="pending">Chờ xử lý</option>
-                          <option value="processing">Đang xử lý</option>
-                          <option value="shipping">Đang giao</option>
-                          <option value="completed">Hoàn thành</option>
-                          <option value="cancelled">Đã hủy</option>
+                          {getAllowedStatuses(order.status ?? 'pending').map(s => (
+                            <option key={s} value={s}>{statusOptionDefs[s]}</option>
+                          ))}
                         </select>
                       </div>
                     </td>
@@ -991,10 +998,6 @@ const SalesManagement = () => {
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Giảm giá (VNĐ)</label>
-                        <input type="number" value={newOrder.discount} onChange={(e) => setNewOrder({ ...newOrder, discount: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nhập số tiền giảm giá" />
-                      </div>
-                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
                         <textarea value={newOrder.notes} onChange={(e) => setNewOrder({ ...newOrder, notes: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nhập ghi chú" />
                       </div>
@@ -1022,8 +1025,7 @@ const SalesManagement = () => {
                       </div>
                       <div className="border-t pt-4">
                         <div className="flex justify-between text-sm"><span>Tạm tính:</span><span>{newOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString('vi-VN')}đ</span></div>
-                        <div className="flex justify-between text-sm"><span>Giảm giá:</span><span>{newOrder.discount.toLocaleString('vi-VN')}đ</span></div>
-                        <div className="flex justify-between font-semibold text-lg border-t pt-2"><span>Tổng cộng:</span><span>{(newOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) - newOrder.discount).toLocaleString('vi-VN')}đ</span></div>
+                        <div className="flex justify-between font-semibold text-lg border-t pt-2"><span>Tổng cộng:</span><span>{(newOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)).toLocaleString('vi-VN')}đ</span></div>
                       </div>
                     </div>
                   </div>
@@ -1040,113 +1042,7 @@ const SalesManagement = () => {
           </div>
         )}
 
-        {/* Order Detail Modal */}
-        {showOrderDetailModal && selectedOrder && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-              <h3 className="text-lg font-semibold mb-4">Chi tiết đơn hàng {selectedOrder.orderNumber}</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Thông tin khách hàng</h4>
-                    <p className="text-gray-600">{selectedOrder.customerName}</p>
-                    <p className="text-gray-600">{selectedOrder.customerPhone}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Phương thức thanh toán</h4>
-                    <p className="text-gray-600">
-                      {selectedOrder.paymentMethod === 'cash' ? 'Tiền mặt' :
-                        selectedOrder.paymentMethod === 'card' ? 'Thẻ' : 'Chuyển khoản'}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Ghi chú</h4>
-                    <p className="text-gray-600">{selectedOrder.notes || 'Không có ghi chú'}</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Sản phẩm</h4>
-                    <div className="space-y-2">
-                      {((selectedOrder.items || [])
-                        .map(i => ({
-                          name: String(i?.name || '').trim(),
-                          quantity: Number(i?.quantity || 0),
-                          price: Number(i?.price || 0)
-                        })))
-                        .map((item, index) => (
-                          <div key={`${item.name || 'item'}-${index}`} className="flex justify-between text-sm">
-                            <span>{item.name} x{item.quantity}</span>
-                            <span>{(item.price * item.quantity).toLocaleString('vi-VN')}đ</span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                  <div className="border-t pt-4">
-                    {(() => {
-                      const items = (selectedOrder.items || []).map(i => ({
-                        quantity: Number(i?.quantity || 0),
-                        price: Number(i?.price || 0)
-                      }));
-                      const itemsSum = items.reduce((acc, it) => acc + it.quantity * it.price, 0);
-                      const subtotalVal = (Number(selectedOrder.subtotal) && Number(selectedOrder.subtotal) > 0) ? Number(selectedOrder.subtotal) : itemsSum;
-                      const discountVal = Number(selectedOrder.discount || 0);
-                      const totalVal = (Number(selectedOrder.total) && Number(selectedOrder.total) > 0) ? Number(selectedOrder.total) : Math.max(0, itemsSum - discountVal);
-
-                      return (
-                        <>
-                          <div className="flex justify-between text-sm">
-                            <span>Tạm tính:</span>
-                            <span>{subtotalVal.toLocaleString('vi-VN')}đ</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span>Giảm giá:</span>
-                            <span>{(selectedOrder.tongGiamGia ?? discountVal).toLocaleString('vi-VN')}đ</span>
-                          </div>
-                          <div className="flex justify-between font-semibold text-lg border-t pt-2">
-                            <span>Tổng cộng:</span>
-                            <span>{totalVal.toLocaleString('vi-VN')}đ</span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  {selectedOrder.diemThuongNhanDuoc !== undefined && (
-                    <div className="mt-2">
-                      <h4 className="font-semibold text-gray-900">Điểm thưởng nhận được</h4>
-                      <p className="text-gray-600">{selectedOrder.diemThuongNhanDuoc} điểm</p>
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="font-semibold text-gray-900">Trạng thái</h4>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedOrder.status)}`}>
-                      {getStatusText(selectedOrder.status)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowOrderDetailModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  Đóng
-                </button>
-                {selectedOrder.status === 'pending' && (
-                  <button
-                    onClick={() => {
-                      setShowOrderDetailModal(false);
-                      handleProcessPayment(selectedOrder);
-                    }}
-                    className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-                  >
-                    Xử lý thanh toán
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Detail modal removed; use full page at /staff/orders/:id */}
 
         {/* Payment Modal */}
         {showPaymentModal && selectedOrder && (

@@ -136,16 +136,32 @@ public class ThongBaoServiceImpl implements IThongBaoService {
     
     @Override
     public List<ThongBao> getNotificationsForUser(Integer nguoiNhanId, String loaiNguoiNhan) {
-        if (nguoiNhanId == null) {
-            // Nếu không có ID, chỉ lấy thông báo cho ALL
-            return thongBaoRepository.findByLoaiNguoiNhanAndNgayXoaIsNullOrderByNgayTaoDesc("ALL");
+        try {
+            if (nguoiNhanId == null) {
+                // Nếu không có ID, chỉ lấy thông báo cho ALL
+                System.out.println("[ThongBaoService] Getting ALL notifications");
+                List<ThongBao> result = thongBaoRepository.findByLoaiNguoiNhanAndNgayXoaIsNullOrderByNgayTaoDesc("ALL");
+                System.out.println("[ThongBaoService] Found " + (result != null ? result.size() : 0) + " ALL notifications");
+                return result != null ? result : List.of();
+            }
+            System.out.println("[ThongBaoService] Getting notifications for user: " + nguoiNhanId + ", type: " + loaiNguoiNhan);
+            List<ThongBao> result = thongBaoRepository.findNotificationsForUser(nguoiNhanId, loaiNguoiNhan);
+            System.out.println("[ThongBaoService] Found " + (result != null ? result.size() : 0) + " notifications");
+            return result != null ? result : List.of();
+        } catch (Exception e) {
+            System.err.println("[ThongBaoService] Error getting notifications: " + e.getMessage());
+            e.printStackTrace();
+            return List.of();
         }
-        return thongBaoRepository.findNotificationsForUser(nguoiNhanId, loaiNguoiNhan);
     }
     
     @Override
     public List<ThongBaoResponse> getNotificationsForUserWithResponse(Integer nguoiNhanId, String loaiNguoiNhan) {
-        return getNotificationsForUser(nguoiNhanId, loaiNguoiNhan).stream()
+        List<ThongBao> notifications = getNotificationsForUser(nguoiNhanId, loaiNguoiNhan);
+        if (notifications == null || notifications.isEmpty()) {
+            return List.of();
+        }
+        return notifications.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -314,7 +330,7 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             request.setDuongDanHanhDong("/admin/khach-hang/" + maKhachHang);
             request.setDoUuTien("medium");
             request.setLienKetId(maKhachHang);
-            request.setLoaiLienKet("KHACH_HANG");
+            request.setLoaiLienKet("CUSTOMER");
             
             create(request);
         } catch (Exception e) {

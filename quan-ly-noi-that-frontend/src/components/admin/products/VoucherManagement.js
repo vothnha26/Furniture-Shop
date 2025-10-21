@@ -145,8 +145,8 @@ const VoucherManagement = () => {
       ? voucher.selectedTiers.map(s => Number(s))
       : undefined
     ,
-    // send admin-selected status token back to API if present
-    ...(voucher.status ? { trangThai: voucher.status } : {})
+    // send admin-selected status token back to API, default to DANG_HOAT_DONG for new vouchers
+    trangThai: voucher.status || 'DANG_HOAT_DONG'
   });
 
   // API Functions
@@ -154,6 +154,7 @@ const VoucherManagement = () => {
     try {
       // Use the detailed endpoint so we receive apDungChoMoiNguoi and tenHangThanhVienApDung
       const response = await api.get('/api/v1/voucher/details');
+
       // Normal case: array of VoucherResponse
       if (Array.isArray(response)) {
         setVouchers(response.map(mapVoucherFromApi));
@@ -196,14 +197,14 @@ const VoucherManagement = () => {
 
   const fetchVoucherDetail = async (id) => {
     try {
-      // Call the detailed endpoint to get tenHangThanhVienApDung and apDungChoMoiNguoi
+      // Call the detailed endpoint to get tenHangThanhVienApDung, maHangThanhVienIds and apDungChoMoiNguoi
       const response = await api.get(`/api/v1/voucher/${id}/details`);
       // Build editing object including applicability and selected tiers
       const base = mapVoucherFromApi(response);
       const applicableTo = response.apDungChoMoiNguoi ? 'everyone' : 'tiers';
-      const rawTiers = response.tenHangThanhVienApDung || response.hanCheHangThanhVien || [];
-      const selectedTiers = Array.isArray(rawTiers)
-        ? rawTiers.map(t => String(t?.maHangThanhVien ?? t?.id ?? t))
+      // Use maHangThanhVienIds from backend (list of IDs from voucher_hang_thanh_vien table)
+      const selectedTiers = Array.isArray(response.maHangThanhVienIds)
+        ? response.maHangThanhVienIds.map(id => String(id))
         : [];
       return { ...base, applicableTo, selectedTiers };
     } catch (err) {
@@ -228,7 +229,8 @@ const VoucherManagement = () => {
       return newVoucher;
     } catch (err) {
       console.error('Create voucher error', err);
-      throw new Error('Không thể tạo voucher');
+      console.error('Error details:', err.response || err.data || err.message);
+      throw new Error(err.response?.message || err.message || 'Không thể tạo voucher');
     }
   };
 
@@ -263,20 +265,36 @@ const VoucherManagement = () => {
   // We intentionally call `fetchVouchers()` here and do not want the
   // exhaustive-deps rule to force it into the dependency list.
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Fetch membership tiers from backend
+  const fetchMembershipTiers = async () => {
+    try {
+      const tResp = await api.get('/api/hang-thanh-vien/all');
+      const mapTiers = arr => Array.isArray(arr) ? arr.map(t => ({ id: t.maHangThanhVien ?? t.id, name: t.tenHang ?? t.name })) : [];
+      if (Array.isArray(tResp)) {
+        setMembershipTiers(mapTiers(tResp));
+      } else if (tResp && Array.isArray(tResp.data)) {
+        setMembershipTiers(mapTiers(tResp.data));
+      } else if (tResp && Array.isArray(tResp.content)) {
+        setMembershipTiers(mapTiers(tResp.content));
+      } else {
+        console.warn('Unexpected /api/hang-thanh-vien/all response shape', tResp);
+      }
+    } catch (err) {
+      console.error('Fetch membership tiers error', err);
+      setError('Không thể tải danh sách hạng thành viên');
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       setIsLoading(true);
       try {
-        // Use the robust fetchVouchers to get helpful logging on failure
         await fetchVouchers();
         if (!mounted) return;
-        const [hResp, tResp] = await Promise.all([
-          api.get('/api/v1/voucher/usage-history'),
-          api.get('/api/hang-thanh-vien/all')
-        ]);
+        const hResp = await api.get('/api/v1/voucher/usage-history');
         if (Array.isArray(hResp)) setUsageHistory(hResp);
-        if (Array.isArray(tResp)) setMembershipTiers(tResp.map(t => ({ id: t.maHangThanhVien ?? t.id, name: t.tenHang ?? t.name })));
+        await fetchMembershipTiers();
       } catch (err) {
         console.error('Fetch data error', err);
       } finally {
@@ -307,19 +325,14 @@ const VoucherManagement = () => {
 
   const handleSaveVoucher = async () => {
     try {
-      const payload = mapVoucherToApi(newVoucher);
-      const created = await createVoucher(payload);
-      // assign tiers when applicable
-      if (newVoucher.applicableTo === 'tiers' && Array.isArray(newVoucher.selectedTiers) && newVoucher.selectedTiers.length > 0) {
-        try {
-          const voucherId = created.maVoucher || created.id;
-          const payload = newVoucher.selectedTiers.map((s) => Number(s));
-          await api.post(`/api/v1/voucher/${voucherId}/assign-tiers`, { body: payload });
-        } catch (err) {
-          console.error('Assign tiers error', err);
-          setError('Tạo voucher thành công nhưng gán hạng thất bại');
-        }
+      // Validate: if applicableTo is 'tiers', must select at least one tier
+      if (newVoucher.applicableTo === 'tiers' && (!Array.isArray(newVoucher.selectedTiers) || newVoucher.selectedTiers.length === 0)) {
+        setError('Vui lòng chọn ít nhất một hạng thành viên');
+        return;
       }
+
+      const payload = mapVoucherToApi(newVoucher);
+      await createVoucher(payload);
       setShowAddModal(false);
       setNewVoucher({
         name: '',
@@ -613,14 +626,26 @@ const VoucherManagement = () => {
                           </button>
                           <button
                             onClick={() => {
-                              // Open assign tiers modal, prefill with voucher selected tiers if available
+                              // Open assign tiers modal, prefill with voucher selected tiers from voucher_hang_thanh_vien table
                               (async () => {
                                 try {
+                                  // Fetch membership tiers if not loaded yet
+                                  if (membershipTiers.length === 0) {
+                                    await fetchMembershipTiers();
+                                  }
+                                  
                                   const detail = await fetchVoucherDetail(voucher.id);
-                                  // normalize for assign modal: applyToEveryone based on apDungChoMoiNguoi
-                                  setAssigningVoucher({ ...detail, applyToEveryone: Boolean(detail.apDungChoMoiNguoi), selectedTiers: Array.isArray(detail.selectedTiers) ? detail.selectedTiers : (Array.isArray(detail.tenHangThanhVienApDung) ? detail.tenHangThanhVienApDung.map(t => String(t?.maHangThanhVien ?? t?.id ?? t)) : []) });
+                                  // Set applyToEveryone based on applicableTo
+                                  const assignData = {
+                                    ...detail,
+                                    applyToEveryone: detail.applicableTo === 'everyone',
+                                    selectedTiers: detail.selectedTiers || []
+                                  };
+                                  
+                                  setAssigningVoucher(assignData);
                                   setShowAssignModal(true);
                                 } catch (err) {
+                                  console.error('Fetch voucher detail for assign error', err);
                                   setError('Không tải được chi tiết voucher để gán hạng');
                                 }
                               })();
@@ -964,7 +989,13 @@ const VoucherManagement = () => {
                           <span className="ml-2">Tất cả mọi người</span>
                         </label>
                         <label className="inline-flex items-center">
-                          <input type="radio" name="applicableTo" checked={newVoucher.applicableTo === 'tiers'} onChange={() => setNewVoucher({ ...newVoucher, applicableTo: 'tiers' })} />
+                          <input type="radio" name="applicableTo" checked={newVoucher.applicableTo === 'tiers'} onChange={() => {
+                            setNewVoucher({ ...newVoucher, applicableTo: 'tiers' });
+                            // Fetch membership tiers when selecting this option
+                            if (membershipTiers.length === 0) {
+                              fetchMembershipTiers();
+                            }
+                          }} />
                           <span className="ml-2">Theo hạng thành viên</span>
                         </label>
                       </div>
@@ -1018,21 +1049,56 @@ const VoucherManagement = () => {
 
                 <div>
                   <p className="text-sm text-gray-600 mb-3">Voucher: <span className="font-medium">{assigningVoucher.name}</span></p>
-                  <div className="mb-3">
+                  <div className="mb-4">
                     <label className="inline-flex items-center">
-                      <input type="checkbox" checked={Boolean(assigningVoucher.applyToEveryone)} onChange={(e) => setAssigningVoucher({ ...assigningVoucher, applyToEveryone: e.target.checked, selectedTiers: e.target.checked ? [] : (assigningVoucher.selectedTiers || []) })} />
-                      <span className="ml-2">Áp dụng cho mọi người</span>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(assigningVoucher.applyToEveryone)}
+                        onChange={(e) => setAssigningVoucher({
+                          ...assigningVoucher,
+                          applyToEveryone: e.target.checked,
+                          selectedTiers: e.target.checked ? [] : (assigningVoucher.selectedTiers || [])
+                        })}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="ml-2 font-medium">Áp dụng cho mọi người</span>
                     </label>
                   </div>
-                  <label className="block text-sm text-gray-600 mb-2">Chọn hạng thành viên</label>
-                  <select multiple value={assigningVoucher.selectedTiers || []} onChange={(e) => {
-                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
-                    setAssigningVoucher({ ...assigningVoucher, selectedTiers: opts, applyToEveryone: false });
-                  }} className="w-full h-40 p-2 border rounded" disabled={Boolean(assigningVoucher.applyToEveryone)}>
-                    {membershipTiers.map(t => (
-                      <option key={t.id} value={String(t.id)}>{t.name}</option>
-                    ))}
-                  </select>
+
+                  {!assigningVoucher.applyToEveryone && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Chọn hạng thành viên</label>
+                      <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        {membershipTiers.map(tier => {
+                          const selectedTiersArray = assigningVoucher.selectedTiers || [];
+                          const tierIdString = String(tier.id);
+                          const isChecked = selectedTiersArray.includes(tierIdString);
+                          return (
+                            <label key={tier.id} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const currentTiers = assigningVoucher.selectedTiers || [];
+                                  const tierId = String(tier.id);
+                                  const newTiers = e.target.checked
+                                    ? [...currentTiers, tierId]
+                                    : currentTiers.filter(id => id !== tierId);
+                                  setAssigningVoucher({
+                                    ...assigningVoucher,
+                                    selectedTiers: newTiers,
+                                    applyToEveryone: false
+                                  });
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="ml-2 text-sm">{tier.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
@@ -1041,9 +1107,18 @@ const VoucherManagement = () => {
                     try {
                       const ids = assigningVoucher.applyToEveryone ? [] : (assigningVoucher.selectedTiers || []).map(s => Number(s));
                       await api.post(`/api/v1/voucher/${assigningVoucher.id}/assign-tiers`, { body: ids });
-                      // refresh vouchers list
+                      
+                      // Refresh vouchers list to show updated tier assignments
                       await fetchVouchers();
+                      
+                      // If editing modal is open, refresh its data too
+                      if (editingVoucher && editingVoucher.id === assigningVoucher.id) {
+                        const updatedDetail = await fetchVoucherDetail(assigningVoucher.id);
+                        setEditingVoucher(updatedDetail);
+                      }
+                      
                       setShowAssignModal(false);
+                      setError(null);
                     } catch (err) {
                       console.error('Assign tiers error', err);
                       setError('Gán hạng thất bại');
@@ -1216,11 +1291,21 @@ const VoucherManagement = () => {
                         <button type="button" onClick={async () => {
                           // Open assign modal to allow assigning/clearing tiers
                           try {
+                            // Fetch membership tiers if not loaded yet
+                            if (membershipTiers.length === 0) {
+                              await fetchMembershipTiers();
+                            }
+                            
                             const detail = await fetchVoucherDetail(editingVoucher.id);
-                            setAssigningVoucher({ ...detail, applyToEveryone: Boolean(detail.apDungChoMoiNguoi), selectedTiers: Array.isArray(detail.selectedTiers) ? detail.selectedTiers : (Array.isArray(detail.tenHangThanhVienApDung) ? detail.tenHangThanhVienApDung.map(t => String(t?.maHangThanhVien ?? t?.id ?? t)) : []) });
+                            setAssigningVoucher({
+                              ...detail,
+                              applyToEveryone: detail.applicableTo === 'everyone',
+                              selectedTiers: detail.selectedTiers || []
+                            });
                             setShowAssignModal(true);
                             // Keep edit modal open underneath; admin can close when done
                           } catch (err) {
+                            console.error('Fetch voucher detail for assign error', err);
                             setError('Không tải được chi tiết voucher để gán hạng');
                           }
                         }} className="px-3 py-1 bg-indigo-600 text-white rounded">Gán hạng</button>

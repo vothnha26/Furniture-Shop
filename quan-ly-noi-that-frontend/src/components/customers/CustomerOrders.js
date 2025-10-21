@@ -334,12 +334,32 @@ const CustomerOrders = () => {
   };
 
   const getStatusSteps = (status) => {
-    const steps = [
-      { id: 'processing', label: 'Đang xử lý', completed: true },
-      { id: 'shipping', label: 'Đang giao hàng', completed: status === 'shipping' || status === 'delivered' },
-      { id: 'delivered', label: 'Đã giao hàng', completed: status === 'delivered' }
+    // Normalize and determine progression
+    const s = status || 'processing';
+    const isProcessing = s === 'processing';
+    const isShipping = s === 'shipping';
+    const isDelivered = s === 'delivered' || s === 'completed';
+
+    return [
+      {
+        id: 'processing',
+        label: 'Đang xử lý',
+        completed: true,
+        active: isProcessing
+      },
+      {
+        id: 'shipping',
+        label: 'Đang giao hàng',
+        completed: isShipping || isDelivered,
+        active: isShipping
+      },
+      {
+        id: 'delivered',
+        label: 'Đã giao hàng',
+        completed: isDelivered,
+        active: isDelivered
+      }
     ];
-    return steps;
   };
 
   return (
@@ -450,26 +470,32 @@ const CustomerOrders = () => {
                 {/* Order Status Steps */}
                 <div className="px-6 py-4 bg-gray-50">
                   <div className="flex items-center justify-between">
-                    {steps.map((step, index) => (
-                      <div key={step.id} className="flex items-center">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step.completed ? 'bg-primary text-white' : 'bg-gray-300 text-gray-600'
-                          }`}>
-                          {step.completed ? (
-                            <IoCheckmarkCircle className="w-4 h-4" />
-                          ) : (
-                            <span className="text-sm font-medium">{index + 1}</span>
+                    {steps.map((step, index) => {
+                      const circleClass = step.completed
+                        ? 'bg-primary text-white'
+                        : step.active
+                          ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                          : 'bg-gray-200 text-gray-600';
+                      const labelClass = step.active || step.completed ? 'text-gray-900' : 'text-gray-500';
+                      const connectorClass = (step.completed || step.active) ? 'bg-primary' : 'bg-gray-300';
+                      return (
+                        <div key={step.id} className="flex items-center">
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full ${circleClass}`}>
+                            {step.completed && !step.active ? (
+                              <IoCheckmarkCircle className="w-4 h-4" />
+                            ) : (
+                              <span className="text-sm font-medium">{index + 1}</span>
+                            )}
+                          </div>
+                          <span className={`ml-2 text-sm font-medium ${labelClass}`}>
+                            {step.label}
+                          </span>
+                          {index < steps.length - 1 && (
+                            <div className={`w-16 h-0.5 mx-4 ${connectorClass}`} />
                           )}
                         </div>
-                        <span className={`ml-2 text-sm ${step.completed ? 'text-gray-900' : 'text-gray-500'
-                          }`}>
-                          {step.label}
-                        </span>
-                        {index < steps.length - 1 && (
-                          <div className={`w-16 h-0.5 mx-4 ${step.completed ? 'bg-primary' : 'bg-gray-300'
-                            }`} />
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

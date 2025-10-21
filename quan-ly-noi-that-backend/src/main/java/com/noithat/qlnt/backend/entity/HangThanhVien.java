@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "HangThanhVien")
+@Table(name = "hang_thanh_vien")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,24 +15,25 @@ import lombok.*;
 public class HangThanhVien {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ma_hang_thanh_vien")
     private Integer maHangThanhVien;
 
-    @Column(name = "TenHang", nullable = false, unique = true)
+    @Column(name = "ten_hang", nullable = false, unique = true)
     private String tenHang;
 
-    @Column(name = "DiemToiThieu", nullable = false)
+    @Column(name = "diem_toi_thieu", nullable = false)
     private Integer diemToiThieu = 0;
 
-    @Column(name = "MoTa", columnDefinition = "TEXT")
+    @Column(name = "mo_ta", columnDefinition = "TEXT")
     private String moTa; // Mô tả hạng thành viên
 
-    @Column(name = "MauSac")
+    @Column(name = "mau_sac")
     private String mauSac; // Màu sắc hiển thị UI (hex color)
 
-    @Column(name = "TrangThai")
+    @Column(name = "trang_thai")
     private Boolean trangThai = true; // Trạng thái kích hoạt
 
-    @Column(name = "Icon")
+    @Column(name = "icon")
     private String icon; // Tên icon cho frontend
 
     @OneToMany(mappedBy = "hangThanhVien", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

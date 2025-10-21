@@ -3,6 +3,7 @@ package com.noithat.qlnt.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.List;
 
 @Entity
 @Table(name = "KhachHang")
@@ -59,4 +60,9 @@ public class KhachHang {
 
     @Column(name = "TrangThaiVip")
     private String trangThaiVip = "active"; // Trạng thái VIP: active, inactive
+
+    // Back-reference to chat sessions
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<com.noithat.qlnt.backend.entity.chat.ChatSession> chatSessions;
 }

@@ -4,10 +4,14 @@ import com.noithat.qlnt.backend.dto.request.ThongBaoRequest;
 import com.noithat.qlnt.backend.dto.response.ThongBaoResponse;
 import com.noithat.qlnt.backend.entity.ThongBao;
 import com.noithat.qlnt.backend.entity.KhachHang;
+import com.noithat.qlnt.backend.entity.NhanVien;
 import com.noithat.qlnt.backend.repository.KhachHangRepository;
+import com.noithat.qlnt.backend.repository.NhanVienRepository;
 import com.noithat.qlnt.backend.service.IThongBaoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -20,15 +24,33 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/thong-bao")
+@CrossOrigin
 public class ThongBaoController {
 
     private final IThongBaoService thongBaoService;
     private final KhachHangRepository khachHangRepository;
+    private final NhanVienRepository nhanVienRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public ThongBaoController(IThongBaoService thongBaoService, KhachHangRepository khachHangRepository) {
+    public ThongBaoController(IThongBaoService thongBaoService, 
+                             KhachHangRepository khachHangRepository,
+                             NhanVienRepository nhanVienRepository,
+                             SimpMessagingTemplate messagingTemplate) {
         this.thongBaoService = thongBaoService;
         this.khachHangRepository = khachHangRepository;
+        this.nhanVienRepository = nhanVienRepository;
+        this.messagingTemplate = messagingTemplate;
     }
+    // ==================== WebSocket Endpoint ====================
+    // Khi có thông báo mới, gửi tới khách hàng qua WebSocket
+    public void sendNotificationToCustomer(Integer maKhachHang, ThongBaoResponse thongBao) {
+        if (maKhachHang != null) {
+            messagingTemplate.convertAndSend("/topic/thong-bao/customer/" + maKhachHang, thongBao);
+        } else {
+            messagingTemplate.convertAndSend("/topic/thong-bao/all", thongBao);
+        }
+    }
+
 
     // ==================== GET Endpoints ====================
 
@@ -84,31 +106,75 @@ public class ThongBaoController {
 
     /**
      * GET /api/v1/thong-bao/me
-     * Lấy thông báo của người dùng đang đăng nhập
-     * Bao gồm cả thông báo cho ALL và thông báo riêng cho user
+     * Lấy thông báo của người dùng đang đăng nhập (cho giao diện khách hàng)
      */
     @GetMapping("/me")
     public ResponseEntity<List<ThongBaoResponse>> getMyNotifications(Principal principal) {
         if (principal == null) {
-            System.err.println("[ThongBaoController] /me called without authentication");
             List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(null, "ALL");
             return ResponseEntity.ok(notifications);
         }
-
         String username = principal.getName();
-        System.out.println("[ThongBaoController] /me called for user: " + username);
-
-        // Try to find a KhachHang by linked account username
         KhachHang kh = khachHangRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
         if (kh != null) {
-            List<ThongBaoResponse> notifications = thongBaoService
-                    .getNotificationsForUserWithResponse(kh.getMaKhachHang(), "KHACH_HANG");
+            List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(kh.getMaKhachHang(), "CUSTOMER");
             return ResponseEntity.ok(notifications);
         }
-
-        // Fallback: return ALL notifications
         List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(null, "ALL");
         return ResponseEntity.ok(notifications);
+    }
+
+    /**
+     * GET /api/v1/thong-bao/staff/me
+     * Lấy thông báo của nhân viên/admin đang đăng nhập (ALL + STAFF)
+     */
+    @GetMapping("/staff/me")
+    public ResponseEntity<List<ThongBaoResponse>> getStaffNotifications(Principal principal) {
+        try {
+            if (principal == null) {
+                // Không có user, chỉ lấy ALL
+                System.out.println("[StaffNotifications] No principal, returning ALL notifications");
+                List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(null, "ALL");
+                return ResponseEntity.ok(notifications != null ? notifications : List.of());
+            }
+            
+            String username = principal.getName();
+            System.out.println("[StaffNotifications] Username: " + username);
+            NhanVien nv = nhanVienRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
+            
+            if (nv != null) {
+                // Nhân viên: lấy thông báo STAFF + ALL
+                System.out.println("[StaffNotifications] Found staff ID: " + nv.getMaNhanVien());
+                List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(nv.getMaNhanVien(), "STAFF");
+                return ResponseEntity.ok(notifications != null ? notifications : List.of());
+            }
+            
+            // Fallback: lấy ALL
+            System.out.println("[StaffNotifications] Staff not found, returning ALL notifications");
+            List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(null, "ALL");
+            return ResponseEntity.ok(notifications != null ? notifications : List.of());
+        } catch (Exception e) {
+            System.err.println("[StaffNotifications] Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(List.of()); // Return empty list on error instead of 500
+        }
+    }
+
+    /**
+     * GET /api/v1/thong-bao/chua-doc
+     * Lấy thông báo chưa đọc của khách hàng
+     */
+    // (đã có endpoint GET /api/v1/thong-bao/chua-doc ở bên dưới)
+
+
+    /**
+     * DELETE /api/v1/thong-bao/{id}
+     * Xóa thông báo (cho khách hàng)
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteForCustomer(@PathVariable Integer id) {
+        thongBaoService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -136,7 +202,7 @@ public class ThongBaoController {
         KhachHang kh = khachHangRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
         if (kh != null) {
             List<ThongBaoResponse> notifications = thongBaoService.getChuaDocWithResponse(kh.getMaKhachHang(),
-                    "KHACH_HANG");
+                    "CUSTOMER");
             return ResponseEntity.ok(notifications);
         }
         List<ThongBaoResponse> notifications = thongBaoService.getChuaDocWithResponse(null, "ALL");
@@ -157,10 +223,34 @@ public class ThongBaoController {
         String username = principal.getName();
         KhachHang kh = khachHangRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
         if (kh != null) {
-            count = thongBaoService.countChuaDoc(kh.getMaKhachHang(), "KHACH_HANG");
+            count = thongBaoService.countChuaDoc(kh.getMaKhachHang(), "CUSTOMER");
         } else {
             count = thongBaoService.countChuaDoc(null, "ALL");
         }
+        return ResponseEntity.ok(Map.of("count", count, "unread", count));
+    }
+
+    /**
+     * GET /api/v1/thong-bao/staff/chua-doc/count
+     * Đếm số thông báo chưa đọc của nhân viên (STAFF + ALL)
+     */
+    @GetMapping("/staff/chua-doc/count")
+    public ResponseEntity<Map<String, Long>> countStaffChuaDoc(Principal principal) {
+        long count;
+        if (principal == null) {
+            count = thongBaoService.countChuaDoc(null, "ALL");
+            return ResponseEntity.ok(Map.of("count", count, "unread", count));
+        }
+        
+        String username = principal.getName();
+        NhanVien nv = nhanVienRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
+        
+        if (nv != null) {
+            count = thongBaoService.countChuaDoc(nv.getMaNhanVien(), "STAFF");
+        } else {
+            count = thongBaoService.countChuaDoc(null, "ALL");
+        }
+        
         return ResponseEntity.ok(Map.of("count", count, "unread", count));
     }
 
@@ -178,7 +268,7 @@ public class ThongBaoController {
         KhachHang kh = khachHangRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
         if (kh != null) {
             List<ThongBaoResponse> notifications = thongBaoService
-                    .getHighPriorityUnreadWithResponse(kh.getMaKhachHang(), "KHACH_HANG");
+                    .getHighPriorityUnreadWithResponse(kh.getMaKhachHang(), "CUSTOMER");
             return ResponseEntity.ok(notifications);
         }
         List<ThongBaoResponse> notifications = thongBaoService.getHighPriorityUnreadWithResponse(null, "ALL");
@@ -191,10 +281,22 @@ public class ThongBaoController {
      * POST /api/v1/thong-bao
      * Tạo thông báo mới
      * Quyền: Admin/Nhân viên
+     * Khi tạo xong sẽ gửi realtime qua WebSocket cho khách hàng
      */
     @PostMapping
     public ResponseEntity<ThongBaoResponse> create(@Valid @RequestBody ThongBaoRequest request) {
-        ThongBaoResponse created = thongBaoService.createWithResponse(request);
+        ThongBao thongBaoEntity = thongBaoService.create(request);
+        ThongBaoResponse created = thongBaoService.getByIdWithResponse(thongBaoEntity.getMaThongBao());
+        // Lấy mã khách hàng từ entity nếu có
+        Integer maKhachHang = null;
+        if (thongBaoEntity.getKhachHang() != null) {
+            maKhachHang = thongBaoEntity.getKhachHang().getMaKhachHang();
+        }
+        if (maKhachHang != null) {
+            sendNotificationToCustomer(maKhachHang, created);
+        } else {
+            sendNotificationToCustomer(null, created);
+        }
         return ResponseEntity.ok(created);
     }
 
@@ -241,9 +343,9 @@ public class ThongBaoController {
     public ResponseEntity<ThongBaoResponse> update(
             @PathVariable Integer id,
             @Valid @RequestBody ThongBaoRequest request) {
-        ThongBao updated = thongBaoService.update(id, request);
-        ThongBaoResponse resp = thongBaoService.getByIdWithResponse(id);
-        return ResponseEntity.ok(resp);
+    thongBaoService.update(id, request);
+    ThongBaoResponse resp = thongBaoService.getByIdWithResponse(id);
+    return ResponseEntity.ok(resp);
     }
 
     /**
@@ -271,11 +373,66 @@ public class ThongBaoController {
     @PutMapping("/danh-dau-tat-ca-da-doc")
     public ResponseEntity<Map<String, String>> danhDauTatCaDaDoc(Principal principal) {
         try {
-            // For now, mark all notifications for ALL as read
-            thongBaoService.danhDauTatCaDaDoc(null, "ALL");
-            return ResponseEntity.ok(Map.of(
-                    "success", "true",
-                    "message", "Đã đánh dấu tất cả thông báo là đã đọc"));
+            if (principal == null) {
+                thongBaoService.danhDauTatCaDaDoc(null, "ALL");
+                return ResponseEntity.ok(Map.of(
+                        "success", "true",
+                        "message", "Đã đánh dấu tất cả thông báo là đã đọc"));
+            }
+            
+            String username = principal.getName();
+            KhachHang kh = khachHangRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
+            
+            if (kh != null) {
+                // Đánh dấu thông báo của khách hàng cụ thể
+                thongBaoService.danhDauTatCaDaDoc(kh.getMaKhachHang(), "CUSTOMER");
+                return ResponseEntity.ok(Map.of(
+                        "success", "true",
+                        "message", "Đã đánh dấu tất cả thông báo của bạn là đã đọc"));
+            } else {
+                // Nếu không tìm thấy khách hàng, đánh dấu thông báo chung
+                thongBaoService.danhDauTatCaDaDoc(null, "ALL");
+                return ResponseEntity.ok(Map.of(
+                        "success", "true",
+                        "message", "Đã đánh dấu tất cả thông báo là đã đọc"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", "false",
+                    "message", "Lỗi: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * PUT /api/v1/thong-bao/staff/danh-dau-tat-ca-da-doc
+     * Đánh dấu tất cả thông báo của nhân viên là đã đọc (STAFF + ALL)
+     */
+    @PutMapping("/staff/danh-dau-tat-ca-da-doc")
+    public ResponseEntity<Map<String, String>> danhDauTatCaDaDocStaff(Principal principal) {
+        try {
+            if (principal == null) {
+                thongBaoService.danhDauTatCaDaDoc(null, "ALL");
+                return ResponseEntity.ok(Map.of(
+                        "success", "true",
+                        "message", "Đã đánh dấu tất cả thông báo là đã đọc"));
+            }
+            
+            String username = principal.getName();
+            NhanVien nv = nhanVienRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
+            
+            if (nv != null) {
+                // Đánh dấu thông báo của nhân viên cụ thể
+                thongBaoService.danhDauTatCaDaDoc(nv.getMaNhanVien(), "STAFF");
+                return ResponseEntity.ok(Map.of(
+                        "success", "true",
+                        "message", "Đã đánh dấu tất cả thông báo của bạn là đã đọc"));
+            } else {
+                // Nếu không tìm thấy nhân viên, đánh dấu thông báo chung
+                thongBaoService.danhDauTatCaDaDoc(null, "ALL");
+                return ResponseEntity.ok(Map.of(
+                        "success", "true",
+                        "message", "Đã đánh dấu tất cả thông báo là đã đọc"));
+            }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", "false",
@@ -288,11 +445,7 @@ public class ThongBaoController {
     /**
      * DELETE /api/v1/thong-bao/{id}
      * Xóa thông báo (soft delete)
-     */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Integer id) {
-        thongBaoService.delete(id);
-        return ResponseEntity.noContent().build();
+    // (đã có endpoint DELETE /api/v1/thong-bao/{id} ở phần DELETE Endpoints)
     }
 
     /**

@@ -5,7 +5,6 @@ import { IoSearch, IoFilter, IoHeart, IoCart, IoStar, IoGrid, IoList, IoArrowFor
 import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
-import { readFavoritesLocal, writeFavoritesLocal } from '../../utils/favorites';
 
 // Mapping functions for Vietnamese API field names
 const mapProductFromApi = (product) => {
@@ -66,7 +65,6 @@ const mapCategoryFromApi = (category) => ({
 
 const CustomerShopPage = () => {
   const auth = useAuth();
-  const currentUser = auth?.user ?? null;
   const navigate = useNavigate();
   const location = useLocation();
   const [products, setProducts] = useState([]);
@@ -83,6 +81,7 @@ const CustomerShopPage = () => {
   const [priceRange, setPriceRange] = useState([0, 10000000]);
   const [sortBy, setSortBy] = useState('featured');
   const [showFilters, setShowFilters] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
   // Pagination
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(12);
@@ -90,6 +89,31 @@ const CustomerShopPage = () => {
   const [lastFilters, setLastFilters] = useState({});
 
   // API Functions
+  const fetchFavorites = useCallback(async () => {
+    if (!auth?.isAuthenticated) {
+      setFavoriteIds(new Set());
+      return;
+    }
+    
+    try {
+      console.log('🔄 [Shop] Load danh sách yêu thích từ database...');
+      const response = await api.get('/api/v1/yeu-thich');
+      const favoriteProducts = response.data || [];
+      const ids = new Set(favoriteProducts.map(p => p.maSanPham || p.id));
+      setFavoriteIds(ids);
+      console.log('✅ [Shop] Đã load', ids.size, 'sản phẩm yêu thích');
+      
+      // Update products with favorite status
+      setProducts(prev => prev.map(p => ({
+        ...p,
+        isFavorite: ids.has(p.id)
+      })));
+    } catch (error) {
+      console.error('❌ [Shop] Lỗi khi load yêu thích:', error);
+      setFavoriteIds(new Set());
+    }
+  }, [auth?.isAuthenticated]);
+
   const fetchProducts = useCallback(async (filters = {}, requestedPage = 0, requestedSize = size, append = false) => {
     setLoading(true);
     try {
@@ -230,13 +254,26 @@ const CustomerShopPage = () => {
         setSize(respSize);
         setTotalPages(respTotalPages);
 
-        setProducts(prev => append ? [...prev, ...mapped] : mapped);
+        // Mark products as favorite based on favoriteIds
+        const mappedWithFavorites = mapped.map(p => ({
+          ...p,
+          isFavorite: favoriteIds.has(p.id)
+        }));
+
+        setProducts(prev => append ? [...prev, ...mappedWithFavorites] : mappedWithFavorites);
   } else {
         // legacy array response — treat as single full page (replace)
         setPage(0);
         setSize(mapped.length);
         setTotalPages(1);
-        setProducts(mapped);
+        
+        // Mark products as favorite based on favoriteIds
+        const mappedWithFavorites = mapped.map(p => ({
+          ...p,
+          isFavorite: favoriteIds.has(p.id)
+        }));
+        
+        setProducts(mappedWithFavorites);
       }
     } catch (error) {
       setError('Không thể tải danh sách sản phẩm');
@@ -244,7 +281,7 @@ const CustomerShopPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [size]);
+  }, [size, favoriteIds]);
 
   const fetchCategories = async () => {
     try {
@@ -271,34 +308,63 @@ const CustomerShopPage = () => {
 
   const addToFavorites = async (productId) => {
     try {
-  const isAuthenticated = auth?.isAuthenticated;
-    // Accept either product object or id
-    const id = typeof productId === 'object' ? (productId.id ?? productId.maSanPham) : productId;
-    if (!isAuthenticated) {
-      // redirect to login
-      window.location.href = '/login';
-      return;
-    }
-    // Optimistic UI update
-    setCategories(prev => prev); // no-op to keep consistent signature
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: !p.isFavorite } : p));
-    // persist per-user fallback
-    try {
-      const user = auth?.user ?? null;
-  const existing = readFavoritesLocal(currentUser);
-      const exists = existing.find(f => String(f.id) === String(id));
-      const next = exists ? existing.filter(f => String(f.id) !== String(id)) : [...existing, { id }];
-      writeFavoritesLocal(user, next);
-    } catch (e) {}
-    // Call backend if endpoint exists (best-effort)
-    try {
-      await api.post('/api/v1/yeu-thich', { san_pham_id: id });
-    } catch (e) {
-      // ignore if backend not ready
-      console.debug('Favorites API not available', e);
-    }
+      const isAuthenticated = auth?.isAuthenticated;
+      // Accept either product object or id
+      const id = typeof productId === 'object' ? (productId.id ?? productId.maSanPham) : productId;
+      
+      if (!isAuthenticated) {
+        // redirect to login
+        window.location.href = '/login';
+        return;
+      }
+
+      // Check if product is already in favorites
+      const isFavorite = favoriteIds.has(id);
+
+      console.log(`${isFavorite ? '🗑️' : '💝'} [Shop] ${isFavorite ? 'Xóa' : 'Thêm'} yêu thích:`, id);
+
+      if (isFavorite) {
+        // Remove from favorites
+        await api.delete(`/api/v1/yeu-thich/${id}`);
+        console.log('✅ [Shop] Đã xóa khỏi yêu thích:', id);
+        
+        // Update favoriteIds
+        setFavoriteIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+        
+        // Update UI
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: false } : p));
+        
+        // Dispatch event to update favorites count
+        window.dispatchEvent(new CustomEvent('favorites:changed', { 
+          detail: { count: favoriteIds.size - 1 } 
+        }));
+      } else {
+        // Add to favorites
+        await api.post('/api/v1/yeu-thich', { productId: id });
+        console.log('✅ [Shop] Đã thêm vào yêu thích:', id);
+        
+        // Update favoriteIds
+        setFavoriteIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(id);
+          return newSet;
+        });
+        
+        // Update UI
+        setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: true } : p));
+        
+        // Dispatch event to update favorites count
+        window.dispatchEvent(new CustomEvent('favorites:changed', { 
+          detail: { count: favoriteIds.size + 1 } 
+        }));
+      }
     } catch (error) {
-      console.error('Error adding to favorites:', error);
+      console.error('❌ [Shop] Lỗi khi thao tác yêu thích:', error);
+      alert('Có lỗi xảy ra. Vui lòng thử lại!');
     }
   };
 
@@ -326,8 +392,14 @@ const CustomerShopPage = () => {
   useEffect(() => {
     fetchCategories();
     fetchCollections();
+    fetchFavorites();
     fetchProducts({}, 0, size, false);
-  }, [fetchProducts, size]);
+  }, [fetchProducts, fetchFavorites, size]);
+
+  // Load favorites when auth state changes
+  useEffect(() => {
+    fetchFavorites();
+  }, [auth?.isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // If the URL contains ?tab=collections (header links use this), redirect to the dedicated collections route
   useEffect(() => {

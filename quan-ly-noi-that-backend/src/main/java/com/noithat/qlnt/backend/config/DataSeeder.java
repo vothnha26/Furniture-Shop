@@ -373,7 +373,7 @@ public class DataSeeder {
                     tb1.setTieuDe("Chào mừng khách hàng mới");
                     tb1.setNoiDung(
                             "Xin chào " + kh1.getHoTen() + ", cảm ơn bạn đã đăng ký tài khoản tại cửa hàng chúng tôi.");
-                    tb1.setLoaiNguoiNhan("KHACH_HANG");
+                    tb1.setLoaiNguoiNhan("CUSTOMER");
                     tb1.setNguoiNhanId(kh1.getMaKhachHang());
                     tb1.setDoUuTien("normal");
                     tb1.setNgayTao(java.time.LocalDateTime.now());
@@ -394,7 +394,7 @@ public class DataSeeder {
                         tbEntity1.setTieuDe("Chào mừng khách hàng mới");
                         tbEntity1.setNoiDung("Xin chào " + kh1.getHoTen()
                                 + ", cảm ơn bạn đã đăng ký tài khoản tại cửa hàng chúng tôi.");
-                        tbEntity1.setLoaiNguoiNhan("KHACH_HANG");
+                        tbEntity1.setLoaiNguoiNhan("CUSTOMER");
                         tbEntity1.setNguoiNhanId(kh1.getMaKhachHang());
                         tbEntity1.setDoUuTien("normal");
                         tbEntity1.setNgayTao(LocalDateTime.now());

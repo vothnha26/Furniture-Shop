@@ -35,6 +35,18 @@ public class ProductController {
         }
     }
 
+    // New endpoint: lightweight product list for category assignment UI
+    @GetMapping("/basic")
+    public ResponseEntity<?> getBasicProducts() {
+        try {
+            var list = productService.getBasicProducts();
+            return ResponseEntity.ok(list);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
     // New endpoint: products shaped for shop listing (variant-aware price range & stock)
     @GetMapping("/shop")
     public ResponseEntity<?> getProductsForShop(@RequestParam(value = "page", required = false) Integer page,
@@ -152,10 +164,15 @@ public class ProductController {
 
     // ===== Chức năng gán Sản phẩm vào Danh mục =====
     @PostMapping("/{productId}/categories/{categoryId}")
-    public ResponseEntity<Void> addProductToCategory(@PathVariable Integer productId,
+    public ResponseEntity<?> addProductToCategory(@PathVariable Integer productId,
             @PathVariable Integer categoryId) {
-        productService.addProductToCategory(productId, categoryId);
-        return ResponseEntity.ok().build();
+        try {
+            productService.addProductToCategory(productId, categoryId);
+            return ResponseEntity.ok().body(java.util.Map.of("message", "Product assigned to category successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/{productId}/variants")

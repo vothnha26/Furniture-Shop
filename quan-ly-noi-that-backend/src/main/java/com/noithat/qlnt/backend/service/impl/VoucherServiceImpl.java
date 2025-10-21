@@ -393,10 +393,14 @@ public class VoucherServiceImpl implements IVoucherService {
         }
 
         List<String> tenHangThanhVienApDung = new java.util.ArrayList<>();
+        List<Integer> maHangThanhVienIds = new java.util.ArrayList<>();
         if (Boolean.FALSE.equals(voucher.getApDungChoMoiNguoi())
                 && voucher.getHanCheHangThanhVien() != null) {
             tenHangThanhVienApDung = voucher.getHanCheHangThanhVien().stream()
                     .map(link -> link.getHangThanhVien().getTenHang())
+                    .collect(Collectors.toList());
+            maHangThanhVienIds = voucher.getHanCheHangThanhVien().stream()
+                    .map(link -> link.getHangThanhVien().getMaHangThanhVien())
                     .collect(Collectors.toList());
         }
 
@@ -417,6 +421,7 @@ public class VoucherServiceImpl implements IVoucherService {
                 .moTa(voucher.getMoTa())
                 .trangThai(trangThai)
                 .tenHangThanhVienApDung(tenHangThanhVienApDung)
+                .maHangThanhVienIds(maHangThanhVienIds)
                 .build();
     }
 }

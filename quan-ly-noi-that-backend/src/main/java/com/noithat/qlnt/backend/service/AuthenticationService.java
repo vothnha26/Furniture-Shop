@@ -92,25 +92,46 @@ public class AuthenticationService {
                 taiKhoan.setOtpGeneratedTime(LocalDateTime.now());
                 taiKhoanRepository.save(taiKhoan);
 
-                // Create KhachHang for USER role
-                KhachHang khachHang = new KhachHang();
-                khachHang.setTaiKhoan(taiKhoan);
-                khachHang.setHoTen(request.getHoTen());
-                khachHang.setEmail(request.getEmail());
-                khachHang.setSoDienThoai(request.getSoDienThoai());
+                // Check for existing guest customer by email or phone
+                KhachHang existingGuest = null;
+                if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                    existingGuest = khachHangRepository.findByEmail(request.getEmail()).orElse(null);
+                }
+                if (existingGuest == null && request.getSoDienThoai() != null && !request.getSoDienThoai().isBlank()) {
+                    existingGuest = khachHangRepository.findBySoDienThoai(request.getSoDienThoai()).orElse(null);
+                }
 
-                // Set default membership tier
-                HangThanhVien defaultTier = hangThanhVienRepository.findByTenHang("Ð?ng")
-                        .orElseThrow(() -> new IllegalStateException("Hạng thành viên mặc định không tồn tại."));
-                khachHang.setHangThanhVien(defaultTier);
-
-                // Set default values
-                khachHang.setDiemThuong(0);
-                khachHang.setTongChiTieu(java.math.BigDecimal.ZERO);
-                khachHang.setTongDonHang(0);
-                khachHang.setNgayThamGia(java.time.LocalDate.now());
-
-                khachHangRepository.save(khachHang);
+                if (existingGuest != null && existingGuest.getTaiKhoan() == null) {
+                    // Link new account to existing guest customer
+                    existingGuest.setTaiKhoan(taiKhoan);
+                    // Set other fields to default
+                    existingGuest.setHoTen(request.getHoTen());
+                    existingGuest.setEmail(request.getEmail());
+                    existingGuest.setSoDienThoai(request.getSoDienThoai());
+                    HangThanhVien defaultTier = hangThanhVienRepository.findByTenHang("Ð?ng")
+                            .orElseThrow(() -> new IllegalStateException("Hạng thành viên mặc định không tồn tại."));
+                    existingGuest.setHangThanhVien(defaultTier);
+                    existingGuest.setDiemThuong(0);
+                    existingGuest.setTongChiTieu(java.math.BigDecimal.ZERO);
+                    existingGuest.setTongDonHang(0);
+                    existingGuest.setNgayThamGia(java.time.LocalDate.now());
+                    khachHangRepository.save(existingGuest);
+                } else {
+                    // Create new customer as before
+                    KhachHang khachHang = new KhachHang();
+                    khachHang.setTaiKhoan(taiKhoan);
+                    khachHang.setHoTen(request.getHoTen());
+                    khachHang.setEmail(request.getEmail());
+                    khachHang.setSoDienThoai(request.getSoDienThoai());
+                    HangThanhVien defaultTier = hangThanhVienRepository.findByTenHang("Ð?ng")
+                            .orElseThrow(() -> new IllegalStateException("Hạng thành viên mặc định không tồn tại."));
+                    khachHang.setHangThanhVien(defaultTier);
+                    khachHang.setDiemThuong(0);
+                    khachHang.setTongChiTieu(java.math.BigDecimal.ZERO);
+                    khachHang.setTongDonHang(0);
+                    khachHang.setNgayThamGia(java.time.LocalDate.now());
+                    khachHangRepository.save(khachHang);
+                }
 
                 try {
                     emailService.sendOtpEmail(request.getEmail(), taiKhoan.getOtp());
@@ -120,8 +141,7 @@ public class AuthenticationService {
                     throw new IllegalStateException("Không thể gửi email xác thực. Vui lòng thử lại sau.");
                 }
             } else {
-                // For staff/employee or other roles, enable account immediately and do not send
-                // OTP
+                // For staff/employee or other roles, enable account immediately and do not send OTP
                 taiKhoan.setEnabled(true);
                 taiKhoanRepository.save(taiKhoan);
                 // If admin/staff created via register request provided hoTen, create NhanVien
@@ -132,18 +152,11 @@ public class AuthenticationService {
                         nv.setHoTen(request.getHoTen());
                         nv.setChucVu(null);
                         // Persist NhanVien using repository
-                        // Acquire bean via repository field (add import if necessary)
-                        // We don't have NhanVienRepository as a field here, so use a quick save via
-                        // EntityManager alternative
-                        // To avoid adding new dependencies, attempt to resolve repository from Spring
-                        // context
                         try {
                             var repo = org.springframework.web.context.ContextLoader.getCurrentWebApplicationContext()
                                     .getBean(com.noithat.qlnt.backend.repository.NhanVienRepository.class);
                             repo.save(nv);
                         } catch (Exception ex) {
-                            // Fallback: ignore if saving NhanVien fails here; admin account creation
-                            // shouldn't fail because of this
                             logger.warn("Failed to persist NhanVien for account {}: {}", taiKhoan.getTenDangNhap(),
                                     ex.getMessage());
                         }
@@ -152,7 +165,6 @@ public class AuthenticationService {
                 }
             }
         } catch (IllegalStateException e) {
-            // rethrow known bad-request exceptions
             throw e;
         } catch (Exception e) {
             logger.error("Unexpected error during registration for {}: {}", request.getTenDangNhap(), e.getMessage(),

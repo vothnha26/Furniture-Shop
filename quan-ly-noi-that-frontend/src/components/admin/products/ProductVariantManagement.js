@@ -9,36 +9,48 @@ const ProductVariantManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Attribute/variant helper state (to mirror ProductManagement behavior)
+  // Attributes for single-variant editing
   const [attributes, setAttributes] = useState([]);
   const [attrLoading, setAttrLoading] = useState(false);
   const [attrError, setAttrError] = useState(null);
-  const [variantSelections, setVariantSelections] = useState({}); // { attributeId: Array(valueTextOrId) }
-  const [explicitRows, setExplicitRows] = useState([]); // [{ maThuocTinh, giaTri }]
-  const [variantMode, setVariantMode] = useState('single'); // 'single' | 'rows'
-  const [useExplicitRows, setUseExplicitRows] = useState(false);
-  const [attrTextInputs, setAttrTextInputs] = useState({}); // quick text per-attribute
-  const [dropdownSelections, setDropdownSelections] = useState({}); // quick select per-attribute
+  const [editedAttributes, setEditedAttributes] = useState([]); // [{ maThuocTinh, tenThuocTinh, giaTri }]
+  const [newAttrId, setNewAttrId] = useState('');
+  const [newAttrValue, setNewAttrValue] = useState('');
 
   // Map variant data from API
-  const mapVariantFromApi = (variant) => ({
-    maBienThe: variant.maBienThe || variant.id,
-    sanPham: {
-      maSanPham: variant.sanPham?.maSanPham || variant.productId,
-      tenSanPham: variant.sanPham?.tenSanPham || variant.productName
-    },
-    tenBienThe: variant.tenBienThe || variant.name,
-    sku: variant.sku || variant.sku,
-    giaBan: variant.giaBan || variant.price || 0,
-    giaGoc: variant.giaGoc || variant.originalPrice || 0,
-    soLuongTon: variant.tonKho || variant.stock || 0,
-    trangThai: variant.trangThai || variant.active || true,
-    attributes: variant.thuocTinhList?.map(attr => ({
-      thuocTinh: attr.thuocTinh?.tenThuocTinh || attr.attributeName,
-      giaTri: attr.giaTri?.giaTri || attr.attributeValue
-    })) || [],
-    hinhAnh: variant.hinhAnh || variant.image || ''
-  });
+  const mapVariantFromApi = (variant) => {
+    // Supports BienTheSanPhamDetailResponse from /api/products/{id}/variants
+    const maSanPham = variant.maSanPham ?? variant.sanPham?.maSanPham ?? variant.productId;
+    const tenSanPham = variant.tenSanPham ?? variant.sanPham?.tenSanPham ?? variant.productName ?? '';
+    const attributes = Array.isArray(variant.thuocTinhs)
+      ? variant.thuocTinhs.map((a) => ({
+          maThuocTinh: a.maThuocTinh ?? a.attributeId ?? null,
+          tenThuocTinh: a.tenThuocTinh ?? a.attributeName ?? '',
+          giaTri: a.giaTriThuocTinh ?? a.attributeValue ?? '',
+        }))
+      : Array.isArray(variant.thuocTinhList)
+      ? variant.thuocTinhList.map((attr) => ({
+          maThuocTinh: attr.thuocTinh?.maThuocTinh || attr.attributeId,
+          tenThuocTinh: attr.thuocTinh?.tenThuocTinh || attr.attributeName,
+          giaTri: attr.giaTri?.giaTri || attr.attributeValue,
+        }))
+      : [];
+    const trangThaiKho = variant.trangThaiKho || variant.trangThai;
+    const trangThaiBool = typeof trangThaiKho === 'string' ? (trangThaiKho === 'ACTIVE') : (trangThaiKho ?? true);
+
+    return {
+      maBienThe: variant.maBienThe || variant.id,
+      sanPham: { maSanPham, tenSanPham },
+      tenBienThe: variant.tenBienThe || variant.name || `${tenSanPham} - ${variant.sku || ''}`,
+      sku: variant.sku,
+      giaBan: Number(variant.giaBan ?? variant.price ?? 0),
+      giaGoc: Number(variant.giaGoc ?? variant.originalPrice ?? variant.giaBan ?? 0),
+      soLuongTon: Number(variant.soLuongTon ?? variant.tonKho ?? variant.stock ?? 0),
+      trangThai: trangThaiBool,
+      attributes,
+      hinhAnh: variant.hinhAnh || variant.image || '',
+    };
+  };
 
   const mapVariantToApi = useCallback((variant) => ({
     maSanPham: variant.sanPham.maSanPham,
@@ -55,65 +67,63 @@ const ProductVariantManagement = () => {
     }))
   }), []);
 
-  // Fetch variants
-  useEffect(() => {
-    const fetchVariants = async () => {
-      setIsLoading(true);
-      try {
-        const data = await api.get('/api/products/variants');
-        if (Array.isArray(data)) {
-          setVariants(data.map(mapVariantFromApi));
-        }
-      } catch (err) {
-        console.error('Fetch variants error', err);
-        setError(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchVariants();
+  // Helper: fetch variants by product id (returns mapped list)
+  const fetchVariantsByProduct = useCallback(async (productId) => {
+    const list = await api.get(`/api/products/${productId}/variants`);
+    if (!Array.isArray(list)) return [];
+    return list.map(mapVariantFromApi);
   }, []);
 
-  const [variants, setVariants] = useState([
-    {
-      maBienThe: 1,
-      sanPham: { maSanPham: 1, tenSanPham: 'Ghế gỗ cao cấp' },
-      sku: 'GG001-R-L',
-      giaBan: 2500000,
-      soLuongTon: 15,
-      attributes: [
-        { thuocTinh: 'Màu sắc', giaTri: 'Đỏ' },
-        { thuocTinh: 'Kích thước', giaTri: 'L' }
-      ]
-    },
-    {
-      maBienThe: 2,
-      sanPham: { maSanPham: 1, tenSanPham: 'Ghế gỗ cao cấp' },
-      sku: 'GG001-B-M',
-      giaBan: 2300000,
-      soLuongTon: 8,
-      attributes: [
-        { thuocTinh: 'Màu sắc', giaTri: 'Xanh' },
-        { thuocTinh: 'Kích thước', giaTri: 'M' }
-      ]
-    },
-    {
-      maBienThe: 3,
-      sanPham: { maSanPham: 2, tenSanPham: 'Bàn ăn 6 người' },
-      sku: 'BA001-OAK-STD',
-      giaBan: 4500000,
-      soLuongTon: 12,
-      attributes: [
-        { thuocTinh: 'Chất liệu', giaTri: 'Gỗ sồi' }
-      ]
-    }
-  ]);
+  // Helper: merge/replace variants for a given product id
+  const replaceProductVariantsInState = useCallback((productId, mappedList) => {
+    setVariants((prev) => {
+      const others = prev.filter((v) => String(v.sanPham.maSanPham) !== String(productId));
+      return [...others, ...mappedList];
+    });
+  }, []);
 
-  const [products] = useState([
-    { maSanPham: 1, tenSanPham: 'Ghế gỗ cao cấp' },
-    { maSanPham: 2, tenSanPham: 'Bàn ăn 6 người' },
-    { maSanPham: 3, tenSanPham: 'Tủ quần áo 3 cánh' }
-  ]);
+  // Fetch products then load variants (aggregated) from backend
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        // 1) Load product list for filter dropdown
+        const prods = await api.get('/api/products');
+        const mappedProducts = Array.isArray(prods)
+          ? prods.map((p) => ({ maSanPham: p.maSanPham ?? p.id, tenSanPham: p.tenSanPham ?? p.name }))
+          : [];
+        if (!cancelled) setProducts(mappedProducts);
+
+        // 2) Fetch variants per product in parallel
+        const allVariants = [];
+        for (const p of mappedProducts) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const mapped = await fetchVariantsByProduct(p.maSanPham);
+            allVariants.push(...mapped);
+          } catch (e) {
+            console.warn('Failed to load variants for product', p.maSanPham, e);
+          }
+        }
+        if (!cancelled) setVariants(allVariants);
+      } catch (err) {
+        console.error('Fetch products/variants error', err);
+        if (!cancelled) setError(err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchVariantsByProduct]);
+
+  const [variants, setVariants] = useState([]);
+
+  const [products, setProducts] = useState([]);
 
   const [showModal, setShowModal] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -149,61 +159,52 @@ const ProductVariantManagement = () => {
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!formData.maSanPham || !formData.sku.trim() || !formData.giaBan || !formData.soLuongTon) {
       showToast('Vui lòng điền đầy đủ thông tin', 'error');
       return;
     }
+    try {
+      // Build ThuocTinhGiaTriTuDoDto list from editedAttributes
+      const payloadAttrs = (editedAttributes || [])
+        .filter((r) => r && r.maThuocTinh && String(r.giaTri || '').trim().length > 0)
+        .map((r) => ({ maThuocTinh: Number(r.maThuocTinh), giaTri: String(r.giaTri) }));
 
-    // Check if SKU already exists
-    const exists = variants.some(variant => 
-      variant.sku.toLowerCase() === formData.sku.toLowerCase() &&
-      variant.maBienThe !== editingVariant?.maBienThe
-    );
-
-    if (exists) {
-      showToast('Mã SKU đã tồn tại', 'error');
-      return;
+      if (editingVariant) {
+        // Update existing variant
+        await api.put(`/api/bien-the-san-pham/${editingVariant.maBienThe}/variant`, {
+          sku: formData.sku.trim(),
+          giaBan: Number(formData.giaBan),
+          soLuongTon: Number(formData.soLuongTon),
+          thuocTinhGiaTriTuDo: payloadAttrs,
+        });
+        // Refresh variants for this product
+        const pid = Number(formData.maSanPham);
+        const mapped = await fetchVariantsByProduct(pid);
+        replaceProductVariantsInState(pid, mapped);
+        showToast('Cập nhật biến thể sản phẩm thành công');
+      } else {
+        // Create new variant
+        await api.post('/api/bien-the-san-pham/create', {
+          maSanPham: Number(formData.maSanPham),
+          sku: formData.sku.trim(),
+          giaBan: Number(formData.giaBan),
+          soLuongTon: Number(formData.soLuongTon),
+          thuocTinhGiaTriTuDo: payloadAttrs,
+        });
+        // Refresh variants for this product
+        const pid = Number(formData.maSanPham);
+        const mapped = await fetchVariantsByProduct(pid);
+        replaceProductVariantsInState(pid, mapped);
+        showToast('Thêm biến thể sản phẩm thành công');
+      }
+      closeModal();
+    } catch (err) {
+      console.error('Submit variant failed', err);
+      const msg = err?.data?.error || err?.message || 'Có lỗi xảy ra';
+      showToast(msg, 'error');
     }
-
-    const selectedProd = products.find(prod => prod.maSanPham.toString() === formData.maSanPham);
-    const tenBienThe = selectedProd ? `${selectedProd.tenSanPham} - ${formData.sku}` : formData.sku;
-
-    if (editingVariant) {
-      // Update existing variant
-      const updatedAttributes = buildAttributesForDisplay();
-      setVariants(variants.map(variant =>
-        variant.maBienThe === editingVariant.maBienThe
-          ? { 
-              ...variant, 
-              sanPham: selectedProd,
-              tenBienThe: tenBienThe,
-              sku: formData.sku,
-              giaBan: parseInt(formData.giaBan),
-              soLuongTon: parseInt(formData.soLuongTon),
-              attributes: updatedAttributes
-            }
-          : variant
-      ));
-      showToast('Cập nhật biến thể sản phẩm thành công');
-    } else {
-      // Add new variant
-      const newVariant = {
-        maBienThe: Math.max(...variants.map(v => v.maBienThe), 0) + 1,
-        sanPham: selectedProd,
-        tenBienThe: tenBienThe,
-        sku: formData.sku,
-        giaBan: parseInt(formData.giaBan),
-        soLuongTon: parseInt(formData.soLuongTon),
-        attributes: buildAttributesForDisplay()
-      };
-      setVariants([...variants, newVariant]);
-      showToast('Thêm biến thể sản phẩm thành công');
-    }
-
-    closeModal();
   };
 
   const openModal = (variant = null) => {
@@ -214,38 +215,22 @@ const ProductVariantManagement = () => {
       giaBan: variant ? variant.giaBan.toString() : '',
       soLuongTon: variant ? variant.soLuongTon.toString() : ''
     });
-    // Prepare attribute helpers
-    setVariantSelections({});
-    setExplicitRows([]);
-    setVariantMode('single');
-    setUseExplicitRows(false);
+    // Prepare attribute edits for single variant
+    const preset = variant && Array.isArray(variant.attributes)
+      ? variant.attributes.map((a) => ({
+          maThuocTinh: a.maThuocTinh,
+          tenThuocTinh: a.tenThuocTinh || a.thuocTinh,
+          giaTri: a.giaTri || ''
+        }))
+      : [];
+    setEditedAttributes(preset);
+    setNewAttrId('');
+    setNewAttrValue('');
     fetchAttributes().catch(() => {});
     setShowModal(true);
   };
 
-  // Build attribute display objects for storing on the variant in frontend state.
-  const buildAttributesForDisplay = () => {
-    if (Array.isArray(explicitRows) && explicitRows.length > 0) {
-      return explicitRows.filter(r => r && (r.maThuocTinh || r.giaTri)).map(r => {
-        const attrMeta = attributes.find(a => String(a.id ?? a.maThuocTinh) === String(r.maThuocTinh));
-        return { thuocTinh: attrMeta ? (attrMeta.tenThuocTinh || attrMeta.name) : String(r.maThuocTinh || ''), giaTri: String(r.giaTri || '') };
-      });
-    }
-    const out = [];
-    for (const a of attributes) {
-      const aKey = String(a.id ?? a.maThuocTinh);
-      const sel = variantSelections[aKey] || [];
-      if (sel.length === 0) continue;
-      const first = sel[0];
-      let valueName = first;
-      if (a.values && a.values.length > 0) {
-        const v = a.values.find(vv => String(vv.id) === String(first) || String(vv.tenGiaTri) === String(first));
-        if (v) valueName = v.tenGiaTri || v.name || String(first);
-      }
-      out.push({ thuocTinh: a.tenThuocTinh || a.name || a.label || String(aKey), giaTri: String(valueName) });
-    }
-    return out;
-  };
+  // Removed old buildAttributesForDisplay; we now build payload attributes inline in handleSubmit
 
   // Fetch attributes simple loader
   const fetchAttributes = async () => {
@@ -288,10 +273,15 @@ const ProductVariantManagement = () => {
 
   const confirmDeactivate = async () => {
     try {
+      const v = variants.find((x) => x.maBienThe === deleteId);
+      if (!v) throw new Error('Không tìm thấy biến thể');
       await api.put(`/api/bien-the-san-pham/${deleteId}/variant`, {
-        trangThaiKho: 'DISCONTINUED'
+        sku: v.sku,
+        giaBan: Number(v.giaBan),
+        soLuongTon: Number(v.soLuongTon),
+        trangThaiKho: 'DISCONTINUED',
       });
-      setVariants(prev => prev.map(v => v.maBienThe === deleteId ? { ...v, trangThai: false } : v));
+      setVariants(prev => prev.map(x => x.maBienThe === deleteId ? { ...x, trangThai: false } : x));
       setShowConfirmDialog(false);
       setDeleteId(null);
       showToast('Biến thể đã được tạm dừng hoạt động', 'success');
@@ -305,10 +295,15 @@ const ProductVariantManagement = () => {
 
   const handleActivate = async (id) => {
     try {
+      const v = variants.find((x) => x.maBienThe === id);
+      if (!v) throw new Error('Không tìm thấy biến thể');
       await api.put(`/api/bien-the-san-pham/${id}/variant`, {
-        trangThaiKho: 'ACTIVE'
+        sku: v.sku,
+        giaBan: Number(v.giaBan),
+        soLuongTon: Number(v.soLuongTon),
+        trangThaiKho: 'ACTIVE',
       });
-      setVariants(prev => prev.map(v => v.maBienThe === id ? { ...v, trangThai: true } : v));
+      setVariants(prev => prev.map(x => x.maBienThe === id ? { ...x, trangThai: true } : x));
       showToast('Đã kích hoạt lại biến thể', 'success');
     } catch (error) {
       console.error('Error activating variant:', error);
@@ -404,6 +399,9 @@ const ProductVariantManagement = () => {
           </div>
 
           <div className="overflow-x-auto">
+            {isLoading && (
+              <div className="p-6 text-gray-600">Đang tải dữ liệu biến thể...</div>
+            )}
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -440,7 +438,7 @@ const ProductVariantManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredVariants.length === 0 ? (
+                {filteredVariants.length === 0 && !isLoading ? (
                   <tr>
                     <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center">
@@ -473,7 +471,7 @@ const ProductVariantManagement = () => {
                           <div className="space-y-1">
                             {variant.attributes.map((attr, index) => (
                               <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1">
-                                {attr.thuocTinh}: {attr.giaTri}
+                                {(attr.tenThuocTinh || attr.thuocTinh || attr.maThuocTinh)}: {attr.giaTri}
                               </span>
                             ))}
                             {variant.attributes.length === 0 && (
@@ -619,132 +617,69 @@ const ProductVariantManagement = () => {
             </button>
             </div>
 
-          {/* Attribute selection UI (single / rows) */}
+          {/* Attribute editing (single variant only) */}
           <div className="mt-4 border-t pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium">Chế độ thêm giá trị</h4>
-              <div className="flex items-center gap-3">
-                <label className={`flex items-center gap-2 text-sm ${variantMode === 'single' ? 'font-semibold' : ''}`}>
-                  <input type="radio" name="variantMode" checked={variantMode === 'single'} onChange={() => { setVariantMode('single'); setUseExplicitRows(false); }} />
-                  <span>Biến thể đơn (chọn 1 giá trị / thuộc tính)</span>
-                </label>
-                <label className={`flex items-center gap-2 text-sm ${variantMode === 'rows' ? 'font-semibold' : ''}`}>
-                  <input type="radio" name="variantMode" checked={variantMode === 'rows'} onChange={() => { setVariantMode('rows'); setUseExplicitRows(true); }} />
-                  <span>Chế độ hàng (một hàng = một thuộc tính:giá trị)</span>
-                </label>
-              </div>
-            </div>
-
+            <h4 className="font-medium mb-3">Thuộc tính biến thể</h4>
             {attrLoading ? (
-              <div className="py-4 text-center text-gray-600">Đang tải thuộc tính...</div>
+              <div className="py-2 text-gray-600">Đang tải thuộc tính...</div>
             ) : attrError ? (
-              <div className="p-4 bg-red-50 border rounded">
-                <p className="text-sm text-red-700 mb-2">Lỗi khi tải thuộc tính: {attrError}</p>
-                <div className="flex justify-end">
-                  <button onClick={fetchAttributes} className="px-3 py-1 bg-blue-600 text-white rounded">Tải lại</button>
-                </div>
+              <div className="p-3 bg-red-50 border rounded text-sm text-red-700">
+                Lỗi khi tải thuộc tính: {attrError}
+                <div className="mt-2"><button type="button" onClick={fetchAttributes} className="px-3 py-1 bg-blue-600 text-white rounded">Tải lại</button></div>
               </div>
-            ) : (!attributes || attributes.length === 0) ? (
-              <div className="p-4 text-gray-600">Chưa có thuộc tính nào. Bạn có thể tạo thuộc tính trên backend hoặc thử tải lại.</div>
             ) : (
-              <div className="space-y-3">
-                {useExplicitRows && variantMode === 'rows' && (
-                  <div className="p-3 border rounded bg-white">
-                    <h5 className="font-semibold mb-2">Danh sách hàng (một hàng = một thuộc tính:giá trị)</h5>
-                    <div className="space-y-2">
-                      {explicitRows.map((row, idx) => (
-                        <div key={`er-${idx}`} className="flex items-center gap-2">
-                          <select value={row.maThuocTinh || ''} onChange={(e) => {
-                            const v = e.target.value;
-                            setExplicitRows(prev => prev.map((r, i) => i === idx ? { ...r, maThuocTinh: v } : r));
-                          }} className="p-2 border rounded">
-                            <option value="">-- Chọn thuộc tính --</option>
-                            {attributes.map((a, ai) => (
-                              <option key={`attr-option-${a.id ?? a.maThuocTinh ?? ai}`} value={a.id ?? a.maThuocTinh}>{a.tenThuocTinh}</option>
-                            ))}
-                          </select>
-                          <input type="text" value={row.giaTri || ''} onChange={(e) => {
-                            const v = e.target.value;
-                            setExplicitRows(prev => prev.map((r, i) => i === idx ? { ...r, giaTri: v } : r));
-                          }} placeholder="Giá trị (VD: Đỏ)" className="p-2 border rounded flex-1" />
-                          <button type="button" onClick={() => setExplicitRows(prev => prev.filter((_, i) => i !== idx))} className="px-2 py-1 bg-red-50 text-red-600 rounded">X</button>
-                        </div>
-                      ))}
-
-                      <div>
-                        <button type="button" onClick={() => setExplicitRows(prev => [...prev, { maThuocTinh: '', giaTri: '' }])} className="px-3 py-1 bg-green-50 text-green-700 rounded">+ Thêm hàng</button>
-                      </div>
+              <>
+                <div className="space-y-2">
+                  {(editedAttributes || []).map((row, idx) => (
+                    <div key={`ea-${idx}`} className="flex items-center gap-3 p-2 border rounded bg-white">
+                      <div className="w-1/3 font-medium text-gray-700">{row.tenThuocTinh || row.maThuocTinh}</div>
+                      <input
+                        type="text"
+                        value={row.giaTri || ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setEditedAttributes((prev) => prev.map((r, i) => i === idx ? { ...r, giaTri: v } : r));
+                        }}
+                        placeholder="Giá trị (VD: Đỏ)"
+                        className="p-2 border rounded flex-1"
+                      />
+                      <button type="button" onClick={() => setEditedAttributes((prev) => prev.filter((_, i) => i !== idx))} className="px-2 py-1 bg-red-50 text-red-600 rounded">Xóa</button>
                     </div>
-                  </div>
-                )}
-
-                {attributes.map((attr, ai) => {
-                  const aKey = String(attr.id ?? attr.maThuocTinh ?? ai);
-                  return (
-                    <div key={`attr-row-${aKey}`} className="p-3 border rounded bg-white">
-                      <div className="flex items-start justify-between">
-                        <div className="font-semibold text-gray-700">{attr.tenThuocTinh}</div>
-                        <button type="button" onClick={() => setAttributes(prev => prev.filter(a => String(a.id ?? a.maThuocTinh) !== String(attr.id ?? attr.maThuocTinh)))} className="text-sm text-red-600 bg-red-50 px-3 py-1 rounded">Xóa thuộc tính</button>
-                      </div>
-
-                      <div className="mt-3 flex items-center gap-3">
-                        <select
-                          value={dropdownSelections[aKey] || ''}
-                          onChange={(e) => setDropdownSelections(prev => ({ ...prev, [aKey]: e.target.value }))}
-                          className="p-2 border rounded w-1/3"
-                        >
-                          <option value="">-- Chọn hoặc gõ giá trị --</option>
-                          {(attr.values || []).map((v, vi) => (
-                            <option key={`opt-${aKey}-${vi}`} value={v.tenGiaTri || v.id}>{v.tenGiaTri || v.name || v.id}</option>
-                          ))}
-                        </select>
-
-                        <input
-                          type="text"
-                          placeholder={`Gõ nhanh giá trị cho ${attr.tenThuocTinh}`}
-                          value={attrTextInputs[aKey] || ''}
-                          onChange={(e) => setAttrTextInputs(prev => ({ ...prev, [aKey]: e.target.value }))}
-                          className="p-2 border rounded flex-1"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const val = (attrTextInputs[aKey] || dropdownSelections[aKey] || '').toString().trim();
-                            if (!val) { showToast('Vui lòng nhập hoặc chọn một giá trị', 'error'); return; }
-                            setVariantSelections(prev => ({ ...prev, [aKey]: [val] }));
-                            showToast('Đã thêm giá trị cho thuộc tính', 'success');
-                          }}
-                          className="px-3 py-1 bg-green-50 text-green-700 rounded"
-                        >Thêm</button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <div className="flex justify-start space-x-2 border-t pt-3 mt-3">
-                  <button
-                    onClick={() => {
-                      // Build attributes and submit form manually by triggering submit
-                      // We simply allow normal submit to pick up state in handleSubmit
-                      // but ensure selections are present
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Thiết lập thuộc tính
-                  </button>
-                  <button
-                    onClick={() => {
-                      setVariantMode('rows');
-                      setUseExplicitRows(true);
-                      if (!Array.isArray(explicitRows) || explicitRows.length === 0) setExplicitRows([{ maThuocTinh: '', giaTri: '' }]);
-                    }}
-                    className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-800"
-                  >
-                    Tạo hàng thuộc tính
-                  </button>
+                  ))}
                 </div>
-              </div>
+                <div className="mt-3 p-2 border rounded bg-white flex items-center gap-3">
+                  <select
+                    className="p-2 border rounded w-1/3"
+                    value={newAttrId}
+                    onChange={(e) => setNewAttrId(e.target.value)}
+                  >
+                    <option value="">-- Chọn thuộc tính --</option>
+                    {attributes
+                      .filter((a) => !(editedAttributes || []).some((r) => String(r.maThuocTinh) === String(a.id ?? a.maThuocTinh)))
+                      .map((a, ai) => (
+                        <option key={`attr-opt-${ai}`} value={a.id ?? a.maThuocTinh}>{a.tenThuocTinh}</option>
+                      ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Giá trị (VD: Đỏ)"
+                    value={newAttrValue}
+                    onChange={(e) => setNewAttrValue(e.target.value)}
+                    className="p-2 border rounded flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newAttrId || !String(newAttrValue).trim()) { showToast('Chọn thuộc tính và nhập giá trị', 'error'); return; }
+                      const meta = attributes.find((a) => String(a.id ?? a.maThuocTinh) === String(newAttrId));
+                      setEditedAttributes((prev) => [...prev, { maThuocTinh: Number(newAttrId), tenThuocTinh: meta?.tenThuocTinh || String(newAttrId), giaTri: String(newAttrValue) }]);
+                      setNewAttrId('');
+                      setNewAttrValue('');
+                    }}
+                    className="px-3 py-2 bg-green-600 text-white rounded"
+                  >Thêm thuộc tính</button>
+                </div>
+              </>
             )}
           </div>
 

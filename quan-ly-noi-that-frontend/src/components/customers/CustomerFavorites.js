@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { IoHeart, IoHeartOutline, IoCart, IoStar, IoSearch, IoClose, IoTrash, IoStorefront } from 'react-icons/io5';
+import { IoHeart, IoHeartOutline, IoStar, IoSearch, IoClose, IoTrash, IoStorefront } from 'react-icons/io5';
 import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 
 const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
-  const { id, name, image, collection, rating, reviewCount, price, originalPrice, discount, isFavorite } = product;
+  const { id, name, image, collection, rating, reviewCount, price, originalPrice } = product;
 
   const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
+  
+  // Tính discount percent từ originalPrice và price
+  const discountPercent = originalPrice > 0 && price > 0 && originalPrice > price 
+    ? Math.round(((originalPrice - price) / originalPrice) * 100) 
+    : 0;
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-xl transition-all duration-300 group border border-gray-100">
@@ -30,13 +35,10 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
         </Link>
 
         {/* Discount Badge */}
-        {((product.discountPercent != null && product.discountPercent > 0) || (discount && discount > 0)) && (
+        {discountPercent > 0 && (
           <div className="absolute top-4 left-4">
             <span className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-lg">
-              -{product.discountPercent != null && product.discountPercent > 0 
-                ? product.discountPercent 
-                : Math.round(((discount || 0) / (originalPrice || 1)) * 100)
-              }%
+              -{discountPercent}%
             </span>
           </div>
         )}
@@ -69,7 +71,7 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
         </h3>
 
         {/* Rating */}
-        {rating > 0 && (
+        {rating > 0 && reviewCount > 0 && (
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center">
               {[...Array(5)].map((_, i) => (
@@ -80,45 +82,45 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
               ))}
             </div>
             <span className="text-xs text-gray-600">
-              {rating.toFixed(1)} ({reviewCount || 0})
+              {rating.toFixed(1)} ({reviewCount})
             </span>
           </div>
         )}
 
         {/* Price */}
-        <div className="flex flex-col gap-1.5 mb-4">
-          <div className="flex items-baseline gap-2">
-            <span className="font-bold text-2xl text-orange-600">
-              {price > 0 ? formatPrice(price) : 'Liên hệ'}
-            </span>
-            {originalPrice && originalPrice > price && price > 0 && (
-              <span className="text-sm text-gray-400 line-through">
-                {formatPrice(originalPrice)}
+        <div className="flex flex-col gap-1 mb-4 min-h-[5rem]">
+          {price > 0 ? (
+            <>
+              {originalPrice && originalPrice > price && (
+                <span className="text-sm text-gray-400 line-through">
+                  {formatPrice(originalPrice)}
+                </span>
+              )}
+              <span className="font-bold text-2xl text-orange-600">
+                {formatPrice(price)}
               </span>
-            )}
-          </div>
-          {discount && discount > 0 && price > 0 && (
+            </>
+          ) : (
+            <span className="font-bold text-2xl text-orange-600">
+              Liên hệ
+            </span>
+          )}
+          {originalPrice && originalPrice > price && price > 0 && (
             <div className="text-xs text-green-600 font-medium">
-              Tiết kiệm: {formatPrice(discount)}
+              Tiết kiệm: {formatPrice(originalPrice - price)}
             </div>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
-          <button 
-            onClick={() => onAddToCart && onAddToCart(product)} 
-            className="flex-1 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg hover:scale-105"
-          >
-            <IoCart className="text-lg" />
-            <span className="text-sm">Thêm giỏ</span>
-          </button>
+        <div className="flex justify-center">
           <button 
             onClick={onToggleFavorite}
-            className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-all duration-300 hover:scale-105"
+            className="w-full py-3 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg"
             title="Xóa khỏi yêu thích"
           >
             <IoTrash className="text-lg" />
+            <span className="text-sm">Xóa khỏi yêu thích</span>
           </button>
         </div>
       </div>
@@ -151,49 +153,56 @@ const CustomerFavorites = () => {
           console.log('🔍 [Favorites] Sản phẩm đầu tiên (raw):', data[0]);
         }
         
-        // Map product to match shop page structure
-        const mapped = (Array.isArray(data) ? data : []).map(p => {
-          // Main image logic
-          const mainImage = p.hinhAnhs && Array.isArray(p.hinhAnhs) && p.hinhAnhs.length > 0
-            ? p.hinhAnhs.find(h => h.laAnhChinh)?.duongDanHinhAnh || p.hinhAnhs[0]?.duongDanHinhAnh
-            : null;
-          const image = mainImage && typeof mainImage === 'string' && mainImage.startsWith('/')
-            ? api.buildUrl(mainImage)
-            : mainImage || 'https://via.placeholder.com/300';
+        // Lấy tất cả sản phẩm từ shop API để có giá đầy đủ
+        const shopResponse = await api.get('/api/products/shop');
+        const shopData = shopResponse.data ?? shopResponse;
+        const shopProducts = Array.isArray(shopData) ? shopData : (shopData.items ?? shopData.content ?? []);
+        
+        // Map product IDs từ favorites
+        const favoriteIds = new Set((Array.isArray(data) ? data : []).map(p => p.maSanPham ?? p.id));
+        
+        // Filter shop products để chỉ lấy những sản phẩm yêu thích
+        const mapped = shopProducts
+          .filter(p => favoriteIds.has(p.maSanPham ?? p.id))
+          .map(p => {
+            // Main image logic
+            const rawImages = Array.isArray(p.images) ? p.images : [];
+            const images = rawImages.map(img => (typeof img === 'string' && img.startsWith('/') ? api.buildUrl(img) : img));
+            const image = images.length > 0 ? images[0] : 'https://via.placeholder.com/300';
 
-          // Category and collection
-          const category = p.danhMuc?.name || p.boSuuTap?.name || '';
-          const collection = p.boSuuTap?.name || '';
+            // Category and collection
+            const category = p.category?.name ?? '';
+            const collection = p.boSuuTap?.name ?? '';
 
-          // Rating and reviews
-          const rating = Number(p.averageRating) || 0;
-          const reviews = Number(p.reviewCount) || 0;
+            // Rating and reviews
+            const rating = Number(p.averageRating) || 0;
+            const reviews = Number(p.reviewCount) || 0;
 
-          // Lấy giá từ API response (giống CustomerShop)
-          const price = p.lowestVariantPrice ?? p.minPrice ?? p.price ?? 0;
-          const originalPrice = p.lowestVariantOriginalPrice ?? p.maxPrice ?? p.originalPrice ?? 0;
-          const stockCount = p.totalStock ?? p.stockQuantity ?? 0;
-          const inStock = stockCount > 0;
-          const discountPercent = p.lowestVariantDiscountPercent ?? p.discountPercent ?? 0;
-          const isOnSale = originalPrice > 0 && price < originalPrice;
+            // Lấy giá từ API response (giống CustomerShop)
+            const price = p.lowestVariantPrice ?? p.minPrice ?? p.price ?? 0;
+            const originalPrice = p.lowestVariantOriginalPrice ?? p.maxPrice ?? p.originalPrice ?? 0;
+            const stockCount = p.totalStock ?? p.stockQuantity ?? 0;
+            const inStock = stockCount > 0;
+            const discountPercent = p.lowestVariantDiscountPercent ?? p.discountPercent ?? 0;
+            const isOnSale = originalPrice > 0 && price < originalPrice;
 
-          return {
-            id: p.maSanPham ?? p.id,
-            name: p.tenSanPham ?? p.name ?? 'Sản phẩm',
-            price: Number(price) || 0,
-            originalPrice: Number(originalPrice) || 0,
-            image,
-            category,
-            collection,
-            rating,
-            reviews,
-            inStock,
-            discountPercent: Number(discountPercent) || 0,
-            isOnSale,
-            stockCount,
-            diemThuong: p.diemThuong || 0
-          };
-        });
+            return {
+              id: p.maSanPham ?? p.id,
+              name: p.tenSanPham ?? p.name ?? 'Sản phẩm',
+              price: Number(price) || 0,
+              originalPrice: Number(originalPrice) || 0,
+              image,
+              category,
+              collection,
+              rating,
+              reviews,
+              inStock,
+              discountPercent: Number(discountPercent) || 0,
+              isOnSale,
+              stockCount,
+              diemThuong: p.diemThuong || 0
+            };
+          });
         
         console.log('🔄 [Favorites] Dữ liệu sau khi map:', mapped);
         if (mapped.length > 0) {
@@ -202,7 +211,7 @@ const CustomerFavorites = () => {
 
         console.log('✅ [Favorites] Dữ liệu cuối cùng:', mapped);
         console.log('📊 [Favorites] Tổng số sản phẩm yêu thích:', mapped.length);
-  setFavorites(mapped);
+        setFavorites(mapped);
         try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mapped.length } })); } catch (e) {}
       } catch (e) {
         console.error('❌ [Favorites] Lỗi khi load từ API:', e);

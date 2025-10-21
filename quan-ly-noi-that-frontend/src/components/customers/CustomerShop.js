@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IoSearch, IoCart, IoHeart, IoStar, IoChevronDown, IoChevronForward, IoFunnel } from 'react-icons/io5';
+import { IoSearch, IoHeart, IoStar, IoChevronDown, IoChevronForward, IoFunnel } from 'react-icons/io5';
 import api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCart } from '../../contexts/CartContext';
 
 // Add custom checkbox style
 const checkboxStyle = `
@@ -80,7 +79,6 @@ const CustomerShop = () => {
   const [sortBy, setSortBy] = useState('newest');
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const { user } = useAuth();
-  const { addToCart } = useCart();
   const [isLoading, setIsLoading] = useState(false);
   const [apiCategories, setApiCategories] = useState([]);
   const [apiSuppliers, setApiSuppliers] = useState([]);
@@ -159,24 +157,60 @@ const CustomerShop = () => {
   useEffect(() => {
     const fetchFavorites = async () => {
       if (!user) {
+        console.log('⚠️ [CustomerShop] User chưa đăng nhập, skip load favorites');
         setFavoriteIds(new Set());
         return;
       }
-      
+
       try {
         console.log('🔄 [CustomerShop] Load danh sách yêu thích từ database...');
+        console.log('👤 [CustomerShop] User:', user);
+        console.log('📡 [CustomerShop] Calling API: GET /api/v1/yeu-thich');
+
+        // Log token lấy từ localStorage
+        const token = localStorage.getItem('token');
+        console.log('[CustomerShop] Token from localStorage:', token);
+        // Nếu dùng axios instance (api), log interceptor nếu có
+        if (api && api.defaults && api.defaults.headers && api.defaults.headers.common) {
+          console.log('[CustomerShop] api.defaults.headers.common.Authorization:', api.defaults.headers.common['Authorization']);
+        }
+
         const response = await api.get('/api/v1/yeu-thich');
-        console.log('[CustomerShop] JSON response /api/v1/yeu-thich:', JSON.stringify(response.data));
-        const favoriteProducts = response.data || [];
-        const ids = new Set(favoriteProducts.map(p => p.maSanPham || p.id));
+
+        console.log('[CustomerShop] ✅ API call successful');
+        console.log('[CustomerShop] Status:', response.status);
+        console.log('[CustomerShop] Raw response:', response);
+        console.log('[CustomerShop] Response data:', response.data);
+        console.log('[CustomerShop] Data type:', typeof response.data, 'Array?', Array.isArray(response.data));
+
+        const favoriteProducts = Array.isArray(response.data) ? response.data : [];
+        console.log('[CustomerShop] Favorite products array:', favoriteProducts);
+        console.log('[CustomerShop] Array length:', favoriteProducts.length);
+
+        if (favoriteProducts.length > 0) {
+          console.log('[CustomerShop] First item:', favoriteProducts[0]);
+        }
+
+        // Xử lý nhiều trường hợp để lấy product ID
+        const ids = new Set(favoriteProducts.map(p => {
+          // Thử nhiều cách lấy ID
+          const id = p.maSanPham ?? p.id ?? p.productId ?? p.sanPham?.maSanPham ?? p.sanPham?.id;
+          console.log('[CustomerShop] Product item:', p, '-> ID:', id);
+          return id;
+        }).filter(id => id != null));
+
         setFavoriteIds(ids);
-        console.log('✅ [CustomerShop] Đã load', ids.size, 'sản phẩm yêu thích');
+        console.log('✅ [CustomerShop] Đã load', ids.size, 'sản phẩm yêu thích, IDs:', Array.from(ids));
       } catch (error) {
         console.error('❌ [CustomerShop] Lỗi khi load yêu thích:', error);
+        console.error('❌ [CustomerShop] Error message:', error.message);
+        console.error('❌ [CustomerShop] Error response:', error.response);
+        console.error('❌ [CustomerShop] Error response data:', error.response?.data);
+        console.error('❌ [CustomerShop] Error response status:', error.response?.status);
         setFavoriteIds(new Set());
       }
     };
-    
+
     fetchFavorites();
   }, [user]);
 
@@ -343,16 +377,6 @@ const CustomerShop = () => {
   const handleViewProduct = (product) => {
     // Navigate to product detail page
     navigate(`/shop/products/${product.id}`);
-  };
-
-  const handleAddToCart = (product) => {
-    addToCart({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      quantity: 1
-    });
   };
 
   const renderStars = (rating) => {
@@ -676,33 +700,16 @@ const CustomerShop = () => {
                       </div>
 
                       {/* Price */}
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-xl font-bold text-blue-600">
-                          {formatPrice(product.price)}
-                        </span>
+                      <div className="flex flex-col gap-1 mb-4 min-h-[4rem]">
                         {product.originalPrice > 0 && product.isOnSale && (
                           <span className="text-sm text-gray-500 line-through">
                             {formatPrice(product.originalPrice)}
                           </span>
                         )}
+                        <span className="text-xl font-bold text-blue-600">
+                          {formatPrice(product.price)}
+                        </span>
                       </div>
-
-                      {/* Add to Cart Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCart(product);
-                        }}
-                        disabled={!product.inStock}
-                        className={`w-full flex items-center justify-center gap-2 p-3.5 rounded-xl font-bold text-sm uppercase transition-all shadow-lg ${
-                          product.inStock
-                            ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 hover:shadow-2xl transform hover:scale-105 active:scale-95'
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
-                        }`}
-                      >
-                        <IoCart className="w-5 h-5" />
-                        {product.inStock ? '🛒 Thêm vào giỏ' : '❌ Hết hàng'}
-                      </button>
                     </div>
                   </div>
                 ))}

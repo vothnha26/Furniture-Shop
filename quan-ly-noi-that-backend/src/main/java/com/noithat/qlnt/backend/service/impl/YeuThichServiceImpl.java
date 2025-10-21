@@ -6,6 +6,7 @@ import com.noithat.qlnt.backend.repository.SanPhamRepository;
 import com.noithat.qlnt.backend.repository.YeuThichRepository;
 import com.noithat.qlnt.backend.service.IYeuThichService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -41,6 +42,7 @@ public class YeuThichServiceImpl implements IYeuThichService {
     }
 
     @Override
+    @Transactional
     public void removeFavorite(Integer maKhachHang, Integer maSanPham) {
         yeuThichRepository.deleteByKhachHang_MaKhachHangAndSanPham_MaSanPham(maKhachHang, maSanPham);
     }

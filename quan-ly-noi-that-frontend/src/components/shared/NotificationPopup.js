@@ -46,73 +46,49 @@ const NotificationPopup = () => {
   // Lấy thông báo động từ backend khi user thay đổi
   useEffect(() => {
     if (!user || !user.maKhachHang) {
-      console.log('[NotificationPopup] No user or maKhachHang, skipping fetch');
       return;
     }
-    console.log('[NotificationPopup] Fetching notifications for user:', user.maKhachHang);
+
     api.get(`/api/v1/thong-bao/me`)
       .then(res => {
         const data = res?.data ?? res;
-        console.log('[NotificationPopup] Received notifications:', data);
         setNotifications(normalizeNotifications(data));
       })
-      .catch((err) => {
-        console.error('[NotificationPopup] Failed to fetch notifications:', err);
-      });
+      .catch(() => {});
   }, [user]);
 
   // WebSocket: kết nối STOMP để nhận thông báo realtime
   useEffect(() => {
     if (!user || !user.maKhachHang) {
-      console.log('[NotificationPopup] No user or maKhachHang, skipping WebSocket');
       return;
     }
 
-    console.log('[NotificationPopup] Initializing WebSocket for user:', user.maKhachHang);
-
     // Lấy baseURL từ api client nếu có, fallback sang current origin
-  const baseURL = api?.defaults?.baseURL || `${window.location.protocol}//${window.location.hostname}:8080`;
-  // Backend SockJS endpoint is registered at /ws-notifications
-  const wsUrl = `${baseURL.replace(/\/$/, '')}/ws-notifications`;
-
-    console.log('[NotificationPopup] WebSocket URL:', wsUrl);
+    const baseURL = api?.defaults?.baseURL || `${window.location.protocol}//${window.location.hostname}:8080`;
+    // Backend SockJS endpoint is registered at /ws-notifications
+    const wsUrl = `${baseURL.replace(/\/$/, '')}/ws-notifications`;
 
     const client = new StompClient({
       webSocketFactory: () => new SockJS(wsUrl),
       reconnectDelay: 5000,
-      debug: (msg) => console.log('[NotificationPopup STOMP]', msg),
       onConnect: () => {
-        console.log('[NotificationPopup] WebSocket connected!');
         // Subscribe kênh chung
         client.subscribe('/topic/thong-bao/all', (message) => {
           try {
-            console.log('[NotificationPopup] Received from /all:', message.body);
             const body = JSON.parse(message.body);
             const [item] = normalizeNotifications([body]);
             if (item) setNotifications((prev) => [item, ...prev]);
-          } catch (e) {
-            console.error('[NotificationPopup] Error parsing /all message:', e);
-          }
+          } catch (e) {}
         });
         // Subscribe kênh theo khách hàng
         const customerTopic = `/topic/thong-bao/customer/${user.maKhachHang}`;
-        console.log('[NotificationPopup] Subscribing to:', customerTopic);
         client.subscribe(customerTopic, (message) => {
           try {
-            console.log('[NotificationPopup] Received from customer topic:', message.body);
             const body = JSON.parse(message.body);
             const [item] = normalizeNotifications([body]);
             if (item) setNotifications((prev) => [item, ...prev]);
-          } catch (e) {
-            console.error('[NotificationPopup] Error parsing customer message:', e);
-          }
+          } catch (e) {}
         });
-      },
-      onStompError: (frame) => {
-        console.error('[NotificationPopup] STOMP error:', frame);
-      },
-      onWebSocketError: (event) => {
-        console.error('[NotificationPopup] WebSocket error:', event);
       }
     });
     client.activate();
@@ -121,7 +97,6 @@ const NotificationPopup = () => {
     // Fallback polling mỗi 15s nếu không có websocket hoặc miss message
     const startPolling = () => {
       if (pollerRef.current) return;
-      console.log('[NotificationPopup] Starting fallback polling');
       pollerRef.current = setInterval(() => {
         api.get(`/api/v1/thong-bao/me`).then(res => {
           const data = res?.data ?? res;
@@ -132,7 +107,6 @@ const NotificationPopup = () => {
     startPolling();
 
     return () => {
-      console.log('[NotificationPopup] Cleaning up WebSocket and polling');
       if (stompRef.current) {
         stompRef.current.deactivate();
         stompRef.current = null;
@@ -195,14 +169,10 @@ const NotificationPopup = () => {
   };
 
   const markAllAsRead = () => {
-    console.log('[NotificationPopup] Đánh dấu tất cả thông báo là đã đọc');
     api.put(`/api/v1/thong-bao/danh-dau-tat-ca-da-doc`).then(() => {
-      console.log('[NotificationPopup] Thành công! Cập nhật UI');
       setNotifications(notifications.map(notif => ({ ...notif, read: true })));
-      setIsOpen(false); // Đóng dropdown sau khi đánh dấu
-    }).catch(err => {
-      console.error('[NotificationPopup] Lỗi khi đánh dấu tất cả:', err);
-    });
+      setIsOpen(false);
+    }).catch(() => {});
   };
 
   const deleteNotification = (id, e) => {

@@ -6,10 +6,33 @@
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
 
 function buildUrl(path, query) {
-  const url = path.startsWith('http') ? path : `${BASE_URL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
-  if (!query) return url;
-  const params = new URLSearchParams(query).toString();
-  return params ? `${url}?${params}` : url;
+  try {
+    // Normalize path to string
+    if (path == null) return '';
+    if (typeof path !== 'string') {
+      if (Array.isArray(path)) {
+        // If array, take the first element
+        path = path[0] ?? '';
+      } else if (typeof path === 'object') {
+        // Common fields that may contain URL/path
+        path = path.url || path.href || path.duongDanHinhAnh || path.path || String(path);
+      } else {
+        path = String(path);
+      }
+    }
+
+    if (!path) return '';
+
+    const cleanedBase = String(BASE_URL || '').replace(/\/$/, '');
+    const cleanedPath = String(path).replace(/^\//, '');
+    const url = cleanedPath.startsWith('http') ? cleanedPath : `${cleanedBase}/${cleanedPath}`;
+    if (!query) return url;
+    const params = new URLSearchParams(query).toString();
+    return params ? `${url}?${params}` : url;
+  } catch (e) {
+    // On any failure, return empty to avoid throwing in render paths like <img src="">
+    return '';
+  }
 }
 
 let _cachedAuthToken = null;

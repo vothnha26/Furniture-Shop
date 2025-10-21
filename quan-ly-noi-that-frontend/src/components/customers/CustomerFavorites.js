@@ -137,21 +137,11 @@ const CustomerFavorites = () => {
 
   useEffect(() => {
     const loadFavorites = async () => {
-      console.log('🔄 [Favorites] Bắt đầu load dữ liệu yêu thích...');
-      console.log('👤 [Favorites] Current User:', currentUser);
       
       try {
-        console.log('📡 [Favorites] Gọi API: GET /api/v1/yeu-thich');
         const res = await api.get('/api/v1/yeu-thich');
-        console.log('✅ [Favorites] API Response:', res);
         
         const data = res?.data || res || [];
-        console.log('📦 [Favorites] Data nhận được:', data);
-        console.log('📊 [Favorites] Số lượng sản phẩm:', Array.isArray(data) ? data.length : 0);
-        
-        if (Array.isArray(data) && data.length > 0) {
-          console.log('🔍 [Favorites] Sản phẩm đầu tiên (raw):', data[0]);
-        }
         
         // Lấy tất cả sản phẩm từ shop API để có giá đầy đủ
         const shopResponse = await api.get('/api/products/shop');
@@ -203,19 +193,10 @@ const CustomerFavorites = () => {
               diemThuong: p.diemThuong || 0
             };
           });
-        
-        console.log('🔄 [Favorites] Dữ liệu sau khi map:', mapped);
-        if (mapped.length > 0) {
-          console.log('🔍 [Favorites] Sản phẩm đầu tiên (mapped):', mapped[0]);
-        }
 
-        console.log('✅ [Favorites] Dữ liệu cuối cùng:', mapped);
-        console.log('📊 [Favorites] Tổng số sản phẩm yêu thích:', mapped.length);
         setFavorites(mapped);
         try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mapped.length } })); } catch (e) {}
       } catch (e) {
-        console.error('❌ [Favorites] Lỗi khi load từ API:', e);
-        console.error('❌ [Favorites] Chi tiết lỗi:', e.response || e.message);
         setFavorites([]);
       }
     };
@@ -223,19 +204,15 @@ const CustomerFavorites = () => {
   }, [currentUser]);
 
   const removeFromFavorites = async (id) => {
-    console.log('🗑️ [Favorites] Xóa sản phẩm:', id);
-    
     try {
       if (auth?.isAuthenticated) {
         // Gọi API xóa khỏi database
-        await api.delete(`/api/v1/yeu-thich/${id}`);
-        console.log('✅ [Favorites] Đã xóa khỏi database:', id);
+        await api.del(`/api/v1/yeu-thich/${id}`);
       }
       
       // Cập nhật state
       setFavorites(prev => {
         const next = prev.filter(item => String(item.id) !== String(id));
-        console.log('📊 [Favorites] Số sản phẩm còn lại:', next.length);
         
         try { 
           window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: next.length } })); 
@@ -243,9 +220,13 @@ const CustomerFavorites = () => {
         
         return next;
       });
-    } catch (e) { 
-      console.error('❌ [Favorites] Lỗi khi xóa:', e);
-      alert('Có lỗi xảy ra khi xóa sản phẩm yêu thích');
+    } catch (e) {
+      try {
+        const msg = e?.data?.message || e?.message || 'Có lỗi xảy ra khi xóa sản phẩm yêu thích';
+        alert(msg);
+      } catch (_) {
+        alert('Có lỗi xảy ra khi xóa sản phẩm yêu thích');
+      }
     }
   };
 

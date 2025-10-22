@@ -3,9 +3,8 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
-    # Giữ nguyên cấu hình này. Việc sửa lỗi đã được thực hiện trong Dockerfile.
+    # Đã xóa buildContext vì nó không phải là trường hợp lệ trên Render.
     dockerfilePath: quan-ly-noi-that-backend/Dockerfile
-    buildContext: quan-ly-noi-that-backend
     buildFilter:
       paths:
         - quan-ly-noi-that-backend/**

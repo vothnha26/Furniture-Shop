@@ -3,6 +3,10 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
+    buildFilter:
+      paths:
+        - quan-ly-noi-that-backend/**
+    dockerfilePath: quan-ly-noi-that-backend/Dockerfile
     envVars:
       - key: SPRING_DATASOURCE_URL
         value: jdbc:sqlserver://103.199.36.147:1433;databaseName=qlnt_db;encrypt=false

@@ -3,7 +3,7 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
-    # Giữ nguyên cấu hình buildContext và dockerfilePath
+    # Giữ nguyên cấu hình này. Việc sửa lỗi đã được thực hiện trong Dockerfile.
     dockerfilePath: quan-ly-noi-that-backend/Dockerfile
     buildContext: quan-ly-noi-that-backend
     buildFilter:

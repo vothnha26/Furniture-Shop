@@ -3,12 +3,15 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
-    # Đã xóa buildContext vì nó không phải là trường hợp lệ trên Render.
     dockerfilePath: quan-ly-noi-that-backend/Dockerfile
+    # buildContext: (Đã xóa để tránh lỗi trước đó)
     buildFilter:
       paths:
         - quan-ly-noi-that-backend/**
     envVars:
+      # FIX 1: Thêm SERVER_PORT để Render phát hiện ứng dụng đang lắng nghe trên 8080
+      - key: SERVER_PORT
+        value: 8080 
       - key: SPRING_DATASOURCE_URL
         value: jdbc:sqlserver://103.199.36.147:1433;databaseName=qlnt_db;encrypt=false
       - key: SPRING_DATASOURCE_USERNAME

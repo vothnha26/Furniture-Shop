@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { IoAdd, IoSearch, IoTrash, IoEye, IoCart, IoReceipt, IoTime, IoCheckmark } from 'react-icons/io5';
+import { IoAdd, IoSearch, IoTrash, IoEye, IoCart, IoReceipt, IoTime, IoCheckmark, IoClose } from 'react-icons/io5';
 import api from '../../../api';
 import { useNavigate } from 'react-router-dom';
+import Toast from '../../shared/Toast';
 
 const SalesManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -205,14 +206,29 @@ const SalesManagement = () => {
 
   const [foundCustomer, setFoundCustomer] = useState(null); // { maKhachHang, tenKhachHang, soDienThoai, diemTichLuy }
 
-  // local toast fallback for admin page
-  const showToast = (message, type = 'success') => {
-    if (type === 'error') {
-      alert(message);
-    } else {
-      // keep simple for admin flows
-      console.info('[Toast]', message);
-    }
+  // Import Toast for notifications
+  const [toasts, setToasts] = useState([]);
+  
+  const showToast = (message, type = 'success', title) => {
+    const id = Date.now() + Math.random();
+    const toast = {
+      id,
+      type,
+      title: title || (type === 'success' ? 'Thành công' : type === 'error' ? 'Lỗi' : 'Thông báo'),
+      message,
+      isVisible: true,
+      duration: 5000
+    };
+    setToasts(prev => [...prev, toast]);
+    
+    // Auto remove after duration
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 5000);
+  };
+  
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
   };
 
   const getStatusColor = (status) => {
@@ -538,8 +554,17 @@ const SalesManagement = () => {
     const allowed = getAllowedStatuses(currentStatus);
     if (newStatus === currentStatus) return;
     if (!allowed.includes(newStatus)) {
-      alert('Vui lòng chuyển trạng thái theo từng bước.');
+      showToast('Vui lòng chuyển trạng thái theo từng bước.', 'warning', 'Cảnh báo');
       return;
+    }
+
+    // Hiển thị dialog xác nhận
+    const statusText = getStatusText(newStatus);
+    const currentStatusText = getStatusText(currentStatus);
+    const confirmMessage = `Bạn có chắc chắn muốn thay đổi trạng thái đơn hàng #${currentOrder?.orderNumber || orderId} từ "${currentStatusText}" sang "${statusText}"?`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return; // User cancelled
     }
 
     // Optimistic UI: update the order status locally first so the select reflects the change immediately
@@ -558,6 +583,13 @@ const SalesManagement = () => {
         await api.put(`/api/banhang/donhang/${orderId}/trangthai`, { trangThai: backendStatus });
       }
 
+      // Hiển thị thông báo thành công
+      showToast(
+        `Đơn hàng #${currentOrder?.orderNumber || orderId} đã được cập nhật sang "${statusText}"`,
+        'success',
+        'Cập nhật thành công'
+      );
+
       // Refresh orders data
       const ordersData = await api.get('/api/banhang/donhang');
       if (Array.isArray(ordersData)) {
@@ -570,8 +602,8 @@ const SalesManagement = () => {
       // revert optimistic update
       setOrders(prevOrders);
       const serverMsg = err?.data?.message || err?.data?.details || err?.message || 'Cập nhật trạng thái thất bại';
-      // show a more informative alert for debugging
-      alert(`Cập nhật trạng thái thất bại: ${serverMsg}`);
+      // Hiển thị thông báo lỗi chi tiết
+      showToast(serverMsg, 'error', 'Lỗi cập nhật');
     }
   };
 
@@ -1102,6 +1134,21 @@ const SalesManagement = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <Toast
+            key={toast.id}
+            isVisible={toast.isVisible}
+            onClose={() => removeToast(toast.id)}
+            type={toast.type}
+            title={toast.title}
+            message={toast.message}
+            duration={toast.duration}
+          />
+        ))}
       </div>
     </div>
   );

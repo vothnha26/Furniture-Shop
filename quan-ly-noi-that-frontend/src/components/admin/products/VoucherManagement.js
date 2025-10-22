@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { IoGift, IoAdd, IoCreate, IoTrash, IoEye, IoTime, IoCheckmarkCircle, IoRefresh, IoCopy } from 'react-icons/io5';
+import React, { useState, useEffect, useRef } from 'react';
+import { IoGift, IoAdd, IoCreate, IoTrash, IoEye, IoTime, IoCheckmarkCircle, IoRefresh, IoCopy, IoPause, IoPlay } from 'react-icons/io5';
 import api from '../../../api';
 
 const VoucherManagement = () => {
@@ -23,7 +23,8 @@ const VoucherManagement = () => {
     endDate: '',
     description: '',
     applicableTo: 'everyone', // 'everyone' or 'tiers'
-    selectedTiers: []
+    selectedTiers: [],
+    isActive: true // Mặc định voucher được kích hoạt
   });
 
   const [vouchers, setVouchers] = useState([]);
@@ -32,6 +33,15 @@ const VoucherManagement = () => {
   const [usageHistory, setUsageHistory] = useState([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigningVoucher, setAssigningVoucher] = useState(null);
+  // Lightweight toast notifications
+  const [toast, setToast] = useState(null); // { type: 'success'|'error'|'info', message: string }
+  const toastTimerRef = useRef(null);
+
+  const showToast = (type, message) => {
+    try { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); } catch { }
+    setToast({ type, message });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  };
 
   // Use backend status tokens as keys here so UI directly reflects server-side enum-like values.
   // Expected tokens: "CHUA_BAT_DAU", "DANG_HOAT_DONG", "DA_HET_HAN", "KHONG_HOAT_DONG"
@@ -107,7 +117,9 @@ const VoucherManagement = () => {
       apDungChoMoiNguoi: voucher.apDungChoMoiNguoi === undefined ? true : Boolean(voucher.apDungChoMoiNguoi),
       description: voucher.moTa || voucher.description || '',
       createdBy: voucher.nguoiTao || 'Admin',
-      createdAt: voucher.ngayTao || voucher.createdAt || ''
+      createdAt: voucher.ngayTao || voucher.createdAt || '',
+      // Map trạng thái thành checkbox isActive (true nếu KHÔNG phải KHONG_HOAT_DONG)
+      isActive: voucher.trangThai !== 'KHONG_HOAT_DONG'
     });
   };
 
@@ -145,8 +157,11 @@ const VoucherManagement = () => {
       ? voucher.selectedTiers.map(s => Number(s))
       : undefined
     ,
-    // send admin-selected status token back to API, default to DANG_HOAT_DONG for new vouchers
-    trangThai: voucher.status || 'DANG_HOAT_DONG'
+    // Gửi trạng thái dựa trên checkbox isActive:
+    // - Nếu isActive = false => KHONG_HOAT_DONG (tạm dừng)
+    // - Nếu isActive = true => để trigger tự động quyết định dựa trên ngày
+    //   (CHUA_BAT_DAU / DANG_HOAT_DONG / DA_HET_HAN)
+    trangThai: voucher.isActive === false ? 'KHONG_HOAT_DONG' : 'DANG_HOAT_DONG'
   });
 
   // API Functions
@@ -250,13 +265,13 @@ const VoucherManagement = () => {
     }
   };
 
-  const deleteVoucher = async (voucherId) => {
+  // Toggle voucher active state: pause (KHONG_HOAT_DONG) or resume (DANG_HOAT_DONG)
+  const toggleVoucherStatus = async (voucher, newStatus) => {
     try {
-      await api.delete(`/api/v1/voucher/${voucherId}`);
-      setVouchers(prev => prev.filter(voucher => voucher.id !== voucherId));
+      await updateVoucher(voucher.id, { trangThai: newStatus });
     } catch (err) {
-      console.error('Delete voucher error', err);
-      throw new Error('Không thể xóa voucher');
+      console.error('Toggle voucher status error', err);
+      throw new Error('Không thể cập nhật trạng thái voucher');
     }
   };
 
@@ -285,6 +300,7 @@ const VoucherManagement = () => {
     }
   };
 
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -303,6 +319,14 @@ const VoucherManagement = () => {
     })();
     return () => { mounted = false; };
   }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  // Cleanup toast timer on unmount
+  useEffect(() => {
+    return () => {
+      try { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); } catch { }
+    };
+  }, []);
 
   const handleViewVoucher = (voucher) => {
     // load full voucher details (including dates and applied tiers) before opening modal
@@ -319,7 +343,13 @@ const VoucherManagement = () => {
   };
 
   const handleAddVoucher = () => {
-    setNewVoucher(prev => ({ ...prev, code: generateVoucherCode(), applicableTo: 'everyone', selectedTiers: [] }));
+    setNewVoucher(prev => ({ 
+      ...prev, 
+      code: generateVoucherCode(), 
+      applicableTo: 'everyone', 
+      selectedTiers: [],
+      isActive: true // Mặc định kích hoạt
+    }));
     setShowAddModal(true);
   };
 
@@ -334,6 +364,7 @@ const VoucherManagement = () => {
       const payload = mapVoucherToApi(newVoucher);
       await createVoucher(payload);
       setShowAddModal(false);
+      showToast('success', `Đã tạo voucher "${newVoucher.name}"`);
       setNewVoucher({
         name: '',
         code: '',
@@ -346,10 +377,12 @@ const VoucherManagement = () => {
         endDate: '',
         description: '',
         applicableTo: 'everyone',
-        selectedTiers: []
+        selectedTiers: [],
+        isActive: true // Reset về mặc định kích hoạt
       });
     } catch (err) {
       setError(err.message);
+      showToast('error', err.message || 'Tạo voucher thất bại');
     }
   };
 
@@ -381,24 +414,32 @@ const VoucherManagement = () => {
       await updateVoucher(editingVoucher.id, payload);
       setShowEditModal(false);
       setEditingVoucher(null);
+      showToast('success', 'Đã cập nhật voucher');
     } catch (err) {
       setError(err.message);
+      showToast('error', err.message || 'Cập nhật voucher thất bại');
     }
   };
 
-  const handleDeleteVoucher = async (voucher) => {
-    if (window.confirm(`Bạn có chắc muốn xóa voucher ${voucher.name}?`)) {
-      try {
-        await deleteVoucher(voucher.id);
-      } catch (err) {
-        setError(err.message);
-      }
+  const handleToggleVoucherStatus = async (voucher) => {
+    const isActive = voucher.status === 'DANG_HOAT_DONG';
+    const newStatus = isActive ? 'KHONG_HOAT_DONG' : 'DANG_HOAT_DONG';
+    const msg = isActive
+      ? `Bạn muốn tạm dừng voucher ${voucher.name}?`
+      : `Bạn muốn tiếp tục kích hoạt voucher ${voucher.name}?`;
+    if (!window.confirm(msg)) return;
+    try {
+      await toggleVoucherStatus(voucher, newStatus);
+      showToast('success', isActive ? `Đã tạm dừng "${voucher.name}"` : `Đã kích hoạt lại "${voucher.name}"`);
+    } catch (err) {
+      setError(err.message);
+      showToast('error', err.message || 'Cập nhật trạng thái thất bại');
     }
   };
 
   const handleCopyCode = (code) => {
     navigator.clipboard.writeText(code);
-    // Show toast notification
+    showToast('success', 'Đã sao chép mã voucher');
   };
 
   const getVoucherUsage = (voucherCode) => {
@@ -432,6 +473,27 @@ const VoucherManagement = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Toast notification */}
+        {toast && (
+          <div className="fixed top-4 right-4 z-50">
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-lg shadow-lg border ${toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' :
+                toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' :
+                  'bg-blue-50 border-blue-200 text-blue-700'
+              }`}>
+              <div className="mt-0.5">
+                {toast.type === 'success' ? (
+                  <IoCheckmarkCircle className="w-5 h-5" />
+                ) : toast.type === 'error' ? (
+                  <IoTrash className="w-5 h-5" />
+                ) : (
+                  <IoTime className="w-5 h-5" />
+                )}
+              </div>
+              <div className="text-sm font-medium">{toast.message}</div>
+              <button onClick={() => setToast(null)} className="ml-2 text-inherit hover:opacity-80">✕</button>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Quản lý voucher</h1>
@@ -503,9 +565,22 @@ const VoucherManagement = () => {
                 <IoGift className="w-6 h-6 text-orange-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Tổng giảm giá</p>
+                <p className="text-sm font-medium text-gray-600">Tổng giảm giá ước tính</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {usageHistory.reduce((sum, u) => sum + (u.discountAmount || 0), 0).toLocaleString('vi-VN')}đ
+                  {(() => {
+                    // Tính tổng giá trị giảm dựa trên số lượng đã sử dụng * giá trị giảm
+                    const total = vouchers.reduce((sum, v) => {
+                      const usedCount = v.usedCount || 0;
+                      const value = v.value || 0;
+                      // Ước tính: nếu là phần trăm, giả sử đơn hàng trung bình 1,000,000đ
+                      // Nếu là fixed, lấy giá trị trực tiếp
+                      const avgDiscount = v.type === 'percentage' 
+                        ? (value / 100) * 1000000 // Giả sử đơn hàng TB 1tr
+                        : value;
+                      return sum + (usedCount * avgDiscount);
+                    }, 0);
+                    return Math.round(total).toLocaleString('vi-VN');
+                  })()}đ
                 </p>
               </div>
             </div>
@@ -517,7 +592,20 @@ const VoucherManagement = () => {
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Danh sách voucher</h3>
             <div className="flex items-center space-x-2">
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button
+                onClick={async () => {
+                  try {
+                    setIsLoading(true);
+                    await fetchVouchers();
+                    showToast('info', 'Đã làm mới danh sách voucher');
+                  } catch (e) {
+                    showToast('error', 'Làm mới thất bại');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
                 <IoRefresh className="w-4 h-4" />
                 Làm mới
               </button>
@@ -563,6 +651,7 @@ const VoucherManagement = () => {
                   const typeInfo = getTypeInfo(voucher.type);
                   const StatusIcon = statusInfo.icon;
                   const usagePercentage = getUsagePercentage(voucher.usedCount, voucher.usageLimit);
+                  const isActive = voucher.status === 'DANG_HOAT_DONG';
 
                   return (
                     <tr key={voucher.id} className="hover:bg-gray-50">
@@ -633,7 +722,7 @@ const VoucherManagement = () => {
                                   if (membershipTiers.length === 0) {
                                     await fetchMembershipTiers();
                                   }
-                                  
+
                                   const detail = await fetchVoucherDetail(voucher.id);
                                   // Set applyToEveryone based on applicableTo
                                   const assignData = {
@@ -641,7 +730,7 @@ const VoucherManagement = () => {
                                     applyToEveryone: detail.applicableTo === 'everyone',
                                     selectedTiers: detail.selectedTiers || []
                                   };
-                                  
+
                                   setAssigningVoucher(assignData);
                                   setShowAssignModal(true);
                                 } catch (err) {
@@ -655,10 +744,15 @@ const VoucherManagement = () => {
                             Gán hạng
                           </button>
                           <button
-                            onClick={() => handleDeleteVoucher(voucher)}
-                            className="text-red-600 hover:text-red-800"
+                            onClick={() => handleToggleVoucherStatus(voucher)}
+                            className={isActive ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}
+                            title={isActive ? 'Tạm dừng' : 'Tiếp tục'}
                           >
-                            <IoTrash className="w-4 h-4" />
+                            {isActive ? (
+                              <IoPause className="w-4 h-4" />
+                            ) : (
+                              <IoPlay className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                       </td>
@@ -1014,6 +1108,23 @@ const VoucherManagement = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Checkbox kích hoạt voucher */}
+                    <div className="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <input
+                        type="checkbox"
+                        id="newVoucherActive"
+                        checked={newVoucher.isActive}
+                        onChange={(e) => setNewVoucher({ ...newVoucher, isActive: e.target.checked })}
+                        className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
+                      />
+                      <label htmlFor="newVoucherActive" className="ml-3 text-sm font-medium text-gray-700">
+                        Kích hoạt voucher này ngay sau khi tạo
+                        <span className="block text-xs text-gray-500 mt-1">
+                          Nếu bỏ chọn, voucher sẽ ở trạng thái "Tạm dừng" và không thể sử dụng
+                        </span>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
@@ -1107,21 +1218,23 @@ const VoucherManagement = () => {
                     try {
                       const ids = assigningVoucher.applyToEveryone ? [] : (assigningVoucher.selectedTiers || []).map(s => Number(s));
                       await api.post(`/api/v1/voucher/${assigningVoucher.id}/assign-tiers`, { body: ids });
-                      
+
                       // Refresh vouchers list to show updated tier assignments
                       await fetchVouchers();
-                      
+
                       // If editing modal is open, refresh its data too
                       if (editingVoucher && editingVoucher.id === assigningVoucher.id) {
                         const updatedDetail = await fetchVoucherDetail(assigningVoucher.id);
                         setEditingVoucher(updatedDetail);
                       }
-                      
+
                       setShowAssignModal(false);
                       setError(null);
+                      showToast('success', 'Đã gán hạng cho voucher');
                     } catch (err) {
                       console.error('Assign tiers error', err);
                       setError('Gán hạng thất bại');
+                      showToast('error', 'Gán hạng thất bại');
                     }
                   }} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">Gán</button>
                 </div>
@@ -1244,22 +1357,6 @@ const VoucherManagement = () => {
                         required
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Trạng thái
-                      </label>
-                      <select
-                        value={editingVoucher.status}
-                        onChange={(e) => setEditingVoucher({ ...editingVoucher, status: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      >
-                        <option value="DANG_HOAT_DONG">Hoạt động</option>
-                        <option value="KHONG_HOAT_DONG">Không hoạt động</option>
-                        <option value="DA_HET_HAN">Hết hạn</option>
-                        <option value="CHUA_BAT_DAU">Chưa bắt đầu</option>
-                      </select>
-                    </div>
                   </div>
 
                   <div className="mt-6">
@@ -1273,6 +1370,23 @@ const VoucherManagement = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       placeholder="Nhập mô tả voucher"
                     />
+                  </div>
+
+                  {/* Checkbox kích hoạt voucher */}
+                  <div className="mt-6 flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <input
+                      type="checkbox"
+                      id="editVoucherActive"
+                      checked={editingVoucher.isActive}
+                      onChange={(e) => setEditingVoucher({ ...editingVoucher, isActive: e.target.checked })}
+                      className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
+                    />
+                    <label htmlFor="editVoucherActive" className="ml-3 text-sm font-medium text-gray-700">
+                      Kích hoạt voucher này
+                      <span className="block text-xs text-gray-500 mt-1">
+                        Nếu bỏ chọn, voucher sẽ ở trạng thái "Tạm dừng" và không thể sử dụng
+                      </span>
+                    </label>
                   </div>
 
                   {/* Applicability is read-only in the Edit modal. Use the separate "Gán hạng" flow to manage tier assignments. */}
@@ -1295,7 +1409,7 @@ const VoucherManagement = () => {
                             if (membershipTiers.length === 0) {
                               await fetchMembershipTiers();
                             }
-                            
+
                             const detail = await fetchVoucherDetail(editingVoucher.id);
                             setAssigningVoucher({
                               ...detail,

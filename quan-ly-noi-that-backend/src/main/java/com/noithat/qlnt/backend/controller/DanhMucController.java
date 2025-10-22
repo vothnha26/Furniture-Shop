@@ -98,7 +98,14 @@ public class DanhMucController {
      * Delete a category
      */
     @DeleteMapping("/{id}")
+    @Transactional
     public ResponseEntity<Void> deleteDanhMuc(@PathVariable Integer id) {
+        // Set all products in this category to null before deleting
+        List<com.noithat.qlnt.backend.entity.SanPham> products = sanPhamRepository.findByDanhMuc_MaDanhMuc(id);
+        for (com.noithat.qlnt.backend.entity.SanPham sp : products) {
+            sp.setDanhMuc(null);
+            sanPhamRepository.save(sp);
+        }
         danhMucService.deleteDanhMuc(id);
         logger.info("Deleted category id={}", id);
         return ResponseEntity.noContent().build();

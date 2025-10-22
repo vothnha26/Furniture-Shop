@@ -317,4 +317,17 @@ public class ProductController {
 
         return ResponseEntity.ok().body(null != out ? java.util.List.copyOf(out) : java.util.Collections.emptyList());
     }
+    /**
+     * Remove product from category (set category to null)
+     */
+    @PatchMapping("/{productId}/categories/null")
+    public ResponseEntity<?> removeProductFromCategory(@PathVariable Integer productId) {
+        try {
+            productService.removeProductFromCategory(productId);
+            return ResponseEntity.ok().body(java.util.Map.of("message", "Product removed from category successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
 }

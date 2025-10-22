@@ -167,7 +167,9 @@ const CollectionManagement = () => {
         await fetchCollections();
       } catch (err) {
         console.error('Delete collection error', err);
-        showToast('Xóa bộ sưu tập thất bại', 'error');
+        // Hiển thị thông báo lỗi chi tiết
+        const errorMessage = err.data?.message || err.message || 'Xóa bộ sưu tập thất bại';
+        showToast(errorMessage, 'error');
       } finally {
         setIsLoading(false);
         setShowConfirmDialog(false);

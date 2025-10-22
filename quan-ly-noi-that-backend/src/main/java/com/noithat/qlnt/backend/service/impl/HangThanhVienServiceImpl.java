@@ -609,11 +609,16 @@ public class HangThanhVienServiceImpl implements IHangThanhVienService {
                     dto.setSoDienThoai(kh.getSoDienThoai());
                     dto.setDiemThuong(kh.getDiemThuong());
                     dto.setTongChiTieu(kh.getTongChiTieu());
-                    dto.setNgayThamGia(kh.getNgayTao() != null ? kh.getNgayTao().toString() : null);
+                    dto.setTongDonHang(kh.getTongDonHang());
+                    dto.setNgayThamGia(kh.getNgayThamGia());
+                    dto.setDonHangCuoi(kh.getDonHangCuoi());
+                    dto.setTrangThaiVip(kh.getTrangThaiVip());
                     
                     // Set thông tin hạng thành viên
                     if (kh.getHangThanhVien() != null) {
-                        dto.setHangThanhVien(kh.getHangThanhVien().getTenHang());
+                        dto.setTenHang(kh.getHangThanhVien().getTenHang());
+                        dto.setMauSac(kh.getHangThanhVien().getMauSac());
+                        dto.setIcon(kh.getHangThanhVien().getIcon());
                     }
                     
                     return dto;

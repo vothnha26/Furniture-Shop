@@ -35,7 +35,13 @@ public interface IProductService {
 
     void deleteSanPham(Integer id);
 
+
     void addProductToCategory(Integer productId, Integer categoryId);
+
+    /**
+     * Remove product from category (set category to null)
+     */
+    void removeProductFromCategory(Integer productId);
 
     BienTheSanPham createBienThe(Integer sanPhamId, BienTheRequestDto dto);
 

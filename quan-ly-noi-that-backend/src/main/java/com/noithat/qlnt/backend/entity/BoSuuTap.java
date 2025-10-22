@@ -30,7 +30,7 @@ public class BoSuuTap {
     private String hinhAnh;
 
     // Quan hệ OneToMany: Một bộ sưu tập có nhiều sản phẩm (1-N)
-    @OneToMany(mappedBy = "boSuuTap", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "boSuuTap", fetch = FetchType.LAZY)
     @JsonIgnore // Tránh circular reference khi serialize JSON
     private List<SanPham> sanPhams = new ArrayList<>();
 }

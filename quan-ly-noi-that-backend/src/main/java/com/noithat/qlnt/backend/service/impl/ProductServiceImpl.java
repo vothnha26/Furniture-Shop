@@ -45,6 +45,14 @@ public class ProductServiceImpl implements IProductService {
         private HinhAnhSanPhamRepository hinhAnhSanPhamRepository;
         @Autowired
         private BoSuuTapRepository boSuuTapRepository;
+
+        @Transactional
+        public void removeProductFromCategory(Integer productId) {
+                SanPham sp = findProductById(productId);
+                sp.setDanhMuc(null);
+                sanPhamRepository.save(sp);
+        }
+
         @Autowired
         private DanhGiaSanPhamRepository danhGiaSanPhamRepository;
 

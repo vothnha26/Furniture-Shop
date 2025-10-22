@@ -109,4 +109,13 @@ public class HangThanhVienController {
         Map<String, Object> thongKe = hangThanhVienService.getThongKeHangThanhVien();
         return ResponseEntity.ok(thongKe);
     }
+
+    /**
+     * Lấy danh sách khách hàng theo hạng thành viên
+     */
+    @GetMapping("/{id}/khach-hang")
+    public ResponseEntity<List<com.noithat.qlnt.backend.dto.common.VipKhachHangDto>> getKhachHangByHang(@PathVariable Integer id) {
+        List<com.noithat.qlnt.backend.dto.common.VipKhachHangDto> khachHangs = hangThanhVienService.getKhachHangByHang(id);
+        return ResponseEntity.ok(khachHangs);
+    }
 }

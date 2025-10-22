@@ -61,12 +61,6 @@ const CustomerProfile = () => {
         try {
           // Fetch fresh customer data from API
           const freshCustomerData = await api.get('/api/v1/khach-hang/me');
-          // Log the full response object
-          console.log('[CustomerProfile] API response from /api/v1/khach-hang/me:', freshCustomerData);
-          // Log the .data property for clarity
-          if (freshCustomerData && freshCustomerData.data) {
-            console.log('[CustomerProfile] API response .data:', freshCustomerData.data);
-          }
 
           const customerData = freshCustomerData?.data || freshCustomerData;
 
@@ -86,20 +80,15 @@ const CustomerProfile = () => {
             rewardPoints: Number(customerData.diemThuong || 0)
           };
 
-          console.log('[CustomerProfile] Mapped profile:', userProfile);
-
           setProfile(userProfile);
           setEditProfile(userProfile);
 
           // Fetch orders
           try {
             const customerId = customerData.maKhachHang || user.maKhachHang;
-            console.log('[CustomerProfile] Fetching orders for customerId:', customerId);
 
             if (customerId) {
               const ordersResponse = await api.get(`/api/v1/khach-hang/${customerId}/don-hang?limit=5&sort=desc`);
-              // Log the full response for debugging
-              console.log('[CustomerProfile] Orders response (full):', ordersResponse);
 
               // Try to get the array of orders from possible response shapes
               let orders = [];
@@ -130,8 +119,6 @@ const CustomerProfile = () => {
                 canceledOrders: canceled,
                 rewardPoints: userProfile.rewardPoints
               });
-
-              console.log('[CustomerProfile] Stats:', { completed, pending, canceled, rewardPoints: userProfile.rewardPoints });
             }
           } catch (err) {
             console.error('Failed to fetch orders:', err);

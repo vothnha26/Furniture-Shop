@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.noithat.qlnt.backend.dto.common.BoSuuTapDto;
 import com.noithat.qlnt.backend.entity.BoSuuTap;
@@ -41,9 +42,18 @@ public class BoSuuTapServiceImpl implements IBoSuuTapService {
         return boSuuTapRepository.save(bst);
     }
 
+    @Transactional
     public void delete(Integer id) {
         if (!boSuuTapRepository.existsById(id)) {
             throw new EntityNotFoundException("Không tìm thấy bộ sưu tập với id: " + id);
+        }
+        // Nullify FK from products before deleting the collection
+        List<SanPham> products = sanPhamRepository.findByBoSuuTap_MaBoSuuTap(id);
+        if (!products.isEmpty()) {
+            for (SanPham sp : products) {
+                sp.setBoSuuTap(null);
+            }
+            sanPhamRepository.saveAll(products);
         }
         boSuuTapRepository.deleteById(id);
     }

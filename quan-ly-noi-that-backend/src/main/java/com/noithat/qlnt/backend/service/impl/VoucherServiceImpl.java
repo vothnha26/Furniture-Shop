@@ -159,6 +159,16 @@ public class VoucherServiceImpl implements IVoucherService {
             throw new InvalidVoucherException("Voucher đã hết hạn hoặc chưa kích hoạt.");
         }
 
+        // Kiểm tra trạng thái voucher (không cho phép sử dụng voucher bị tạm dừng)
+        if ("KHONG_HOAT_DONG".equalsIgnoreCase(voucher.getTrangThai())) {
+            throw new InvalidVoucherException("Voucher này đã bị tạm dừng.");
+        }
+
+        // Kiểm tra số lượng còn lại
+        if (voucher.getSoLuongDaSuDung() >= voucher.getSoLuongToiDa()) {
+            throw new InvalidVoucherException("Voucher đã hết số lượng sử dụng.");
+        }
+
         if (Boolean.FALSE.equals(voucher.getApDungChoMoiNguoi())) {
             KhachHang khachHang = khachHangService.getKhachHangProfile(request.getMaKhachHang());
             Integer maHangThanhVien = khachHang.getHangThanhVien().getMaHangThanhVien();
@@ -186,18 +196,37 @@ public class VoucherServiceImpl implements IVoucherService {
                 tongTien = tongTien.add(price.multiply(qty));
             }
         }
+
+        // Kiểm tra giá trị đơn hàng tối thiểu
+        BigDecimal giaTriDonHangToiThieu = voucher.getGiaTriDonHangToiThieu();
+        if (giaTriDonHangToiThieu != null && tongTien.compareTo(giaTriDonHangToiThieu) < 0) {
+            throw new InvalidVoucherException(
+                String.format("Đơn hàng tối thiểu %,dđ để sử dụng voucher này.", 
+                    giaTriDonHangToiThieu.longValue())
+            );
+        }
+
         BigDecimal giaTriGiam = voucher.getGiaTriGiam();
         BigDecimal soTienGiam;
 
         if ("PERCENTAGE".equalsIgnoreCase(voucher.getLoaiGiamGia())
                 || "PERCENT".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
+            // Tính theo phần trăm
             soTienGiam = tongTien.multiply(giaTriGiam.divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP));
+            
+            // Áp dụng giá trị giảm tối đa nếu có
+            BigDecimal giaTriGiamToiDa = voucher.getGiaTriGiamToiDa();
+            if (giaTriGiamToiDa != null && soTienGiam.compareTo(giaTriGiamToiDa) > 0) {
+                soTienGiam = giaTriGiamToiDa;
+            }
         } else if ("FIXED".equalsIgnoreCase(voucher.getLoaiGiamGia())) {
+            // Giảm giá cố định
             soTienGiam = giaTriGiam;
         } else {
             throw new InvalidVoucherException("Loại giảm giá Voucher không xác định.");
         }
 
+        // Đảm bảo số tiền giảm không vượt quá tổng tiền đơn hàng
         soTienGiam = soTienGiam.min(tongTien);
 
         return VoucherApplyResponse.builder()
@@ -355,8 +384,11 @@ public class VoucherServiceImpl implements IVoucherService {
     }
 
     private void validateDateRange(LocalDateTime start, LocalDateTime end) {
-        if (start == null || end == null || end.isBefore(start)) {
-            throw new InvalidVoucherException("Khoảng thời gian không hợp lệ.");
+        if (start == null || end == null) {
+            throw new InvalidVoucherException("Ngày bắt đầu và ngày kết thúc không được để trống.");
+        }
+        if (end.isBefore(start) || end.isEqual(start)) {
+            throw new InvalidVoucherException("Ngày kết thúc phải lớn hơn ngày bắt đầu.");
         }
     }
 

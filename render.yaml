@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: furniture-backend
+    env: java
+    plan: free
+    buildCommand: ./mvnw clean package -DskipTests
+    startCommand: java -jar target/*.jar
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:sqlserver://<sql-server-host>:1433;databaseName=qlnt_db;encrypt=false
+      - key: SPRING_DATASOURCE_USERNAME
+        value: sa
+      - key: SPRING_DATASOURCE_PASSWORD
+        value: nhacc123@

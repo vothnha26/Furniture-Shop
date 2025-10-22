@@ -7,6 +7,7 @@ services:
       paths:
         - quan-ly-noi-that-backend/**
     dockerfilePath: quan-ly-noi-that-backend/Dockerfile
+    buildContext: quan-ly-noi-that-backend
     envVars:
       - key: SPRING_DATASOURCE_URL
         value: jdbc:sqlserver://103.199.36.147:1433;databaseName=qlnt_db;encrypt=false

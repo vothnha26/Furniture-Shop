@@ -18,6 +18,10 @@ public interface IQuanLyTonKhoService {
     List<BienTheSanPham> getLowStockProducts();
     List<BienTheSanPham> getOutOfStockProducts();
     List<LichSuTonKho> getStockHistory(Integer maBienThe);
+    List<LichSuTonKho> getAllStockHistoryNhap();
+    List<LichSuTonKho> getStockHistoryNhapBetween(java.time.LocalDateTime from, java.time.LocalDateTime to);
+    List<LichSuTonKho> getAllStockHistory();
+    List<LichSuTonKho> getStockHistoryBetween(java.time.LocalDateTime from, java.time.LocalDateTime to);
     boolean isAvailableForSale(Integer maBienThe, Integer quantity);
     Integer getAvailableQuantity(Integer maBienThe);
     Double getTotalStockValue();

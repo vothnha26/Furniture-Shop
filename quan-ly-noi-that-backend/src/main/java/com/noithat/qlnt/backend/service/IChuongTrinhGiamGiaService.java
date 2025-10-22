@@ -22,6 +22,8 @@ public interface IChuongTrinhGiamGiaService {
 
     void delete(Integer id);
 
+    void updateStatus(Integer id, String trangThai);
+
     // Compatibility: compute the display price information for a variant (BienThe)
     BienTheSanPhamGiaResponse getBienTheGiaChiTiet(Integer maBienThe);
 

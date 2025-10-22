@@ -17,6 +17,8 @@ public record BienThePatchRequestDto(
     @DecimalMin(value = "0.0", inclusive = false, message = "Giá bán phải lớn hơn 0")
     BigDecimal giaBan,
     
+    String trangThaiKho,
+    
     List<ThuocTinhGiaTriTuDoDto> thuocTinhGiaTriTuDo,
     
     List<Integer> giaTriThuocTinhIds

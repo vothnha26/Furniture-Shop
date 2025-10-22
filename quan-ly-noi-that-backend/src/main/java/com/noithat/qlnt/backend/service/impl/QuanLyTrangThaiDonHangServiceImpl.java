@@ -136,7 +136,7 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
                         java.math.BigDecimal orderTotal = donHang.getThanhTien() != null ? donHang.getThanhTien()
                                 : java.math.BigDecimal.ZERO;
                         kh.setTongChiTieu(currentSpending.add(orderTotal));
-
+                        // kh.setDiemThuong(maDonHang);
                         System.out.println("✅ Updated customer stats for order " + donHang.getMaDonHang()
                                 + ": tongDonHang=" + kh.getTongDonHang()
                                 + ", tongChiTieu=" + kh.getTongChiTieu());

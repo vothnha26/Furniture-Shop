@@ -217,6 +217,10 @@ public class BienTheSanPhamServiceImpl implements IBienTheSanPhamService {
         if (request.giaBan() != null) {
             existing.setGiaBan(request.giaBan());
         }
+        
+        if (request.trangThaiKho() != null) {
+            existing.setTrangThaiKho(request.trangThaiKho());
+        }
 
         // Handle attribute updates if provided
         if (request.thuocTinhGiaTriTuDo() != null && !request.thuocTinhGiaTriTuDo().isEmpty()) {

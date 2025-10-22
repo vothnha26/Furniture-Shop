@@ -61,13 +61,15 @@ const ProductManagement = () => {
   const [productImages, setProductImages] = useState([]);
   const [productVariants, setProductVariants] = useState([]);
   const [variantCountsMap, setVariantCountsMap] = useState({}); // { [productId]: count }
+  const [variantSearchTerm, setVariantSearchTerm] = useState(''); // Search term for filtering variants
 
   const [variantForm, setVariantForm] = useState({
     sku: '',
     giaMua: '',
     giaBan: '',
     soLuongTon: '',
-    mucTonToiThieu: ''
+    mucTonToiThieu: '',
+    trangThaiKho: 'INACTIVE' // Default to INACTIVE for new variants
   });
 
   // Auto-generate SKU when selections change
@@ -142,7 +144,7 @@ const ProductManagement = () => {
     tenNhaCungCap: p.tenNhaCungCap || (p.nhaCungCap && (p.nhaCungCap.tenNhaCungCap || p.nhaCungCap.name)) || 'Chưa phân loại',
     maBoSuuTap: p.maBoSuuTap || (p.boSuuTap && (p.boSuuTap.maBoSuuTap || p.boSuuTap.id)) || '',
     tenBoSuuTap: p.tenBoSuuTap || (p.boSuuTap && (p.boSuuTap.tenBoSuuTap || p.boSuuTap.name)) || 'Chưa phân loại',
-    trangThai: p.trangThai !== false,
+    trangThai: p.trangThai || 'ACTIVE', // Default to ACTIVE if not set
     ngayTao: p.ngayTao || '',
     ngayCapNhat: p.ngayCapNhat || '',
     soLuongBienThe: p.soLuongBienThe || 0,
@@ -416,7 +418,7 @@ const ProductManagement = () => {
     }
   };
 
-  const handleDeleteProduct = (maybeIdOrObj) => {
+  const handleDeactivateProduct = (maybeIdOrObj) => {
     let product = null;
     if (!maybeIdOrObj) return;
     if (typeof maybeIdOrObj === 'object') {
@@ -425,23 +427,68 @@ const ProductManagement = () => {
       product = products.find(p => p.id === maybeIdOrObj || p.maSanPham === maybeIdOrObj);
     }
     if (!product) {
-      console.warn('Could not find product to delete for', maybeIdOrObj);
+      console.warn('Could not find product to deactivate for', maybeIdOrObj);
       return;
     }
     setProductToDelete(product);
     setShowDeleteConfirm(true);
   };
 
-  const confirmDeleteProduct = async () => {
+  const confirmDeactivateProduct = async () => {
     if (!productToDelete) return;
 
     try {
-      await api.del(`/api/products/${productToDelete.id}`);
-      setProducts(prev => prev.filter(p => p.id !== productToDelete.id));
+      const productId = productToDelete.id || productToDelete.maSanPham;
+      
+      // Update status to DISCONTINUED instead of deleting
+      await api.patch(`/api/san-pham/${productId}`, {
+        body: { trangThai: 'DISCONTINUED' }
+      });
+      
+      // Update local state with new status
+      setProducts(prev => prev.map(p => 
+        (p.id === productId || p.maSanPham === productId)
+          ? { ...p, trangThai: 'DISCONTINUED' }
+          : p
+      ));
+      
       setShowDeleteConfirm(false);
       setProductToDelete(null);
     } catch (err) {
-      console.error('Delete product error', err);
+      console.error('Deactivate product error', err);
+      setError(err);
+    }
+  };
+
+  const handleReactivateProduct = async (maybeIdOrObj) => {
+    let product = null;
+    if (!maybeIdOrObj) return;
+    if (typeof maybeIdOrObj === 'object') {
+      product = maybeIdOrObj;
+    } else {
+      product = products.find(p => p.id === maybeIdOrObj || p.maSanPham === maybeIdOrObj);
+    }
+    if (!product) {
+      console.warn('Could not find product to reactivate for', maybeIdOrObj);
+      return;
+    }
+
+    try {
+      const productId = product.id || product.maSanPham;
+      
+      // Update status to ACTIVE to reactivate the product
+      await api.patch(`/api/san-pham/${productId}`, {
+        body: { trangThai: 'ACTIVE' }
+      });
+      
+      // Update local state with new status
+      setProducts(prev => prev.map(p => 
+        (p.id === productId || p.maSanPham === productId)
+          ? { ...p, trangThai: 'ACTIVE' }
+          : p
+      ));
+    } catch (err) {
+      console.error('Reactivate product error', err);
       setError(err);
     }
   };
@@ -543,7 +590,8 @@ const ProductManagement = () => {
       sku: '',
       giaMua: '',
       giaBan: '',
-      soLuongTon: ''
+      soLuongTon: '',
+      trangThaiKho: 'INACTIVE' // Default to INACTIVE for new variants
     });
   };
 
@@ -794,7 +842,7 @@ const ProductManagement = () => {
         giaBan: variantForm.giaBan && Number(variantForm.giaBan) > 0 ? Number(variantForm.giaBan) : 1000,
         soLuongTon: 0,
         mucTonToiThieu: 0,
-        trangThaiKho: "INACTIVE",
+        trangThaiKho: variantForm.trangThaiKho || "INACTIVE", // Use selected status from form
         thuocTinhGiaTriTuDo: mappings
       };
 
@@ -859,7 +907,8 @@ const ProductManagement = () => {
           giaMua: variant.giaMua || '',
           giaBan: variant.giaBan || '',
           soLuongTon: variant.soLuongTon || '',
-          mucTonToiThieu: variant.mucTonToiThieu || ''
+          mucTonToiThieu: variant.mucTonToiThieu || '',
+          trangThaiKho: variant.trangThaiKho || 'INACTIVE'
         });
         fetchAttributes(false, variant);
       }
@@ -918,34 +967,68 @@ const ProductManagement = () => {
     }
   };
 
-  const handleDeleteVariant = (variant) => {
+  const handleDeactivateVariant = (variant) => {
     setVariantToDelete(variant);
     setShowDeleteVariantConfirm(true);
   };
 
-  const confirmDeleteVariant = async () => {
+  const confirmDeactivateVariant = async () => {
     if (!variantToDelete) return;
 
     try {
-      const delId = variantToDelete?.id ?? variantToDelete?.maBienThe ?? variantToDelete?.ma ?? variantToDelete?.maBienTheId ?? null;
-      if (!delId) {
-        console.error('Cannot determine variant id for delete', variantToDelete);
-        setError(new Error('Không xác định được ID biến thể để xóa'));
+      const variantId = variantToDelete?.id ?? variantToDelete?.maBienThe ?? variantToDelete?.ma ?? variantToDelete?.maBienTheId ?? null;
+      if (!variantId) {
+        console.error('Cannot determine variant id for deactivate', variantToDelete);
+        setError(new Error('Không xác định được ID biến thể'));
         return;
       }
 
-      await api.del(`/api/bien-the-san-pham/${delId}`);
-      setProductVariants(prev => prev.filter(v => !(String(v.id) === String(delId) || String(v.maBienThe) === String(delId))));
+      // Update status to DISCONTINUED (keep prices unchanged)
+      const payload = {
+        trangThaiKho: 'DISCONTINUED'
+      };
+
+      await api.patch(`/api/bien-the-san-pham/${variantId}`, { body: payload });
+      
+      // Update local state with new status
+      setProductVariants(prev => prev.map(v => 
+        (String(v.id) === String(variantId) || String(v.maBienThe) === String(variantId)) 
+          ? { ...v, trangThaiKho: 'DISCONTINUED' } 
+          : v
+      ));
+      
       setShowDeleteVariantConfirm(false);
       setVariantToDelete(null);
-
-      // Decrease product variant count
-      if (selectedProduct && selectedProduct.id) {
-        setProducts(prev => prev.map(p => p.id === selectedProduct.id ? { ...p, soLuongBienThe: (p.soLuongBienThe || 0) - 1 } : p));
-        setVariantCountsMap(prev => ({ ...prev, [selectedProduct.id]: (Number(prev[selectedProduct.id] || selectedProduct.soLuongBienThe || 0) - 1) }));
-      }
     } catch (err) {
-      console.error('Delete variant error', err);
+      console.error('Deactivate variant error', err);
+      setError(err);
+    }
+  };
+
+  const handleReactivateVariant = async (variant) => {
+    try {
+      const variantId = variant?.id ?? variant?.maBienThe ?? variant?.ma ?? variant?.maBienTheId ?? null;
+      if (!variantId) {
+        console.error('Cannot determine variant id for reactivate', variant);
+        setError(new Error('Không xác định được ID biến thể'));
+        return;
+      }
+
+      // Update status to ACTIVE to reactivate the variant (keep prices unchanged)
+      const payload = {
+        trangThaiKho: 'ACTIVE'
+      };
+
+      await api.patch(`/api/bien-the-san-pham/${variantId}`, { body: payload });
+      
+      // Update local state with new status
+      setProductVariants(prev => prev.map(v => 
+        (String(v.id) === String(variantId) || String(v.maBienThe) === String(variantId)) 
+          ? { ...v, trangThaiKho: 'ACTIVE' } 
+          : v
+      ));
+    } catch (err) {
+      console.error('Reactivate variant error', err);
       setError(err);
     }
   };
@@ -1064,7 +1147,7 @@ const ProductManagement = () => {
           columns={columns}
           onView={handleViewProduct}
           onEdit={handleEditClick}
-          onDelete={handleDeleteProduct}
+          onDelete={handleDeactivateProduct}
           searchable={true}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
@@ -1097,32 +1180,48 @@ const ProductManagement = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                  {/* Product Image */}
-                  <div className="aspect-square bg-gray-100 relative">
-                    {product.hinhAnhs && product.hinhAnhs.length > 0 ? (
-                      <img
-                        src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'}${product.hinhAnhs[0].duongDanHinhAnh}`}
-                        alt={product.tenSanPham}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <IoImage className="w-12 h-12" />
-                      </div>
-                    )}
+              {filteredProducts
+                .sort((a, b) => {
+                  // Sort: DISCONTINUED products go to bottom
+                  const statusOrder = { 'ACTIVE': 1, 'INACTIVE': 2, 'DISCONTINUED': 3 };
+                  const orderA = statusOrder[a.trangThai] || 99;
+                  const orderB = statusOrder[b.trangThai] || 99;
+                  return orderA - orderB;
+                })
+                .map(product => {
+                  const isDiscontinued = product.trangThai === 'DISCONTINUED';
+                  return (
+                    <div 
+                      key={product.id} 
+                      className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden ${isDiscontinued ? 'opacity-50' : ''}`}
+                    >
+                      {/* Product Image */}
+                      <div className="aspect-square bg-gray-100 relative">
+                        {product.hinhAnhs && product.hinhAnhs.length > 0 ? (
+                          <img
+                            src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'}${product.hinhAnhs[0].duongDanHinhAnh}`}
+                            alt={product.tenSanPham}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <IoImage className="w-12 h-12" />
+                          </div>
+                        )}
 
-                    {/* Status Badge */}
-                    <div className="absolute top-2 right-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.trangThai
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                        }`}>
-                        {product.trangThai ? 'Hoạt động' : 'Ngừng'}
-                      </span>
-                    </div>
-                  </div>
+                        {/* Status Badge */}
+                        <div className="absolute top-2 right-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            product.trangThai === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+                            product.trangThai === 'DISCONTINUED' ? 'bg-gray-100 text-gray-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {product.trangThai === 'ACTIVE' ? 'Hoạt động' : 
+                             product.trangThai === 'DISCONTINUED' ? 'Ngừng kinh doanh' : 
+                             'Không hoạt động'}
+                          </span>
+                        </div>
+                      </div>
 
                   {/* Product Info */}
                   <div className="p-4">
@@ -1151,22 +1250,34 @@ const ProductManagement = () => {
                       >
                         Xem
                       </button>
-                      <button
-                        onClick={() => handleEditClick(product)}
-                        className="flex-1 bg-yellow-50 text-yellow-600 px-3 py-2 rounded-lg hover:bg-yellow-100 transition-colors text-sm font-medium"
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="flex-1 bg-red-50 text-red-600 px-3 py-2 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
-                      >
-                        Xóa
-                      </button>
+                      {!isDiscontinued && (
+                        <button
+                          onClick={() => handleEditClick(product)}
+                          className="flex-1 bg-yellow-50 text-yellow-600 px-3 py-2 rounded-lg hover:bg-yellow-100 transition-colors text-sm font-medium"
+                        >
+                          Sửa
+                        </button>
+                      )}
+                      {isDiscontinued ? (
+                        <button
+                          onClick={() => handleReactivateProduct(product)}
+                          className="flex-1 bg-green-50 text-green-600 px-3 py-2 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+                        >
+                          ✓ Kích hoạt lại
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDeactivateProduct(product.id)}
+                          className="flex-1 bg-orange-50 text-orange-600 px-3 py-2 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium"
+                        >
+                          Vô hiệu hóa
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
+                  );
+                })}
             </div>
           )}
 
@@ -1557,32 +1668,106 @@ const ProductManagement = () => {
                   </button>
                 </div>
               </div>
+              
+              {/* Search bar for variants */}
+              {productVariants.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={variantSearchTerm}
+                      onChange={(e) => setVariantSearchTerm(e.target.value)}
+                      placeholder="Tìm kiếm theo SKU, giá bán, tồn kho..."
+                      className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    {variantSearchTerm && (
+                      <button
+                        onClick={() => setVariantSearchTerm('')}
+                        className="px-3 py-2 text-gray-600 hover:text-gray-800"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  {variantSearchTerm && (
+                    <p className="text-sm text-gray-600">
+                      Hiển thị {productVariants.filter(variant => {
+                        const searchLower = variantSearchTerm.toLowerCase();
+                        return (
+                          (variant.sku && variant.sku.toLowerCase().includes(searchLower)) ||
+                          (variant.giaBan && String(variant.giaBan).includes(searchLower)) ||
+                          (variant.soLuongTon !== undefined && String(variant.soLuongTon).includes(searchLower)) ||
+                          (variant.tenBienThe && variant.tenBienThe.toLowerCase().includes(searchLower))
+                        );
+                      }).length} / {productVariants.length} biến thể
+                    </p>
+                  )}
+                </div>
+              )}
+              
               {productVariants.length > 0 ? (
                 <div className="space-y-2">
-                  {productVariants.map(variant => (
-                    <div key={variant.id} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium">{variant.sku || `Biến thể ${variant.id}`}</h4>
-                          {!!variant.tenBienThe && (
-                            <p className="text-sm text-gray-600">Tên cũ: {variant.tenBienThe}</p>
-                          )}
-                          <p className="text-sm text-gray-600">Giá bán: {variant.giaBan ? variant.giaBan.toLocaleString('vi-VN') + ' VNĐ' : 'Chưa thiết lập'}</p>
-                          <p className="text-sm text-gray-600">Tồn kho: {variant.soLuongTon || 0}</p>
-                        </div>
+                  {productVariants
+                    .filter(variant => {
+                      if (!variantSearchTerm) return true;
+                      const searchLower = variantSearchTerm.toLowerCase();
+                      return (
+                        (variant.sku && variant.sku.toLowerCase().includes(searchLower)) ||
+                        (variant.giaBan && String(variant.giaBan).includes(searchLower)) ||
+                        (variant.soLuongTon !== undefined && String(variant.soLuongTon).includes(searchLower)) ||
+                        (variant.tenBienThe && variant.tenBienThe.toLowerCase().includes(searchLower))
+                      );
+                    })
+                    .sort((a, b) => {
+                      // Sort: DISCONTINUED variants go to bottom
+                      const statusOrder = { 'ACTIVE': 1, 'LOW_STOCK': 2, 'OUT_OF_STOCK': 3, 'INACTIVE': 4, 'DISCONTINUED': 5 };
+                      const orderA = statusOrder[a.trangThaiKho] || 99;
+                      const orderB = statusOrder[b.trangThaiKho] || 99;
+                      return orderA - orderB;
+                    })
+                    .map(variant => {
+                      const isDiscontinued = variant.trangThaiKho === 'DISCONTINUED';
+                      return (
+                        <div 
+                          key={variant.id} 
+                          className={`border rounded-lg p-4 ${isDiscontinued ? 'opacity-50 bg-gray-100' : ''}`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className={isDiscontinued ? 'line-through' : ''}>
+                              <h4 className="font-medium">
+                                {variant.sku || `Biến thể ${variant.id}`}
+                                {isDiscontinued && <span className="ml-2 text-xs text-gray-500">⚫ Ngừng kinh doanh</span>}
+                              </h4>
+                              {!!variant.tenBienThe && (
+                                <p className="text-sm text-gray-600">Tên cũ: {variant.tenBienThe}</p>
+                              )}
+                              <p className="text-sm text-gray-600">Giá bán: {variant.giaBan ? variant.giaBan.toLocaleString('vi-VN') + ' VNĐ' : 'Chưa thiết lập'}</p>
+                              <p className="text-sm text-gray-600">Tồn kho: {variant.soLuongTon || 0}</p>
+                            </div>
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditVariant(variant)}
-                            className="text-blue-600 hover:text-blue-800 text-sm"
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            onClick={() => handleDeleteVariant(variant)}
-                            className="text-red-600 hover:text-red-800 text-sm"
-                          >
-                            Xóa
-                          </button>
+                          {!isDiscontinued && (
+                            <button
+                              onClick={() => handleEditVariant(variant)}
+                              className="text-blue-600 hover:text-blue-800 text-sm"
+                            >
+                              Sửa
+                            </button>
+                          )}
+                          {isDiscontinued ? (
+                            <button
+                              onClick={() => handleReactivateVariant(variant)}
+                              className="text-green-600 hover:text-green-800 text-sm font-medium"
+                            >
+                              ✓ Kích hoạt lại
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleDeactivateVariant(variant)}
+                              className="text-orange-600 hover:text-orange-800 text-sm"
+                            >
+                              Vô hiệu hóa
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1612,8 +1797,9 @@ const ProductManagement = () => {
                           })()}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                        </div>
+                      );
+                    })}
                 </div>
               ) : (
                 <p className="text-gray-500">Chưa có biến thể nào</p>
@@ -1627,15 +1813,15 @@ const ProductManagement = () => {
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => { setShowDeleteConfirm(false); setProductToDelete(null); }}
-        title="Xác nhận xóa"
+        title="Xác nhận vô hiệu hóa sản phẩm"
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-gray-700">
-            Bạn có chắc muốn xóa sản phẩm "<strong>{productToDelete?.tenSanPham}</strong>"?
+            Bạn có chắc muốn vô hiệu hóa sản phẩm "<strong>{productToDelete?.tenSanPham}</strong>"?
           </p>
           <p className="text-sm text-gray-500">
-            Hành động này không thể hoàn tác.
+            Sản phẩm sẽ được đánh dấu là "Ngừng kinh doanh" và không thể sử dụng.
           </p>
           <div className="flex justify-end space-x-2">
             <button
@@ -1645,10 +1831,10 @@ const ProductManagement = () => {
               Hủy
             </button>
             <button
-              onClick={confirmDeleteProduct}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              onClick={confirmDeactivateProduct}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
             >
-              Xóa
+              Vô hiệu hóa
             </button>
           </div>
         </div>
@@ -1813,7 +1999,7 @@ const ProductManagement = () => {
           {/* Common Variant Fields for Single Creation */}
           <div className="p-4 border rounded-lg bg-blue-50">
             <h4 className="font-semibold text-blue-700 mb-2">Thông tin cơ bản</h4>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-3">
               <div>
                 <label className="block text-sm font-medium mb-1">SKU</label>
                 <input
@@ -1823,6 +2009,22 @@ const ProductManagement = () => {
                   className="w-full p-2 border rounded-lg bg-gray-100 cursor-not-allowed"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Trạng thái kho</label>
+                <select
+                  value={variantForm.trangThaiKho}
+                  onChange={(e) => setVariantForm(prev => ({ ...prev, trangThaiKho: e.target.value }))}
+                  className="w-full p-2 border rounded-lg"
+                >
+                  <option value="INACTIVE">🔵 Chưa hoạt động</option>
+                  <option value="ACTIVE">🟢 Hoạt động</option>
+                  <option value="LOW_STOCK">🟡 Hàng sắp hết</option>
+                  <option value="OUT_OF_STOCK">🔴 Hết hàng</option>
+                  <option value="DISCONTINUED">⚫ Ngừng kinh doanh</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Giá mua (VNĐ)</label>
                 <input
@@ -2297,15 +2499,15 @@ const ProductManagement = () => {
       <Modal
         isOpen={showDeleteVariantConfirm}
         onClose={() => { setShowDeleteVariantConfirm(false); setVariantToDelete(null); }}
-        title="Xác nhận xóa biến thể"
+        title="Xác nhận vô hiệu hóa biến thể"
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-gray-700">
-            Bạn có chắc muốn xóa biến thể "<strong>{variantToDelete?.tenBienThe || variantToDelete?.sku}</strong>"?
+            Bạn có chắc muốn vô hiệu hóa biến thể "<strong>{variantToDelete?.tenBienThe || variantToDelete?.sku}</strong>"?
           </p>
           <p className="text-sm text-gray-500">
-            Hành động này không thể hoàn tác.
+            Biến thể sẽ được đánh dấu là "Ngừng kinh doanh" và không thể sử dụng.
           </p>
           <div className="flex justify-end space-x-2">
             <button
@@ -2315,10 +2517,10 @@ const ProductManagement = () => {
               Hủy
             </button>
             <button
-              onClick={confirmDeleteVariant}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              onClick={confirmDeactivateVariant}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
             >
-              Xóa
+              Vô hiệu hóa
             </button>
           </div>
         </div>

@@ -403,13 +403,25 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
   // Compute points earned for this order.
   // Prefer server-provided value `serverPreview.diemThuongNhanDuoc` when available.
   const getPointsEarned = () => {
-    // Strictly use server-provided value if present (PascalCase or camelCase).
-    // Return numeric value or 0 if missing/invalid. No client-side calculation.
     const serverVal = serverPreview && (serverPreview.DiemThuongNhanDuoc ?? serverPreview.diemThuongNhanDuoc);
     if (serverVal != null && !isNaN(Number(serverVal))) {
       return Math.max(0, Number(serverVal));
     }
     return 0;
+  };
+
+  // Lấy giá trị quy đổi điểm thưởng từ backend (nếu có)
+  const getRewardMoneyPerPoint = () => {
+    if (serverPreview && (serverPreview.rewardMoneyPerPoint || serverPreview.rewardMoneyPerPoint === 0)) {
+      return Number(serverPreview.rewardMoneyPerPoint);
+    }
+    return 1000;
+  };
+  const getRewardPointPerMoney = () => {
+    if (serverPreview && (serverPreview.rewardPointPerMoney || serverPreview.rewardPointPerMoney === 0)) {
+      return Number(serverPreview.rewardPointPerMoney);
+    }
+    return 1;
   };
 
   // Fetch detailed server preview whenever relevant inputs change
@@ -470,6 +482,9 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
             thanhTien: Number(data.TongCong ?? data.tongCong ?? 0),
             // Prefer server-provided total discount; fall back to sum of parts
             tongGiamGia: Number(data.TongGiamGia ?? data.tongGiamGia ?? ((Number(data.GiamGiaVip ?? data.giamGiaVip ?? 0) + Number(data.GiamGiaVoucher ?? data.giamGiaVoucher ?? 0) + Number(data.GiamGiaDiem ?? data.giamGiaDiem ?? 0)) || 0))
+            // Add reward points config values from backend
+            ,rewardMoneyPerPoint: data.rewardMoneyPerPoint ?? data.reward_money_per_point ?? null,
+            rewardPointPerMoney: data.rewardPointPerMoney ?? data.reward_point_per_money ?? null,
           };
           console.log('📦 [Checkout Summary] Set preview:', preview);
           setServerPreview(preview);
@@ -1359,15 +1374,7 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
                 {/* VIP discount row */}
                 {serverPreview?.giamGiaVip > 0 && (
                   <div className="flex justify-between text-purple-600">
-                    <span>Giảm giá hạng thành viên</span>
-                    <span>-{formatCurrency(serverPreview.giamGiaVip)}</span>
-                  </div>
-                )}
-
-                {/* Voucher discount */}
-                {serverPreview?.giamGiaVip > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Giảm VIP:</span>
+                    <span>Giảm giá hạng thành viên (VIP)</span>
                     <span>-{formatCurrency(serverPreview.giamGiaVip)}</span>
                   </div>
                 )}
@@ -1392,7 +1399,15 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
                 )}
                 <div className="flex justify-between text-sm">
                   <span>Điểm thưởng nhận được</span>
-                  <span>{getPointsEarned()} điểm (~{formatCurrency(getPointsEarned() * 1000)})</span>
+                  <span>
+                    {getPointsEarned()} điểm
+                    {getPointsEarned() > 0 && (
+                      <>
+                        {' '}~ {formatCurrency(getPointsEarned() * getRewardMoneyPerPoint() / getRewardPointPerMoney())}
+                        <span className="text-xs text-gray-500 ml-1">(1 điểm = {formatCurrency(getRewardMoneyPerPoint() / getRewardPointPerMoney())})</span>
+                      </>
+                    )}
+                  </span>
                 </div>
 
                 <div className="flex justify-between">

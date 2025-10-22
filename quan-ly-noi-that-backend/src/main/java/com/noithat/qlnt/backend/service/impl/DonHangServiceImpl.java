@@ -33,6 +33,7 @@ public class DonHangServiceImpl implements IDonHangService {
     private final ThanhToanService thanhToanService;
     private final GiaoDichThanhToanRepository giaoDichThanhToanRepository;
     private final LichSuTrangThaiDonHangRepository lichSuTrangThaiDonHangRepository;
+    private final com.noithat.qlnt.backend.repository.CauHinhHeThongRepository cauHinhHeThongRepository;
 
     @Override
     @Transactional
@@ -69,20 +70,20 @@ public class DonHangServiceImpl implements IDonHangService {
 
         CheckoutSummaryResponse summary = thanhToanService.getCheckoutSummary(summaryRequest);
 
-        // 4. Gán các giá trị đã tính vào DonHang
+        // 4. Gán các giá trị đã tính vào DonHang (bao gồm điểm thưởng từ procedure)
         donHang.setTongTienGoc(summary.getTamTinh());
         donHang.setGiamGiaVip(summary.getGiamGiaVip());
         donHang.setGiamGiaVoucher(summary.getGiamGiaVoucher());
         donHang.setDiemThuongSuDung(request.getDiemThuongSuDung());
         donHang.setGiamGiaDiemThuong(summary.getGiamGiaDiem());
-        // summary.getDiemThuongNhanDuoc() returns BigDecimal (points may be returned
-        // from stored-proc). DonHang.diemThuongNhanDuoc is Integer, so convert
-        // safely (null -> 0).
+        
+        // Lấy điểm thưởng đã được tính trong stored procedure sp_GetCheckoutSummary
+        // (bao gồm: điểm từ tổng tiền + điểm từ sản phẩm + điểm VIP bonus)
+        int rewardPoints = 0;
         if (summary.getDiemThuongNhanDuoc() != null) {
-            donHang.setDiemThuongNhanDuoc(summary.getDiemThuongNhanDuoc().intValue());
-        } else {
-            donHang.setDiemThuongNhanDuoc(0);
+            rewardPoints = summary.getDiemThuongNhanDuoc().intValue();
         }
+        donHang.setDiemThuongNhanDuoc(rewardPoints);
 
         BigDecimal phiVanChuyen = "Miễn phí".equalsIgnoreCase(summary.getPhiGiaoHang()) ? BigDecimal.ZERO
                 : new BigDecimal(summary.getPhiGiaoHang());

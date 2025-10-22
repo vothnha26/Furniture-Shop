@@ -31,6 +31,8 @@ public interface IProductService {
 
     SanPham updateSanPham(Integer id, SanPhamRequestDto dto);
 
+    SanPham patchSanPham(Integer id, com.noithat.qlnt.backend.dto.request.SanPhamPatchRequestDto request);
+
     void deleteSanPham(Integer id);
 
     void addProductToCategory(Integer productId, Integer categoryId);
@@ -52,4 +54,7 @@ public interface IProductService {
 
     // API mới: Lấy danh sách sản phẩm cơ bản cho category assignment UI
     java.util.List<com.noithat.qlnt.backend.dto.response.ProductBasicResponse> getBasicProducts();
+
+    // API so sánh tổng nhập/xuất theo sản phẩm (gộp các biến thể)
+    java.util.List<com.noithat.qlnt.backend.dto.response.ProductCompareResponse> compareProductsAggregate(java.util.List<Integer> productIds);
 }

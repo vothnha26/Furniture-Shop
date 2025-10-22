@@ -23,10 +23,44 @@ const CustomerBenefits = () => {
   const [vouchers, setVouchers] = useState([]);
   const [allVouchers, setAllVouchers] = useState([]); // Store all vouchers before filtering
   const [membershipInfo, setMembershipInfo] = useState(null);
-  const [allTiers, setAllTiers] = useState([]);
+  const [membershipTiers, setMembershipTiers] = useState([]); // Load from API
   const [currentPoints, setCurrentPoints] = useState(0);
   const [activeTab, setActiveTab] = useState('vouchers'); // 'vouchers' | 'membership'
   const [voucherFilter, setVoucherFilter] = useState('all'); // 'all' | 'for-everyone' | 'for-tier'
+
+  // Helper function to parse benefit params
+  const parseParams = (params) => {
+    if (!params && params !== 0) return {};
+    if (typeof params === 'object') return params;
+    try { return JSON.parse(params); } catch { return {}; }
+  };
+
+  // Helper function to format benefit description
+  const formatBenefit = (benefit) => {
+    if (!benefit) return '';
+    if (typeof benefit === 'string') return benefit;
+    
+    const type = benefit.benefitType || benefit.loaiQuyenLoi || 'CUSTOM';
+    const p = parseParams(benefit.params);
+    
+    if (type === 'PERCENT_DISCOUNT') {
+      return benefit.moTa || benefit.description || `Giảm ${p.percent}% trên đơn hàng`;
+    }
+    if (type === 'FREE_SHIPPING') {
+      return benefit.moTa || benefit.description || `Miễn phí vận chuyển (đơn tối thiểu ${(p.minOrder || 0).toLocaleString('vi-VN')}đ)`;
+    }
+    if (type === 'BONUS_POINTS') {
+      return benefit.moTa || benefit.description || (p.points ? `Tặng ${p.points} điểm thưởng` : `Tặng ${p.percent || 0}% điểm thưởng`);
+    }
+    if (type === 'PRIORITY_SUPPORT') {
+      return benefit.moTa || benefit.description || 'Hỗ trợ ưu tiên';
+    }
+    if (type === 'BIRTHDAY_GIFT') {
+      return benefit.moTa || benefit.description || 'Quà tặng sinh nhật';
+    }
+    
+    return benefit.moTa || benefit.description || benefit.tenQuyenLoi || (typeof benefit.params === 'string' ? benefit.params : JSON.stringify(benefit.params || {}));
+  };
 
   // Check query params for initial tab
   useEffect(() => {
@@ -37,69 +71,6 @@ const CustomerBenefits = () => {
     }
   }, [location]);
 
-  // Define membership tiers with requirements
-  const membershipTiers = [
-    { 
-      id: 1, 
-      name: 'Đồng', 
-      level: 'bronze',
-      minPoints: 0, 
-      maxPoints: 999,
-      color: 'from-yellow-700 to-yellow-900',
-      benefits: [
-        'Tích điểm 1% cho mỗi đơn hàng',
-        'Voucher sinh nhật 50.000đ',
-        'Ưu đãi đặc biệt dịp lễ'
-      ]
-    },
-    { 
-      id: 2, 
-      name: 'Bạc', 
-      level: 'silver',
-      minPoints: 1000, 
-      maxPoints: 4999,
-      color: 'from-gray-300 to-gray-500',
-      benefits: [
-        'Tích điểm 2% cho mỗi đơn hàng',
-        'Voucher sinh nhật 100.000đ',
-        'Miễn phí vận chuyển đơn từ 500k',
-        'Ưu tiên hỗ trợ khách hàng'
-      ]
-    },
-    { 
-      id: 3, 
-      name: 'Vàng', 
-      level: 'gold',
-      minPoints: 5000, 
-      maxPoints: 19999,
-      color: 'from-yellow-400 to-yellow-600',
-      benefits: [
-        'Tích điểm 3% cho mỗi đơn hàng',
-        'Voucher sinh nhật 200.000đ',
-        'Miễn phí vận chuyển tất cả đơn',
-        'Ưu tiên hỗ trợ khách hàng',
-        'Trải nghiệm sản phẩm mới trước'
-      ]
-    },
-    { 
-      id: 4, 
-      name: 'Kim cương', 
-      level: 'diamond',
-      minPoints: 20000, 
-      maxPoints: null,
-      color: 'from-blue-400 to-purple-600',
-      benefits: [
-        'Tích điểm 5% cho mỗi đơn hàng',
-        'Voucher sinh nhật 500.000đ',
-        'Miễn phí vận chuyển & lắp đặt',
-        'Tư vấn thiết kế nội thất miễn phí',
-        'Ưu tiên hỗ trợ 24/7',
-        'Trải nghiệm sản phẩm mới trước',
-        'Ưu đãi độc quyền cho thành viên VIP'
-      ]
-    }
-  ];
-
   useEffect(() => {
     loadData();
   }, [user]);
@@ -107,23 +78,73 @@ const CustomerBenefits = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      // Load membership tiers from API first
+      console.log('[CustomerBenefits] Loading membership tiers...');
+      const tiersResponse = await api.get('/api/hang-thanh-vien/all');
+      const tiersData = tiersResponse?.data || tiersResponse || [];
+      
+      console.log('[CustomerBenefits] Membership tiers from API:', tiersData);
+      
+      // Map backend data to frontend format
+      const mappedTiers = tiersData
+        .sort((a, b) => a.diemToiThieu - b.diemToiThieu)
+        .map((tier, index) => {
+          // Extract and format benefits from vipBenefits if available
+          const benefits = tier.vipBenefits?.map(b => formatBenefit(b)) || [];
+          
+          // Determine color gradient based on mauSac or default
+          let color = 'from-gray-400 to-gray-600';
+          if (tier.mauSac) {
+            if (tier.mauSac.startsWith('bg-')) {
+              color = `${tier.mauSac.replace('bg-', 'from-')} to-${tier.mauSac.replace('bg-', '')}`;
+            } else {
+              color = tier.mauSac;
+            }
+          }
+          
+          // Calculate max points (next tier's min - 1, or null for highest)
+          const nextTier = tiersData[index + 1];
+          const maxPoints = nextTier ? nextTier.diemToiThieu - 1 : null;
+          
+          return {
+            id: tier.maHangThanhVien,
+            name: tier.tenHang,
+            minPoints: tier.diemToiThieu,
+            maxPoints: maxPoints,
+            color: color,
+            description: tier.moTa,
+            benefits: benefits.length > 0 ? benefits : (tier.moTa ? [tier.moTa] : ['Quyền lợi đặc biệt'])
+          };
+        });
+      
+      setMembershipTiers(mappedTiers);
+      console.log('[CustomerBenefits] Mapped membership tiers:', mappedTiers);
+
       // Load customer data including membership info
       const customerData = await api.get('/api/v1/khach-hang/me');
       const customer = customerData?.data || customerData;
       
       console.log('[CustomerBenefits] Customer data:', customer);
 
-      // Calculate points from total spending (100k = 10 points)
-      const points = Math.floor((customer.tongChiTieu || 0) / 10000);
+      // Get points from backend (diemThuong)
+      const points = customer.diemThuong || 0;
       setCurrentPoints(points);
 
-      // Determine current tier
-      const currentTier = membershipTiers.find(tier => 
-        points >= tier.minPoints && (tier.maxPoints === null || points <= tier.maxPoints)
-      );
+      // Determine current tier based on customer's hangThanhVien or points
+      let currentTier = null;
+      if (customer.hangThanhVien) {
+        currentTier = mappedTiers.find(t => t.id === customer.hangThanhVien.maHangThanhVien);
+      }
+      
+      // Fallback: find by points if not found by ID
+      if (!currentTier && mappedTiers.length > 0) {
+        currentTier = mappedTiers.find(tier => 
+          points >= tier.minPoints && (tier.maxPoints === null || points <= tier.maxPoints)
+        ) || mappedTiers[0];
+      }
       
       setMembershipInfo({
-        currentTier: currentTier || membershipTiers[0],
+        currentTier: currentTier || (mappedTiers.length > 0 ? mappedTiers[0] : null),
         points: points,
         totalSpent: customer.tongChiTieu || 0,
         memberSince: customer.ngayThamGia || customer.ngayTaoTaiKhoan || new Date()

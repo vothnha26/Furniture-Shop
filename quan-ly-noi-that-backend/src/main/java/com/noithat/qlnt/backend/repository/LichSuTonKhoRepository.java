@@ -1,3 +1,4 @@
+// ...existing code...
 package com.noithat.qlnt.backend.repository;
 
 import com.noithat.qlnt.backend.entity.LichSuTonKho;
@@ -48,4 +49,23 @@ public interface LichSuTonKhoRepository extends JpaRepository<LichSuTonKho, Inte
     @Query("SELECT l FROM LichSuTonKho l WHERE l.bienTheSanPham.maBienThe = :maBienThe " +
            "ORDER BY l.thoiGianThucHien DESC LIMIT 1")
     LichSuTonKho findLatestByBienTheSanPham(@Param("maBienThe") Integer maBienThe);
+
+    // Lấy lịch sử theo danh sách biến thể
+    List<LichSuTonKho> findByBienTheSanPham_MaBienTheIn(List<Integer> maBienTheList);
+
+       // ===== Nhập kho only (soLuongThayDoi >= 0) =====
+       @Query("SELECT l FROM LichSuTonKho l WHERE l.soLuongThayDoi >= 0 ORDER BY l.thoiGianThucHien DESC")
+       List<LichSuTonKho> findAllNhapOrderByThoiGianThucHienDesc();
+
+       @Query("SELECT l FROM LichSuTonKho l WHERE l.soLuongThayDoi >= 0 AND l.thoiGianThucHien BETWEEN :fromDate AND :toDate ORDER BY l.thoiGianThucHien DESC")
+       List<LichSuTonKho> findNhapBetweenOrderByThoiGianThucHienDesc(@Param("fromDate") LocalDateTime fromDate,
+                                                                                                                   @Param("toDate") LocalDateTime toDate);
+
+              // ===== Nhập + Xuất (tất cả giao dịch) =====
+              @Query("SELECT l FROM LichSuTonKho l ORDER BY l.thoiGianThucHien DESC")
+              List<LichSuTonKho> findAllOrderByThoiGianThucHienDesc();
+
+              @Query("SELECT l FROM LichSuTonKho l WHERE l.thoiGianThucHien BETWEEN :fromDate AND :toDate ORDER BY l.thoiGianThucHien DESC")
+              List<LichSuTonKho> findAllBetweenOrderByThoiGianThucHienDesc(@Param("fromDate") LocalDateTime fromDate,
+                                                                             @Param("toDate") LocalDateTime toDate);
 }

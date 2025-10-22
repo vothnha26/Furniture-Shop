@@ -337,6 +337,59 @@ public class QuanLyTonKhoController {
     }
 
     /**
+     * Lấy lịch sử tổng hợp (bao gồm CẢ Nhập VÀ Xuất)
+     * GET /api/v1/quan-ly-ton-kho/lich-su-xuat-nhap
+     * - scope=all: trả về toàn bộ lịch sử nhập
+     * - from, to (ISO-8601): lọc theo khoảng thời gian
+     */
+    @GetMapping("/lich-su-xuat-nhap")
+    public ResponseEntity<Map<String, Object>> getCombinedNhapHistory(
+            @RequestParam(value = "scope", required = false) String scope,
+            @RequestParam(value = "from", required = false) String fromStr,
+            @RequestParam(value = "to", required = false) String toStr) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<LichSuTonKho> data;
+            if (fromStr != null && toStr != null) {
+                LocalDateTime from = LocalDateTime.parse(fromStr);
+                LocalDateTime to = LocalDateTime.parse(toStr);
+                data = stockManagementService.getStockHistoryBetween(from, to);
+            } else if ("all".equalsIgnoreCase(scope)) {
+                data = stockManagementService.getAllStockHistory();
+            } else {
+                // Mặc định: 90 ngày gần nhất
+                LocalDateTime to = LocalDateTime.now();
+                LocalDateTime from = to.minusDays(90);
+                data = stockManagementService.getStockHistoryBetween(from, to);
+            }
+
+            response.put("success", true);
+            response.put("data", data);
+            response.put("count", data != null ? data.size() : 0);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Lỗi: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Lấy lịch sử nhập kho tổng hợp (alias)
+     * GET /api/v1/quan-ly-ton-kho/lich-su-xuat-nhap/tong-hop
+     */
+    @GetMapping("/lich-su-xuat-nhap/tong-hop")
+    public ResponseEntity<Map<String, Object>> getCombinedNhapHistoryAlias(
+            @RequestParam(value = "from", required = false) String fromStr,
+            @RequestParam(value = "to", required = false) String toStr) {
+        // Alias gọi về endpoint chính, ưu tiên from/to nếu có, nếu không thì scope=all
+        if (fromStr != null && toStr != null) {
+            return getCombinedNhapHistory(null, fromStr, toStr);
+        }
+        return getCombinedNhapHistory("all", null, null);
+    }
+
+    /**
      * Lấy danh sách sản phẩm sắp hết hàng
      * GET /api/v1/quan-ly-ton-kho/san-pham-sap-het
      */

@@ -54,4 +54,7 @@ public interface BienTheSanPhamRepository extends JpaRepository<BienTheSanPham, 
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("UPDATE BienTheSanPham b SET b.soLuongTon = b.soLuongTon - :qty WHERE b.maBienThe = :id AND b.soLuongTon >= :qty")
     int decrementStockIfAvailable(@org.springframework.data.repository.query.Param("id") Integer maBienThe, @org.springframework.data.repository.query.Param("qty") Integer qty);
+
+    // Lấy tất cả biến thể theo danh sách mã sản phẩm
+    List<BienTheSanPham> findAllBySanPham_MaSanPhamIn(List<Integer> productIds);
 }

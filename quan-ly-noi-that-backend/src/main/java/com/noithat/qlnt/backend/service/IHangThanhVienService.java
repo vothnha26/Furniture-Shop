@@ -97,4 +97,9 @@ public interface IHangThanhVienService {
      * Xác định hạng thành viên dựa trên tổng chi tiêu
      */
     HangThanhVien xacDinhHangTheoChiTieu(BigDecimal tongChiTieu);
+
+    /**
+     * Lấy danh sách khách hàng theo hạng thành viên
+     */
+    List<VipKhachHangDto> getKhachHangByHang(Integer maHangThanhVien);
 }

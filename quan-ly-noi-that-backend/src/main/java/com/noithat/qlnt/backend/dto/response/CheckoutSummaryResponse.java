@@ -14,4 +14,8 @@ public class CheckoutSummaryResponse {
     private BigDecimal diemThuongNhanDuoc;
     // Tổng tất cả các khoản giảm giá (VIP + Voucher + Điểm thưởng) - backend computed
     private BigDecimal tongGiamGia;
+
+    // Thông tin cấu hình quy đổi điểm thưởng
+    private Integer rewardMoneyPerPoint; // Số tiền để được 1 lần quy đổi điểm
+    private Integer rewardPointPerMoney; // Số điểm nhận được mỗi lần quy đổi
 }

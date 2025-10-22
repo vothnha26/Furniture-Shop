@@ -36,6 +36,7 @@ public class ThanhToanServiceImpl implements ThanhToanService {
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final com.noithat.qlnt.backend.service.CauHinhService cauHinhService;
     private final HoaDonService hoaDonService;
+    private final com.noithat.qlnt.backend.repository.CauHinhHeThongRepository cauHinhHeThongRepository;
 
     @Override
     public ThongKeThanhToanResponse getThongKe() {
@@ -168,6 +169,12 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         } catch (SQLException ex) {
             throw new RuntimeException("Lỗi khi gọi sp_GetCheckoutSummary: " + ex.getMessage(), ex);
         }
+
+        // Lấy cấu hình quy đổi điểm thưởng từ hệ thống
+        Integer rewardMoneyPerPoint = cauHinhService.getInt("reward_money_per_point", 100000);
+        Integer rewardPointPerMoney = cauHinhService.getInt("reward_point_per_money", 10);
+        summary.setRewardMoneyPerPoint(rewardMoneyPerPoint);
+        summary.setRewardPointPerMoney(rewardPointPerMoney);
         return summary;
     }
 
@@ -358,10 +365,26 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         }
 
         // 6b. Cộng điểm thưởng cho khách hàng từ đơn hàng này (nếu có)
-        if (summary.getDiemThuongNhanDuoc() != null && summary.getDiemThuongNhanDuoc().intValue() > 0) {
-            int diemCong = summary.getDiemThuongNhanDuoc().intValue();
-            donHang.setDiemThuongNhanDuoc(diemCong);
+       BigDecimal total = summary.getTongCong();
+        int rewardPoints = 0;
+        try {
+            // Lấy giá trị quy đổi từ bảng cấu hình hệ thống (chuẩn key)
+            String moneyPerPointStr = cauHinhHeThongRepository.findConfigValueByKey("reward_money_per_point");
+            String pointPerMoneyStr = cauHinhHeThongRepository.findConfigValueByKey("reward_point_per_money");
+            int moneyPerPoint = 100000;
+            int pointPerMoney = 10;
+            if (moneyPerPointStr != null) moneyPerPoint = Integer.parseInt(moneyPerPointStr);
+            if (pointPerMoneyStr != null) pointPerMoney = Integer.parseInt(pointPerMoneyStr);
+            if (total != null && moneyPerPoint > 0 && pointPerMoney > 0) {
+                rewardPoints = (total.divide(new BigDecimal(moneyPerPoint), 0, java.math.RoundingMode.DOWN)).intValue() * pointPerMoney;
+            }
+        } catch (Exception e) {
+            // fallback mặc định nếu lỗi
+            if (total != null) {
+                rewardPoints = (total.divide(new BigDecimal(100000), 0, java.math.RoundingMode.DOWN)).intValue() * 10;
+            }
         }
+        donHang.setDiemThuongNhanDuoc(rewardPoints);
 
         // 7. Lấy lại chi tiết giỏ hàng để có giá thực tế của từng sản phẩm
         List<CartDetailItemResponse> cartDetails = this.getCartDetails(request.getChiTietDonHangList());

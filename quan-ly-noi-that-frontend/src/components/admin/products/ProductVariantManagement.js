@@ -455,23 +455,26 @@ const ProductVariantManagement = () => {
                         <td className="px-6 py-4">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
-                              {variant.sanPham.tenSanPham}
+                              <span className="font-sans">{variant.sanPham.tenSanPham}</span>
                             </div>
                             <div className="text-sm text-gray-500">
-                              ID: #{variant.maBienThe}
+                              <span className="font-sans">ID: #{variant.maBienThe}</span>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-mono font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                          <span
+                            className="text-xs font-mono font-medium text-gray-900 bg-gray-100 px-2 py-1 rounded max-w-[80px] truncate inline-block align-middle cursor-pointer"
+                            title={variant.sku}
+                          >
                             {variant.sku}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="space-y-1">
+                          <div className="space-y-1 min-w-[220px] max-w-[400px] break-words">
                             {variant.attributes.map((attr, index) => (
-                              <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1">
-                                {(attr.tenThuocTinh || attr.thuocTinh || attr.maThuocTinh)}: {attr.giaTri}
+                              <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 font-sans">
+                                {attr.tenThuocTinh ? `${attr.tenThuocTinh}: ${attr.giaTri}` : attr.giaTri}
                               </span>
                             ))}
                             {variant.attributes.length === 0 && (

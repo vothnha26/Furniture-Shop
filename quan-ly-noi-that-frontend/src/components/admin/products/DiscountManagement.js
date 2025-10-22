@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   IoAdd,
-  IoTrashOutline,
   IoPencilOutline,
   IoSearch,
   IoFilterOutline,
@@ -11,13 +10,11 @@ import {
   IoGiftOutline,
   IoStatsChartOutline,
   IoEyeOutline,
-  IoCopyOutline,
   IoPlayOutline,
   IoPauseOutline,
   IoStopOutline
 } from 'react-icons/io5';
 import Modal from '../../shared/Modal';
-import ConfirmDialog from '../../shared/ConfirmDialog';
 import Toast from '../../shared/Toast';
 import api from '../../../api';
 
@@ -35,9 +32,7 @@ const DiscountManagement = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [editingProgram, setEditingProgram] = useState(null);
-  const [deletingProgram, setDeletingProgram] = useState(null);
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [formData, setFormData] = useState({
     tenChuongTrinh: '',
@@ -54,7 +49,9 @@ const DiscountManagement = () => {
   const [filters, setFilters] = useState({
     searchTerm: '',
     status: 'all',
-    dateRange: 'all'
+    dateRange: 'all',
+    startDate: '',
+    endDate: ''
   });
   const [showFilters, setShowFilters] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null); // product currently showing variants in right column
@@ -68,7 +65,7 @@ const DiscountManagement = () => {
       try {
         // Fetch program list with details (includes danhSachBienThe and tongTietKiem)
         const programs = await api.get('/api/chuongtrinh-giamgia?details=true');
-        console.log("ac:", programs);
+
         // programs should be an array of basic ChuongTrinhGiamGia objects
         const mappedPrograms = Array.isArray(programs)
           ? programs.map(p => ({
@@ -231,7 +228,27 @@ const DiscountManagement = () => {
       filtered = filtered.filter(program => program.status === filters.status);
     }
 
-    if (filters.dateRange !== 'all') {
+    // Custom date range filter
+    if (filters.startDate || filters.endDate) {
+      filtered = filtered.filter(program => {
+        const programStart = new Date(program.ngayBatDau);
+        const programEnd = new Date(program.ngayKetThuc);
+        
+        if (filters.startDate && filters.endDate) {
+          const filterStart = new Date(filters.startDate);
+          const filterEnd = new Date(filters.endDate);
+          // Program overlaps with filter range
+          return programStart <= filterEnd && programEnd >= filterStart;
+        } else if (filters.startDate) {
+          const filterStart = new Date(filters.startDate);
+          return programEnd >= filterStart;
+        } else if (filters.endDate) {
+          const filterEnd = new Date(filters.endDate);
+          return programStart <= filterEnd;
+        }
+        return true;
+      });
+    } else if (filters.dateRange !== 'all') {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -405,9 +422,8 @@ const DiscountManagement = () => {
       moTa: '',
       ngayBatDau: '',
       ngayKetThuc: '',
-      // default to 'active' for new programs
-      // default to 'upcoming' for new programs
-      trangThai: 'upcoming'
+      // default to 'active' for new programs (checkbox checked)
+      trangThai: 'active'
     });
     setVariantDiscounts([]);
     setSelectedProducts([]);
@@ -436,8 +452,8 @@ const DiscountManagement = () => {
         moTa: detail.moTa || '',
         ngayBatDau: toDateTimeLocal(detail.ngayBatDau),
         ngayKetThuc: toDateTimeLocal(detail.ngayKetThuc),
-        // keep one of canonical keys
-        trangThai: ['upcoming', 'active', 'paused', 'expired'].includes(norm) ? norm : 'upcoming'
+        // Map status to active/paused for checkbox
+        trangThai: norm === 'paused' ? 'paused' : 'active'
       }));
 
       // Prefer server grouped products (danhSachSanPham) to populate variants for edit UI
@@ -592,9 +608,23 @@ const DiscountManagement = () => {
     }
   };
 
-  const handleDelete = (program) => {
-    setDeletingProgram(program);
-    setShowConfirmDialog(true);
+  const handleToggleStatus = async (program) => {
+    try {
+      setIsLoading(true);
+      const newStatus = program.status === 'active' ? 'paused' : 'active';
+      
+      await api.patch(`/api/chuongtrinh-giamgia/${program.maChuongTrinhGiamGia}/status`, {
+        trangThai: newStatus
+      });
+      
+      showToast(`Đã ${newStatus === 'active' ? 'kích hoạt' : 'vô hiệu hóa'} chương trình thành công`, 'success');
+      await reloadDiscountPrograms();
+    } catch (error) {
+      console.error('Failed to toggle program status:', error);
+      showToast('Không thể thay đổi trạng thái chương trình', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleViewDetails = (program) => {
@@ -623,6 +653,43 @@ const DiscountManagement = () => {
     })();
   };
 
+  // Helper to reload discount programs from backend
+  const reloadDiscountPrograms = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get('/api/chuongtrinh-giamgia?details=true');
+      const data = Array.isArray(response) ? response : [];
+      const mapped = data.map(prog => ({
+        id: prog.maChuongTrinhGiamGia,
+        maChuongTrinhGiamGia: prog.maChuongTrinhGiamGia,
+        tenChuongTrinh: prog.tenChuongTrinh,
+        ngayBatDau: prog.ngayBatDau,
+        ngayKetThuc: prog.ngayKetThuc,
+        status: normalizeStatus(prog.trangThai),
+        statusText: prog.trangThai || '',
+        bienTheGiamGias: (prog.danhSachBienThe || []).map(bt => ({
+          maBienThe: bt.maBienThe,
+          giaSauGiam: bt.giaSauGiam,
+          giaGoc: bt.giaGoc || 0,
+          thuocTinh: bt.skuBienThe || '',
+          sku: bt.skuBienThe || '',
+          tenSanPham: bt.tenSanPham || bt.tenSanPhamGoc || null,
+          phanTramGiam: bt.phanTramGiam || null
+        })),
+        soLuongBienThe: prog.soLuongBienThe || (prog.danhSachBienThe ? prog.danhSachBienThe.length : 0),
+        tongTietKiem: prog.tongTietKiem || 0
+      }));
+      setDiscountPrograms(mapped);
+      setError(null);
+    } catch (err) {
+      console.error('Error reloading discount programs:', err);
+      showToast('Không thể tải lại danh sách chương trình', 'error');
+      setError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -631,17 +698,20 @@ const DiscountManagement = () => {
       showToast('Vui lòng nhập tên chương trình', 'error');
       return;
     }
-
     if (!formData.ngayBatDau || !formData.ngayKetThuc) {
       showToast('Vui lòng chọn ngày bắt đầu và kết thúc', 'error');
       return;
     }
-
-    if (new Date(formData.ngayBatDau) >= new Date(formData.ngayKetThuc)) {
+    const startDate = new Date(formData.ngayBatDau);
+    const endDate = new Date(formData.ngayKetThuc);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      showToast('Ngày bắt đầu/kết thúc không hợp lệ', 'error');
+      return;
+    }
+    if (startDate >= endDate) {
       showToast('Ngày bắt đầu phải trước ngày kết thúc', 'error');
       return;
     }
-
     if (variantDiscounts.length === 0) {
       showToast('Vui lòng thêm ít nhất một biến thể vào chương trình', 'error');
       return;
@@ -714,8 +784,6 @@ const DiscountManagement = () => {
         showToast('Cập nhật chương trình giảm giá thành công');
       } else {
         // Create new program
-        // also log to console for quick dev inspection
-        console.log('Creating program with payload', requestPayload);
         saved = await api.post('/api/chuongtrinh-giamgia/with-details', { body: requestPayload });
         showToast('Thêm chương trình giảm giá thành công');
       }
@@ -784,23 +852,12 @@ const DiscountManagement = () => {
         'error'
       );
     } finally {
+      await reloadDiscountPrograms();
       setIsLoading(false);
     }
   };
 
-  const confirmDelete = async () => {
-    try {
-      await api.delete(`/api/chuongtrinh-giamgia/${deletingProgram.maChuongTrinhGiamGia}`);
-      setDiscountPrograms(discountPrograms.filter(program => program.id !== deletingProgram.id));
-      showToast('Xóa chương trình giảm giá thành công');
-    } catch (error) {
-      console.error('Failed to delete discount program:', error);
-      showToast('Có lỗi xảy ra khi xóa chương trình giảm giá', 'error');
-    } finally {
-      setShowConfirmDialog(false);
-      setDeletingProgram(null);
-    }
-  };
+
 
   const addVariantDiscount = (variant, discountedPrice) => {
     const existingIndex = variantDiscounts.findIndex(item => item.maBienThe === variant.maBienThe);
@@ -864,18 +921,6 @@ const DiscountManagement = () => {
     showToast(`Đã áp dụng giảm ${discountType === 'percent' ? discountValue + '%' : formatCurrency(discountValue)} cho tất cả biến thể`);
   };
 
-  const duplicateProgram = (program) => {
-    const newProgram = {
-      ...program,
-      id: Date.now(),
-      maChuongTrinhGiamGia: Date.now(),
-      tenChuongTrinh: `${program.tenChuongTrinh} (Bản sao)`,
-      status: 'upcoming'
-    };
-
-    setDiscountPrograms([...discountPrograms, newProgram]);
-    showToast('Sao chép chương trình thành công');
-  };
 
   const getStats = () => {
     const total = discountPrograms.length;
@@ -1008,10 +1053,12 @@ const DiscountManagement = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian nhanh</label>
                 <select
                   value={filters.dateRange}
-                  onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
+                  onChange={(e) => {
+                    setFilters({ ...filters, dateRange: e.target.value, startDate: '', endDate: '' });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Tất cả thời gian</option>
@@ -1020,7 +1067,38 @@ const DiscountManagement = () => {
                   <option value="next-month">Tháng tới</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+                <input
+                  type="date"
+                  value={filters.startDate}
+                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value, dateRange: 'all' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
+                <input
+                  type="date"
+                  value={filters.endDate}
+                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value, dateRange: 'all' })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
+
+            {(filters.startDate || filters.endDate) && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => setFilters({ ...filters, startDate: '', endDate: '', dateRange: 'all' })}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Xóa bộ lọc ngày
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1141,13 +1219,6 @@ const DiscountManagement = () => {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => duplicateProgram(program)}
-                    className="text-gray-600 hover:text-gray-800 p-1 rounded"
-                    title="Sao chép"
-                  >
-                    <IoCopyOutline />
-                  </button>
-                  <button
                     onClick={() => handleEdit(program)}
                     className="text-blue-600 hover:text-blue-800 p-1 rounded"
                     title="Chỉnh sửa"
@@ -1155,11 +1226,11 @@ const DiscountManagement = () => {
                     <IoPencilOutline />
                   </button>
                   <button
-                    onClick={() => handleDelete(program)}
-                    className="text-red-600 hover:text-red-800 p-1 rounded"
-                    title="Xóa"
+                    onClick={() => handleToggleStatus(program)}
+                    className={`p-1 rounded ${program.status === 'active' ? 'text-orange-600 hover:text-orange-800' : 'text-green-600 hover:text-green-800'}`}
+                    title={program.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt'}
                   >
-                    <IoTrashOutline />
+                    {program.status === 'active' ? <IoPauseOutline /> : <IoPlayOutline />}
                   </button>
                 </div>
               </div>
@@ -1259,17 +1330,18 @@ const DiscountManagement = () => {
               </div>
 
               <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                <select
-                  value={formData.trangThai}
-                  onChange={(e) => setFormData({ ...formData, trangThai: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="upcoming">Sắp diễn ra</option>
-                  <option value="active">Đang hoạt động</option>
-                  <option value="paused">Tạm dừng</option>
-                  <option value="expired">Đã kết thúc</option>
-                </select>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.trangThai === 'active'}
+                    onChange={(e) => setFormData({ ...formData, trangThai: e.target.checked ? 'active' : 'paused' })}
+                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Kích hoạt chương trình</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-8">
+                  Chương trình sẽ {formData.trangThai === 'active' ? 'được áp dụng' : 'tạm dừng'} trong thời gian đã chọn
+                </p>
               </div>
             </div>
           </div>
@@ -1360,7 +1432,7 @@ const DiscountManagement = () => {
                         onClick={() => removeVariantDiscount(item.maBienThe)}
                         className="text-red-600 hover:text-red-800"
                       >
-                        <IoTrashOutline />
+                        <IoCloseCircle />
                       </button>
                     </div>
                   </div>
@@ -1594,15 +1666,6 @@ const DiscountManagement = () => {
           </div>
         )}
       </Modal>
-
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        isOpen={showConfirmDialog}
-        onClose={() => setShowConfirmDialog(false)}
-        onConfirm={confirmDelete}
-        title="Xóa chương trình giảm giá"
-        message={`Bạn có chắc chắn muốn xóa chương trình "${deletingProgram?.tenChuongTrinh}"? Hành động này không thể hoàn tác.`}
-      />
 
       {/* Toast is shown via global Toast API (Toast.show) */}
     </div>

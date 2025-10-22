@@ -20,6 +20,9 @@ const MembershipTierManagement = () => {
   const [benefitsEditingTier, setBenefitsEditingTier] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [tierToDelete, setTierToDelete] = useState(null);
+  const [showCustomersModal, setShowCustomersModal] = useState(false);
+  const [selectedTierCustomers, setSelectedTierCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
 
   const initialNewTier = {
     tenHang: '',
@@ -148,6 +151,30 @@ const MembershipTierManagement = () => {
       console.error('Delete tier error', err);
       Toast.show(err.data?.message || 'Không thể xóa hạng', 'error');
       throw err;
+    }
+  };
+
+  // Fetch customers for a specific tier
+  const fetchTierCustomers = async (tierId) => {
+    setLoadingCustomers(true);
+    try {
+      const response = await api.get(`/api/hang-thanh-vien/${tierId}/khach-hang`);
+      const customers = Array.isArray(response) ? response : (response?.data || []);
+      setSelectedTierCustomers(customers.map(customer => ({
+        maKhachHang: customer.maKhachHang || customer.id,
+        hoTen: customer.hoTen || customer.name || '',
+        email: customer.email || '',
+        soDienThoai: customer.soDienThoai || customer.phone || '',
+        diemThuong: customer.diemThuong || customer.points || 0,
+        tongChiTieu: customer.tongChiTieu || customer.totalSpent || 0,
+        ngayThamGia: customer.ngayThamGia || customer.joinDate || 'N/A'
+      })));
+      setShowCustomersModal(true);
+    } catch (err) {
+      console.error('Fetch tier customers error', err);
+      Toast.show('Không thể tải danh sách khách hàng', 'error');
+    } finally {
+      setLoadingCustomers(false);
     }
   };
 
@@ -602,7 +629,16 @@ const MembershipTierManagement = () => {
 
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wide">Thành viên</label>
-                  <p className="text-sm font-semibold">{(Number(tier.soThanhVien) || 0).toLocaleString()}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">{(Number(tier.soThanhVien) || 0).toLocaleString()}</p>
+                    <button
+                      onClick={() => fetchTierCustomers(tier.maHang)}
+                      className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      title="Xem danh sách khách hàng"
+                    >
+                      Xem chi tiết
+                    </button>
+                  </div>
                 </div>
 
                 {/* Benefits (show brief summary) */}
@@ -1157,14 +1193,6 @@ const MembershipTierManagement = () => {
                   ))}
                 </ul>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ngày tạo</label>
-                <p className="text-sm text-gray-900">{selectedTier.ngayTao}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Người tạo</label>
-                <p className="text-sm text-gray-900">{selectedTier.nguoiTao}</p>
-              </div>
             </div>
           </div>
         )}
@@ -1187,6 +1215,99 @@ const MembershipTierManagement = () => {
               disabled={isLoading}
             >
               {isLoading ? 'Đang xóa...' : 'Xóa'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Customers List Modal */}
+      <Modal isOpen={showCustomersModal} onClose={() => { setShowCustomersModal(false); setSelectedTierCustomers([]); }} title="Danh sách khách hàng">
+        <div className="space-y-4">
+          {loadingCustomers ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              Đang tải danh sách khách hàng...
+            </div>
+          ) : selectedTierCustomers.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Chưa có khách hàng nào trong hạng này
+            </div>
+          ) : (
+            <div className="max-h-96 overflow-y-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Khách hàng
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Liên hệ
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Điểm thưởng
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tổng chi tiêu
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ngày tham gia
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {selectedTierCustomers.map((customer) => (
+                    <tr key={customer.maKhachHang} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{customer.hoTen}</div>
+                        <div className="text-xs text-gray-500">ID: {customer.maKhachHang}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{customer.email}</div>
+                        <div className="text-xs text-gray-500">{customer.soDienThoai}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        <span className="text-sm font-semibold text-blue-600">
+                          {(Number(customer.diemThuong) || 0).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        <span className="text-sm text-gray-900">
+                          {formatCurrency(Number(customer.tongChiTieu) || 0)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                        {customer.ngayThamGia}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-blue-900">Tổng số khách hàng:</span>
+                  <span className="font-bold text-blue-900">{selectedTierCustomers.length} người</span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="font-medium text-blue-900">Tổng điểm thưởng:</span>
+                  <span className="font-bold text-blue-900">
+                    {selectedTierCustomers.reduce((sum, c) => sum + (Number(c.diemThuong) || 0), 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="font-medium text-blue-900">Tổng chi tiêu:</span>
+                  <span className="font-bold text-blue-900">
+                    {formatCurrency(selectedTierCustomers.reduce((sum, c) => sum + (Number(c.tongChiTieu) || 0), 0))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end pt-3 border-t border-gray-200">
+            <button
+              onClick={() => { setShowCustomersModal(false); setSelectedTierCustomers([]); }}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+            >
+              Đóng
             </button>
           </div>
         </div>

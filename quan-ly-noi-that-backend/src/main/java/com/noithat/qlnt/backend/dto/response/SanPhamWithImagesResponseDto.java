@@ -28,7 +28,7 @@ public class SanPhamWithImagesResponseDto {
     private CategoryDto danhMuc;
     private SupplierDto nhaCungCap;
     private CollectionDto boSuuTap;
-    private Boolean trangThai;
+    private String trangThai; // ACTIVE, INACTIVE, DISCONTINUED
     private LocalDateTime ngayTao;
     private LocalDateTime ngayCapNhat;
 

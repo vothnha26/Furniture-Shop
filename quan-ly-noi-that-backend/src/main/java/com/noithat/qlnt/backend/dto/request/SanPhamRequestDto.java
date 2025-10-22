@@ -19,7 +19,10 @@ public record SanPhamRequestDto(
         Integer maBoSuuTap,
 
         // Optional: Diem Thuong (bonus points)
-        Integer diemThuong
+        Integer diemThuong,
+        
+        // Optional: Trạng thái sản phẩm (ACTIVE, INACTIVE, DISCONTINUED)
+        String trangThai
 ) {
     // Note: chieuDai, chieuRong, chieuCao, canNang đã chuyển sang lưu ở
     // BienTheSanPham (variant level)

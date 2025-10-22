@@ -115,6 +115,14 @@ public class ChuongTrinhGiamGiaServiceImpl implements IChuongTrinhGiamGiaService
         chuongTrinhGiamGiaRepository.delete(ct);
     }
 
+    @Override
+    @Transactional
+    public void updateStatus(Integer id, String trangThai) {
+        ChuongTrinhGiamGia ct = getById(id);
+        ct.setTrangThai(trangThai);
+        chuongTrinhGiamGiaRepository.save(ct);
+    }
+
     // Variant-level discount operations removed. This service now manages
     // product-level mappings only.
 

@@ -39,4 +39,7 @@ public class SanPham {
     
     @Column(name = "DiemThuong", nullable = false)
     private Integer diemThuong = 0;
+    
+    @Column(name = "TrangThai", length = 50, nullable = false)
+    private String trangThai = "ACTIVE"; // ACTIVE, INACTIVE, DISCONTINUED
 }

@@ -25,6 +25,9 @@ import com.noithat.qlnt.backend.repository.BoSuuTapRepository;
 import com.noithat.qlnt.backend.repository.DanhGiaSanPhamRepository;
 import com.noithat.qlnt.backend.repository.BienTheGiamGiaRepository;
 import com.noithat.qlnt.backend.service.IProductService;
+import com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto;
+import com.noithat.qlnt.backend.repository.LichSuTonKhoRepository;
+import com.noithat.qlnt.backend.dto.response.ProductCompareResponse;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -51,9 +54,51 @@ public class ProductServiceImpl implements IProductService {
                                                 "Không tìm thấy sản phẩm với id: " + id));
         }
 
+        @Autowired
+        private LichSuTonKhoRepository lichSuTonKhoRepository;
+
         @Override
         @Transactional(readOnly = true)
-        public java.util.List<com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto> getAllProducts() {
+        public java.util.List<ProductCompareResponse> compareProductsAggregate(java.util.List<Integer> productIds) {
+                if (productIds == null || productIds.isEmpty())
+                        return java.util.Collections.emptyList();
+                // Lấy tất cả sản phẩm cần so sánh
+                List<SanPham> products = sanPhamRepository.findAllById(productIds);
+                java.util.Map<Integer, ProductCompareResponse> resultMap = new java.util.HashMap<>();
+                for (SanPham sp : products) {
+                        resultMap.put(sp.getMaSanPham(), new ProductCompareResponse(
+                                        sp.getMaSanPham(),
+                                        sp.getTenSanPham(),
+                                        0, // nhập
+                                        0 // xuất
+                        ));
+                }
+                // Lấy lịch sử nhập/xuất của các biến thể thuộc các sản phẩm này
+                // (truy vấn tất cả lịch sử liên quan các biến thể của các sản phẩm này)
+                List<BienTheSanPham> allVariants = bienTheRepository.findAllBySanPham_MaSanPhamIn(productIds);
+                java.util.Set<Integer> variantIds = allVariants.stream().map(BienTheSanPham::getMaBienThe)
+                                .collect(java.util.stream.Collectors.toSet());
+                if (variantIds.isEmpty())
+                        return new java.util.ArrayList<>(resultMap.values());
+                List<com.noithat.qlnt.backend.entity.LichSuTonKho> histories = lichSuTonKhoRepository
+                                .findByBienTheSanPham_MaBienTheIn(new java.util.ArrayList<>(variantIds));
+                for (com.noithat.qlnt.backend.entity.LichSuTonKho ls : histories) {
+                        Integer pid = ls.getBienTheSanPham().getSanPham().getMaSanPham();
+                        ProductCompareResponse resp = resultMap.get(pid);
+                        if (resp == null)
+                                continue;
+                        if (ls.getSoLuongThayDoi() > 0) {
+                                resp.setTotalNhap(resp.getTotalNhap() + ls.getSoLuongThayDoi());
+                        } else if (ls.getSoLuongThayDoi() < 0) {
+                                resp.setTotalXuat(resp.getTotalXuat() + Math.abs(ls.getSoLuongThayDoi()));
+                        }
+                }
+                return new java.util.ArrayList<>(resultMap.values());
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public java.util.List<SanPhamWithImagesResponseDto> getAllProducts() {
                 // Return products with images and timestamps to match frontend expectations
                 return sanPhamRepository.findAll().stream()
                                 .map(sp -> {
@@ -146,16 +191,16 @@ public class ProductServiceImpl implements IProductService {
 
         @Override
         @Transactional(readOnly = true)
-        public com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto getProductWithImagesById(Integer id) {
+        public SanPhamWithImagesResponseDto getProductWithImagesById(Integer id) {
                 SanPham sp = findProductById(id);
 
                 // Load images ordered by thuTu
                 List<HinhAnhSanPham> images = hinhAnhSanPhamRepository
                                 .findBySanPhamMaSanPhamOrderByThuTuAsc(sp.getMaSanPham());
 
-                List<com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.HinhAnhDto> hinhAnhDtos = images
+                List<SanPhamWithImagesResponseDto.HinhAnhDto> hinhAnhDtos = images
                                 .stream()
-                                .map(h -> com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.HinhAnhDto
+                                .map(h -> SanPhamWithImagesResponseDto.HinhAnhDto
                                                 .builder()
                                                 .maHinhAnh(h.getMaHinhAnh())
                                                 .duongDanHinhAnh(h.getDuongDanHinhAnh())
@@ -166,33 +211,33 @@ public class ProductServiceImpl implements IProductService {
                                                 .build())
                                 .collect(java.util.stream.Collectors.toList());
 
-                com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto dto = com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto
+                SanPhamWithImagesResponseDto dto = SanPhamWithImagesResponseDto
                                 .builder()
                                 .maSanPham(sp.getMaSanPham())
                                 .tenSanPham(sp.getTenSanPham())
                                 .moTa(sp.getMoTa())
                                 .danhMuc(sp.getDanhMuc() != null
-                                                ? com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.CategoryDto
+                                                ? SanPhamWithImagesResponseDto.CategoryDto
                                                                 .builder()
                                                                 .id(sp.getDanhMuc().getMaDanhMuc())
                                                                 .name(sp.getDanhMuc().getTenDanhMuc())
                                                                 .build()
                                                 : null)
                                 .nhaCungCap(sp.getNhaCungCap() != null
-                                                ? com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.SupplierDto
+                                                ? SanPhamWithImagesResponseDto.SupplierDto
                                                                 .builder()
                                                                 .id(sp.getNhaCungCap().getMaNhaCungCap())
                                                                 .name(sp.getNhaCungCap().getTenNhaCungCap())
                                                                 .build()
                                                 : null)
                                 .boSuuTap(sp.getBoSuuTap() != null
-                                                ? com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.CollectionDto
+                                                ? SanPhamWithImagesResponseDto.CollectionDto
                                                                 .builder()
                                                                 .id(sp.getBoSuuTap().getMaBoSuuTap())
                                                                 .name(sp.getBoSuuTap().getTenBoSuuTap())
                                                                 .build()
                                                 : null)
-                                .trangThai(true)
+                                .trangThai(sp.getTrangThai())
                                 .ngayTao(images.isEmpty() ? null : images.get(0).getNgayTao())
                                 .ngayCapNhat(images.isEmpty() ? null : images.get(0).getNgayCapNhat())
                                 .hinhAnhs(hinhAnhDtos)
@@ -219,6 +264,7 @@ public class ProductServiceImpl implements IProductService {
                 sp.setTenSanPham(dto.tenSanPham());
                 sp.setMoTa(dto.moTa());
                 sp.setDiemThuong(dto.diemThuong() != null ? dto.diemThuong() : 0);
+                sp.setTrangThai(dto.trangThai() != null ? dto.trangThai() : "ACTIVE");
                 sp.setNhaCungCap(ncc);
 
                 // Set danh mục nếu có
@@ -264,6 +310,7 @@ public class ProductServiceImpl implements IProductService {
                 sp.setTenSanPham(dto.tenSanPham());
                 sp.setMoTa(dto.moTa());
                 sp.setDiemThuong(dto.diemThuong() != null ? dto.diemThuong() : sp.getDiemThuong());
+                sp.setTrangThai(dto.trangThai() != null ? dto.trangThai() : sp.getTrangThai());
                 sp.setNhaCungCap(ncc);
 
                 // Set danh mục nếu có
@@ -289,6 +336,19 @@ public class ProductServiceImpl implements IProductService {
                 // Note: chieuDai, chieuRong, chieuCao, canNang đã chuyển sang lưu ở
                 // BienTheSanPham
                 return sanPhamRepository.save(sp);
+        }
+
+        @Override
+        @Transactional
+        public SanPham patchSanPham(Integer id, com.noithat.qlnt.backend.dto.request.SanPhamPatchRequestDto request) {
+                SanPham existing = findProductById(id);
+
+                // Only update fields that are provided (non-null)
+                if (request.trangThai() != null) {
+                        existing.setTrangThai(request.trangThai());
+                }
+
+                return sanPhamRepository.save(existing);
         }
 
         @Override
@@ -334,7 +394,7 @@ public class ProductServiceImpl implements IProductService {
 
         @Override
         @Transactional
-        public com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto createSanPhamWithImages(
+        public SanPhamWithImagesResponseDto createSanPhamWithImages(
                         SanPhamRequestDto sanPhamDto,
                         org.springframework.web.multipart.MultipartFile[] images,
                         Integer[] thuTuArray,
@@ -426,13 +486,13 @@ public class ProductServiceImpl implements IProductService {
                 return buildSanPhamWithImagesResponse(sanPham, savedImages);
         }
 
-        private com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto buildSanPhamWithImagesResponse(
+        private SanPhamWithImagesResponseDto buildSanPhamWithImagesResponse(
                         SanPham sanPham,
-                        List<com.noithat.qlnt.backend.entity.HinhAnhSanPham> hinhAnhs) {
+                        List<HinhAnhSanPham> hinhAnhs) {
 
-                List<com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.HinhAnhDto> hinhAnhDtos = hinhAnhs
+                List<SanPhamWithImagesResponseDto.HinhAnhDto> hinhAnhDtos = hinhAnhs
                                 .stream()
-                                .map(h -> com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.HinhAnhDto
+                                .map(h -> SanPhamWithImagesResponseDto.HinhAnhDto
                                                 .builder()
                                                 .maHinhAnh(h.getMaHinhAnh())
                                                 .duongDanHinhAnh(h.getDuongDanHinhAnh())
@@ -443,33 +503,33 @@ public class ProductServiceImpl implements IProductService {
                                                 .build())
                                 .toList();
 
-                return com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.builder()
+                return SanPhamWithImagesResponseDto.builder()
                                 .maSanPham(sanPham.getMaSanPham())
                                 .tenSanPham(sanPham.getTenSanPham())
                                 .moTa(sanPham.getMoTa())
                                 .moTaChiTiet(null) // SanPham không có field này
                                 .danhMuc(sanPham.getDanhMuc() != null
-                                                ? com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.CategoryDto
+                                                ? SanPhamWithImagesResponseDto.CategoryDto
                                                                 .builder()
                                                                 .id(sanPham.getDanhMuc().getMaDanhMuc())
                                                                 .name(sanPham.getDanhMuc().getTenDanhMuc())
                                                                 .build()
                                                 : null)
                                 .nhaCungCap(sanPham.getNhaCungCap() != null
-                                                ? com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.SupplierDto
+                                                ? SanPhamWithImagesResponseDto.SupplierDto
                                                                 .builder()
                                                                 .id(sanPham.getNhaCungCap().getMaNhaCungCap())
                                                                 .name(sanPham.getNhaCungCap().getTenNhaCungCap())
                                                                 .build()
                                                 : null)
                                 .boSuuTap(sanPham.getBoSuuTap() != null
-                                                ? com.noithat.qlnt.backend.dto.response.SanPhamWithImagesResponseDto.CollectionDto
+                                                ? SanPhamWithImagesResponseDto.CollectionDto
                                                                 .builder()
                                                                 .id(sanPham.getBoSuuTap().getMaBoSuuTap())
                                                                 .name(sanPham.getBoSuuTap().getTenBoSuuTap())
                                                                 .build()
                                                 : null)
-                                .trangThai(true) // Default
+                                .trangThai(sanPham.getTrangThai())
                                 .ngayTao(hinhAnhs.isEmpty() ? null : hinhAnhs.get(0).getNgayTao()) // Lấy từ ảnh đầu
                                                                                                    // tiên
                                 .ngayCapNhat(hinhAnhs.isEmpty() ? null : hinhAnhs.get(0).getNgayCapNhat())
@@ -477,14 +537,16 @@ public class ProductServiceImpl implements IProductService {
                                 .soLuongBienThe(sanPham.getBienTheList() != null ? sanPham.getBienTheList().size() : 0)
                                 .diemThuong(sanPham.getDiemThuong())
                                 .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sanPham.getMaSanPham()))
-                                .reviewCount(danhGiaSanPhamRepository.countByProductId(sanPham.getMaSanPham()).intValue())
+                                .reviewCount(danhGiaSanPhamRepository.countByProductId(sanPham.getMaSanPham())
+                                                .intValue())
                                 .build();
         }
 
         @Override
         public List<BienTheSanPham> getVariantsByProductId(Integer productId) {
                 SanPham sp = findProductById(productId);
-                // Use the fetch-join repository method so BienTheThuocTinhs (and their ThuocTinh) are loaded
+                // Use the fetch-join repository method so BienTheThuocTinhs (and their
+                // ThuocTinh) are loaded
                 return bienTheRepository.findBySanPham_MaSanPhamWithAttributes(sp.getMaSanPham());
         }
 
@@ -493,7 +555,9 @@ public class ProductServiceImpl implements IProductService {
         public java.util.List<com.noithat.qlnt.backend.dto.response.ShopProductResponseDto> getProductsForShop() {
                 return sanPhamRepository.findAll().stream().map(sp -> {
                         // gather variants
-                        java.util.List<BienTheSanPham> variants = sp.getBienTheList() == null ? java.util.Collections.emptyList() : sp.getBienTheList();
+                        java.util.List<BienTheSanPham> variants = sp.getBienTheList() == null
+                                        ? java.util.Collections.emptyList()
+                                        : sp.getBienTheList();
 
                         double min = Double.MAX_VALUE;
                         double max = 0.0;
@@ -503,15 +567,19 @@ public class ProductServiceImpl implements IProductService {
                         for (BienTheSanPham bt : variants) {
                                 if (bt.getGiaBan() != null) {
                                         double price = bt.getGiaBan().doubleValue();
-                                        if (price < min) min = price;
-                                        if (price > max) max = price;
+                                        if (price < min)
+                                                min = price;
+                                        if (price > max)
+                                                max = price;
                                 }
                                 int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
                                 totalStock += qty;
-                                if (qty > 0) availableVariantCount++;
+                                if (qty > 0)
+                                        availableVariantCount++;
                         }
 
-                        if (min == Double.MAX_VALUE) min = 0.0;
+                        if (min == Double.MAX_VALUE)
+                                min = 0.0;
 
                         java.util.List<String> imageUrls = hinhAnhSanPhamRepository
                                         .findBySanPhamMaSanPhamOrderByThuTuAsc(sp.getMaSanPham())
@@ -519,7 +587,8 @@ public class ProductServiceImpl implements IProductService {
                                         .map(h -> h.getDuongDanHinhAnh())
                                         .collect(java.util.stream.Collectors.toList());
 
-                        // Determine per-variant final price (giaSauGiam) if there is an active BienTheGiamGia
+                        // Determine per-variant final price (giaSauGiam) if there is an active
+                        // BienTheGiamGia
                         Double lowestFinalPrice = null;
                         Integer lowestFinalVariantId = null;
                         String lowestFinalVariantSku = null;
@@ -532,30 +601,39 @@ public class ProductServiceImpl implements IProductService {
                                 Double variantFinal = variantOriginal;
 
                                 // check discounts for this variant
-                                java.util.List<BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+                                java.util.List<BienTheGiamGia> discounts = bienTheGiamGiaRepository
+                                                .findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
                                 if (!discounts.isEmpty()) {
                                         BienTheGiamGia disc = discounts.get(0);
-                                        com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = disc.getChuongTrinhGiamGia();
+                                        com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = disc
+                                                        .getChuongTrinhGiamGia();
                                         java.time.LocalDateTime now = java.time.LocalDateTime.now();
-                                        boolean isActive = (chuongTrinh.getNgayBatDau() == null || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
-                                                           (chuongTrinh.getNgayKetThuc() == null || !now.isAfter(chuongTrinh.getNgayKetThuc()));
+                                        boolean isActive = (chuongTrinh.getNgayBatDau() == null
+                                                        || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
+                                                        (chuongTrinh.getNgayKetThuc() == null
+                                                                        || !now.isAfter(chuongTrinh.getNgayKetThuc()));
                                         if (isActive && disc.getGiaSauGiam() != null) {
                                                 variantFinal = disc.getGiaSauGiam().doubleValue();
                                         }
                                 }
 
                                 if (variantFinal != null) {
-                                        if (variantFinal < min) min = variantFinal;
-                                        if (variantFinal > max) max = variantFinal;
+                                        if (variantFinal < min)
+                                                min = variantFinal;
+                                        if (variantFinal > max)
+                                                max = variantFinal;
                                 } else if (variantOriginal != null) {
                                         double price = variantOriginal;
-                                        if (price < min) min = price;
-                                        if (price > max) max = price;
+                                        if (price < min)
+                                                min = price;
+                                        if (price > max)
+                                                max = price;
                                 }
 
                                 int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
                                 totalStock += qty;
-                                if (qty > 0) availableVariantCount++;
+                                if (qty > 0)
+                                        availableVariantCount++;
 
                                 // track lowest final price variant
                                 if (variantFinal != null) {
@@ -568,7 +646,8 @@ public class ProductServiceImpl implements IProductService {
                                                 if (variantOriginal != null && variantOriginal > 0) {
                                                         double amt = variantOriginal - variantFinal;
                                                         lowestFinalVariantDiscountAmount = amt;
-                                                        lowestFinalVariantDiscountPercent = (int) Math.round((amt / variantOriginal) * 100.0);
+                                                        lowestFinalVariantDiscountPercent = (int) Math
+                                                                        .round((amt / variantOriginal) * 100.0);
                                                 } else {
                                                         lowestFinalVariantDiscountAmount = null;
                                                         lowestFinalVariantDiscountPercent = null;
@@ -576,7 +655,8 @@ public class ProductServiceImpl implements IProductService {
                                         }
                                 }
                         }
-                        // Determine discount percent: prefer a real variant-level discount (giaSauGiam) if present.
+                        // Determine discount percent: prefer a real variant-level discount (giaSauGiam)
+                        // if present.
                         // Do NOT infer discount from max/min price range.
                         int discountPercent = 0;
                         if (lowestFinalVariantDiscountPercent != null) {
@@ -585,18 +665,40 @@ public class ProductServiceImpl implements IProductService {
                                 discountPercent = 0;
                         }
 
-                        // Map to frontend-friendly fields: price=min, originalPrice=max, stockQuantity=totalStock
-                        com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()
+                        // Map to frontend-friendly fields: price=min, originalPrice=max,
+                        // stockQuantity=totalStock
+                        com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto
+                                        .builder()
                                         .maSanPham(sp.getMaSanPham())
                                         .tenSanPham(sp.getTenSanPham())
                                         .moTa(sp.getMoTa())
                                         .id(sp.getMaSanPham())
                                         .name(sp.getTenSanPham())
-                                        .category(sp.getDanhMuc() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.CategoryDto.builder().id(sp.getDanhMuc().getMaDanhMuc()).name(sp.getDanhMuc().getTenDanhMuc()).build() : null)
-                                        .supplier(sp.getNhaCungCap() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.SupplierDto.builder().id(sp.getNhaCungCap().getMaNhaCungCap()).name(sp.getNhaCungCap().getTenNhaCungCap()).build() : null)
+                                        .category(sp.getDanhMuc() != null
+                                                        ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.CategoryDto
+                                                                        .builder().id(sp.getDanhMuc().getMaDanhMuc())
+                                                                        .name(sp.getDanhMuc().getTenDanhMuc()).build()
+                                                        : null)
+                                        .supplier(sp.getNhaCungCap() != null
+                                                        ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.SupplierDto
+                                                                        .builder()
+                                                                        .id(sp.getNhaCungCap().getMaNhaCungCap())
+                                                                        .name(sp.getNhaCungCap().getTenNhaCungCap())
+                                                                        .build()
+                                                        : null)
                                         // include category and supplier details for frontend filtering
-                                        .category(sp.getDanhMuc() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.CategoryDto.builder().id(sp.getDanhMuc().getMaDanhMuc()).name(sp.getDanhMuc().getTenDanhMuc()).build() : null)
-                                        .supplier(sp.getNhaCungCap() != null ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.SupplierDto.builder().id(sp.getNhaCungCap().getMaNhaCungCap()).name(sp.getNhaCungCap().getTenNhaCungCap()).build() : null)
+                                        .category(sp.getDanhMuc() != null
+                                                        ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.CategoryDto
+                                                                        .builder().id(sp.getDanhMuc().getMaDanhMuc())
+                                                                        .name(sp.getDanhMuc().getTenDanhMuc()).build()
+                                                        : null)
+                                        .supplier(sp.getNhaCungCap() != null
+                                                        ? com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.SupplierDto
+                                                                        .builder()
+                                                                        .id(sp.getNhaCungCap().getMaNhaCungCap())
+                                                                        .name(sp.getNhaCungCap().getTenNhaCungCap())
+                                                                        .build()
+                                                        : null)
                                         .price(min > 0 ? min : null)
                                         .originalPrice(max > 0 ? max : null)
                                         .stockQuantity(totalStock)
@@ -607,18 +709,20 @@ public class ProductServiceImpl implements IProductService {
                                         .soLuongBienThe(variants.size())
                                         .images(imageUrls)
                                         .discountPercent(discountPercent)
-                                        .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
-                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue())
+                                        .averageRating(danhGiaSanPhamRepository
+                                                        .findAverageByProductId(sp.getMaSanPham()))
+                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham())
+                                                        .intValue())
                                         .diemThuong(sp.getDiemThuong());
 
                         // attach lowest variant info if found
                         if (lowestFinalVariantId != null) {
                                 builder.lowestVariantId(lowestFinalVariantId)
-                                        .lowestVariantSku(lowestFinalVariantSku)
-                                        .lowestVariantPrice(lowestFinalPrice)
-                                        .lowestVariantOriginalPrice(lowestFinalVariantOriginalPrice)
-                                        .lowestVariantDiscountAmount(lowestFinalVariantDiscountAmount)
-                                        .lowestVariantDiscountPercent(lowestFinalVariantDiscountPercent);
+                                                .lowestVariantSku(lowestFinalVariantSku)
+                                                .lowestVariantPrice(lowestFinalPrice)
+                                                .lowestVariantOriginalPrice(lowestFinalVariantOriginalPrice)
+                                                .lowestVariantDiscountAmount(lowestFinalVariantDiscountAmount)
+                                                .lowestVariantDiscountPercent(lowestFinalVariantDiscountPercent);
                         }
 
                         return builder.build();
@@ -628,134 +732,168 @@ public class ProductServiceImpl implements IProductService {
         @Override
         @Transactional(readOnly = true)
         public com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto getProductsForShop(int page, int size) {
-                org.springframework.data.domain.PageRequest pr = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.max(1, size));
+                org.springframework.data.domain.PageRequest pr = org.springframework.data.domain.PageRequest
+                                .of(Math.max(0, page), Math.max(1, size));
                 org.springframework.data.domain.Page<SanPham> p = sanPhamRepository.findAll(pr);
 
-                java.util.List<com.noithat.qlnt.backend.dto.response.ShopProductResponseDto> items = p.stream().map(sp -> {
-                        java.util.List<BienTheSanPham> variants = sp.getBienTheList() == null ? java.util.Collections.emptyList() : sp.getBienTheList();
+                java.util.List<com.noithat.qlnt.backend.dto.response.ShopProductResponseDto> items = p.stream()
+                                .map(sp -> {
+                                        java.util.List<BienTheSanPham> variants = sp.getBienTheList() == null
+                                                        ? java.util.Collections.emptyList()
+                                                        : sp.getBienTheList();
 
-                        double min = Double.MAX_VALUE;
-                        double max = 0.0;
-                        int totalStock = 0;
-                        int availableVariantCount = 0;
+                                        double min = Double.MAX_VALUE;
+                                        double max = 0.0;
+                                        int totalStock = 0;
+                                        int availableVariantCount = 0;
 
-                        for (BienTheSanPham bt : variants) {
-                                if (bt.getGiaBan() != null) {
-                                        double price = bt.getGiaBan().doubleValue();
-                                        if (price < min) min = price;
-                                        if (price > max) max = price;
-                                }
-                                int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
-                                totalStock += qty;
-                                if (qty > 0) availableVariantCount++;
-                        }
-
-                        if (min == Double.MAX_VALUE) min = 0.0;
-
-                        java.util.List<String> imageUrls = hinhAnhSanPhamRepository
-                                        .findBySanPhamMaSanPhamOrderByThuTuAsc(sp.getMaSanPham())
-                                        .stream()
-                                        .map(h -> h.getDuongDanHinhAnh())
-                                        .collect(java.util.stream.Collectors.toList());
-
-                        // Determine per-variant final price (giaSauGiam) if there is an active BienTheGiamGia
-                        Double lowestFinalPrice2 = null;
-                        Integer lowestFinalVariantId2 = null;
-                        String lowestFinalVariantSku2 = null;
-                        Double lowestFinalVariantOriginalPrice2 = null;
-                        Integer lowestFinalVariantDiscountPercent2 = null;
-                        Double lowestFinalVariantDiscountAmount2 = null;
-
-                        for (BienTheSanPham bt : variants) {
-                                Double variantOriginal = bt.getGiaBan() != null ? bt.getGiaBan().doubleValue() : null;
-                                Double variantFinal = variantOriginal;
-
-                                java.util.List<BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
-                                if (!discounts.isEmpty()) {
-                                        BienTheGiamGia disc = discounts.get(0);
-                                        com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = disc.getChuongTrinhGiamGia();
-                                        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-                                        boolean isActive = (chuongTrinh.getNgayBatDau() == null || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
-                                                           (chuongTrinh.getNgayKetThuc() == null || !now.isAfter(chuongTrinh.getNgayKetThuc()));
-                                        if (isActive && disc.getGiaSauGiam() != null) {
-                                                variantFinal = disc.getGiaSauGiam().doubleValue();
+                                        for (BienTheSanPham bt : variants) {
+                                                if (bt.getGiaBan() != null) {
+                                                        double price = bt.getGiaBan().doubleValue();
+                                                        if (price < min)
+                                                                min = price;
+                                                        if (price > max)
+                                                                max = price;
+                                                }
+                                                int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
+                                                totalStock += qty;
+                                                if (qty > 0)
+                                                        availableVariantCount++;
                                         }
-                                }
 
-                                if (variantFinal != null) {
-                                        if (variantFinal < min) min = variantFinal;
-                                        if (variantFinal > max) max = variantFinal;
-                                } else if (variantOriginal != null) {
-                                        double price = variantOriginal;
-                                        if (price < min) min = price;
-                                        if (price > max) max = price;
-                                }
+                                        if (min == Double.MAX_VALUE)
+                                                min = 0.0;
 
-                                int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
-                                totalStock += qty;
-                                if (qty > 0) availableVariantCount++;
+                                        java.util.List<String> imageUrls = hinhAnhSanPhamRepository
+                                                        .findBySanPhamMaSanPhamOrderByThuTuAsc(sp.getMaSanPham())
+                                                        .stream()
+                                                        .map(h -> h.getDuongDanHinhAnh())
+                                                        .collect(java.util.stream.Collectors.toList());
 
-                                // track lowest final price variant
-                                if (variantFinal != null) {
-                                        if (lowestFinalPrice2 == null || variantFinal < lowestFinalPrice2) {
-                                                lowestFinalPrice2 = variantFinal;
-                                                lowestFinalVariantId2 = bt.getMaBienThe();
-                                                lowestFinalVariantSku2 = bt.getSku();
-                                                lowestFinalVariantOriginalPrice2 = variantOriginal;
-                                                if (variantOriginal != null && variantOriginal > 0) {
-                                                        double amt = variantOriginal - variantFinal;
-                                                        lowestFinalVariantDiscountAmount2 = amt;
-                                                        lowestFinalVariantDiscountPercent2 = (int) Math.round((amt / variantOriginal) * 100.0);
-                                                } else {
-                                                        lowestFinalVariantDiscountAmount2 = null;
-                                                        lowestFinalVariantDiscountPercent2 = null;
+                                        // Determine per-variant final price (giaSauGiam) if there is an active
+                                        // BienTheGiamGia
+                                        Double lowestFinalPrice2 = null;
+                                        Integer lowestFinalVariantId2 = null;
+                                        String lowestFinalVariantSku2 = null;
+                                        Double lowestFinalVariantOriginalPrice2 = null;
+                                        Integer lowestFinalVariantDiscountPercent2 = null;
+                                        Double lowestFinalVariantDiscountAmount2 = null;
+
+                                        for (BienTheSanPham bt : variants) {
+                                                Double variantOriginal = bt.getGiaBan() != null
+                                                                ? bt.getGiaBan().doubleValue()
+                                                                : null;
+                                                Double variantFinal = variantOriginal;
+
+                                                java.util.List<BienTheGiamGia> discounts = bienTheGiamGiaRepository
+                                                                .findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+                                                if (!discounts.isEmpty()) {
+                                                        BienTheGiamGia disc = discounts.get(0);
+                                                        com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = disc
+                                                                        .getChuongTrinhGiamGia();
+                                                        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+                                                        boolean isActive = (chuongTrinh.getNgayBatDau() == null
+                                                                        || !now.isBefore(chuongTrinh.getNgayBatDau()))
+                                                                        &&
+                                                                        (chuongTrinh.getNgayKetThuc() == null
+                                                                                        || !now.isAfter(chuongTrinh
+                                                                                                        .getNgayKetThuc()));
+                                                        if (isActive && disc.getGiaSauGiam() != null) {
+                                                                variantFinal = disc.getGiaSauGiam().doubleValue();
+                                                        }
+                                                }
+
+                                                if (variantFinal != null) {
+                                                        if (variantFinal < min)
+                                                                min = variantFinal;
+                                                        if (variantFinal > max)
+                                                                max = variantFinal;
+                                                } else if (variantOriginal != null) {
+                                                        double price = variantOriginal;
+                                                        if (price < min)
+                                                                min = price;
+                                                        if (price > max)
+                                                                max = price;
+                                                }
+
+                                                int qty = bt.getSoLuongTon() == null ? 0 : bt.getSoLuongTon();
+                                                totalStock += qty;
+                                                if (qty > 0)
+                                                        availableVariantCount++;
+
+                                                // track lowest final price variant
+                                                if (variantFinal != null) {
+                                                        if (lowestFinalPrice2 == null
+                                                                        || variantFinal < lowestFinalPrice2) {
+                                                                lowestFinalPrice2 = variantFinal;
+                                                                lowestFinalVariantId2 = bt.getMaBienThe();
+                                                                lowestFinalVariantSku2 = bt.getSku();
+                                                                lowestFinalVariantOriginalPrice2 = variantOriginal;
+                                                                if (variantOriginal != null && variantOriginal > 0) {
+                                                                        double amt = variantOriginal - variantFinal;
+                                                                        lowestFinalVariantDiscountAmount2 = amt;
+                                                                        lowestFinalVariantDiscountPercent2 = (int) Math
+                                                                                        .round((amt / variantOriginal)
+                                                                                                        * 100.0);
+                                                                } else {
+                                                                        lowestFinalVariantDiscountAmount2 = null;
+                                                                        lowestFinalVariantDiscountPercent2 = null;
+                                                                }
+                                                        }
                                                 }
                                         }
-                                }
-                        }
 
-                        // Determine discount percent: prefer variant-level discounted percent when available.
-                        // Avoid inferring discount from min/max price range.
-                        int discountPercent2 = 0;
-                        if (lowestFinalVariantDiscountPercent2 != null) {
-                                discountPercent2 = lowestFinalVariantDiscountPercent2;
-                        } else {
-                                discountPercent2 = 0;
-                        }
+                                        // Determine discount percent: prefer variant-level discounted percent when
+                                        // available.
+                                        // Avoid inferring discount from min/max price range.
+                                        int discountPercent2 = 0;
+                                        if (lowestFinalVariantDiscountPercent2 != null) {
+                                                discountPercent2 = lowestFinalVariantDiscountPercent2;
+                                        } else {
+                                                discountPercent2 = 0;
+                                        }
 
-                        com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder2 = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.builder()
-                                        .maSanPham(sp.getMaSanPham())
-                                        .tenSanPham(sp.getTenSanPham())
-                                        .moTa(sp.getMoTa())
-                                        .id(sp.getMaSanPham())
-                                        .name(sp.getTenSanPham())
-                                        .price(min > 0 ? min : null)
-                                        .originalPrice(max > 0 ? max : null)
-                                        .stockQuantity(totalStock)
-                                        .minPrice(min)
-                                        .maxPrice(max)
-                                        .totalStock(totalStock)
-                                        .availableVariantCount(availableVariantCount)
-                                        .soLuongBienThe(variants.size())
-                                        .images(imageUrls)
-                                        .discountPercent(discountPercent2)
-                                        .averageRating(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
-                                        .reviewCount(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue());
+                                        com.noithat.qlnt.backend.dto.response.ShopProductResponseDto.ShopProductResponseDtoBuilder builder2 = com.noithat.qlnt.backend.dto.response.ShopProductResponseDto
+                                                        .builder()
+                                                        .maSanPham(sp.getMaSanPham())
+                                                        .tenSanPham(sp.getTenSanPham())
+                                                        .moTa(sp.getMoTa())
+                                                        .id(sp.getMaSanPham())
+                                                        .name(sp.getTenSanPham())
+                                                        .price(min > 0 ? min : null)
+                                                        .originalPrice(max > 0 ? max : null)
+                                                        .stockQuantity(totalStock)
+                                                        .minPrice(min)
+                                                        .maxPrice(max)
+                                                        .totalStock(totalStock)
+                                                        .availableVariantCount(availableVariantCount)
+                                                        .soLuongBienThe(variants.size())
+                                                        .images(imageUrls)
+                                                        .discountPercent(discountPercent2)
+                                                        .averageRating(danhGiaSanPhamRepository
+                                                                        .findAverageByProductId(sp.getMaSanPham()))
+                                                        .reviewCount(danhGiaSanPhamRepository
+                                                                        .countByProductId(sp.getMaSanPham())
+                                                                        .intValue());
 
-                        // attach lowest variant info if found
-                        if (lowestFinalVariantId2 != null) {
-                                builder2.lowestVariantId(lowestFinalVariantId2)
-                                        .lowestVariantSku(lowestFinalVariantSku2)
-                                        .lowestVariantPrice(lowestFinalPrice2)
-                                        .lowestVariantOriginalPrice(lowestFinalVariantOriginalPrice2)
-                                        .lowestVariantDiscountAmount(lowestFinalVariantDiscountAmount2)
-                                        .lowestVariantDiscountPercent(lowestFinalVariantDiscountPercent2);
-                        }
+                                        // attach lowest variant info if found
+                                        if (lowestFinalVariantId2 != null) {
+                                                builder2.lowestVariantId(lowestFinalVariantId2)
+                                                                .lowestVariantSku(lowestFinalVariantSku2)
+                                                                .lowestVariantPrice(lowestFinalPrice2)
+                                                                .lowestVariantOriginalPrice(
+                                                                                lowestFinalVariantOriginalPrice2)
+                                                                .lowestVariantDiscountAmount(
+                                                                                lowestFinalVariantDiscountAmount2)
+                                                                .lowestVariantDiscountPercent(
+                                                                                lowestFinalVariantDiscountPercent2);
+                                        }
 
-                        return builder2.build();
-                }).collect(java.util.stream.Collectors.toList());
+                                        return builder2.build();
+                                }).collect(java.util.stream.Collectors.toList());
 
-                com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto pageDto = com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto.builder()
+                com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto pageDto = com.noithat.qlnt.backend.dto.response.ShopProductPageResponseDto
+                                .builder()
                                 .items(items)
                                 .page(p.getNumber())
                                 .size(p.getSize())
@@ -769,21 +907,23 @@ public class ProductServiceImpl implements IProductService {
         @Autowired
         private BienTheGiamGiaRepository bienTheGiamGiaRepository;
 
-
         /**
          * Lấy chi tiết sản phẩm đầy đủ với biến thể, thuộc tính và giá giảm
          */
         @Override
         @Transactional(readOnly = true)
-        public com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto getProductDetailWithVariants(Integer id) {
+        public com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto getProductDetailWithVariants(
+                        Integer id) {
                 SanPham sp = findProductById(id);
 
                 // Load hình ảnh
                 List<HinhAnhSanPham> images = hinhAnhSanPhamRepository
                                 .findBySanPhamMaSanPhamOrderByThuTuAsc(sp.getMaSanPham());
 
-                List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ImageDto> imageDtos = images.stream()
-                                .map(h -> com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ImageDto.builder()
+                List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ImageDto> imageDtos = images
+                                .stream()
+                                .map(h -> com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ImageDto
+                                                .builder()
                                                 .maHinhAnh(h.getMaHinhAnh())
                                                 .duongDanHinhAnh(h.getDuongDanHinhAnh())
                                                 .thuTu(h.getThuTu())
@@ -793,7 +933,8 @@ public class ProductServiceImpl implements IProductService {
                                 .collect(java.util.stream.Collectors.toList());
 
                 // Load biến thể với thuộc tính
-                List<BienTheSanPham> variants = sp.getBienTheList() != null ? sp.getBienTheList() : new java.util.ArrayList<>();
+                List<BienTheSanPham> variants = sp.getBienTheList() != null ? sp.getBienTheList()
+                                : new java.util.ArrayList<>();
 
                 // Tính giá min/max và tổng số lượng
                 java.math.BigDecimal giaMin = null;
@@ -828,20 +969,24 @@ public class ProductServiceImpl implements IProductService {
                         tongSoLuong += (bt.getSoLuongTon() != null ? bt.getSoLuongTon() : 0);
 
                         // Load thuộc tính của biến thể
-                        List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.AttributeDto> attributeDtos = 
-                                bt.getBienTheThuocTinhs() != null 
-                                        ? bt.getBienTheThuocTinhs().stream()
-                                                .map(btt -> com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.AttributeDto.builder()
-                                                                .maThuocTinh(btt.getThuocTinh().getMaThuocTinh())
-                                                                .tenThuocTinh(btt.getThuocTinh().getTenThuocTinh())
-                                                                .giaTri(btt.getGiaTri())
-                                                                .build())
-                                                .collect(java.util.stream.Collectors.toList())
-                                        : new java.util.ArrayList<>();
+                        List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.AttributeDto> attributeDtos = bt
+                                        .getBienTheThuocTinhs() != null
+                                                        ? bt.getBienTheThuocTinhs().stream()
+                                                                        .map(btt -> com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.AttributeDto
+                                                                                        .builder()
+                                                                                        .maThuocTinh(btt.getThuocTinh()
+                                                                                                        .getMaThuocTinh())
+                                                                                        .tenThuocTinh(btt.getThuocTinh()
+                                                                                                        .getTenThuocTinh())
+                                                                                        .giaTri(btt.getGiaTri())
+                                                                                        .build())
+                                                                        .collect(java.util.stream.Collectors.toList())
+                                                        : new java.util.ArrayList<>();
 
                         // Load giảm giá cho biến thể (nếu có)
-                        List<BienTheGiamGia> discounts = bienTheGiamGiaRepository.findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
-                        
+                        List<BienTheGiamGia> discounts = bienTheGiamGiaRepository
+                                        .findByBienTheSanPham_MaBienThe(bt.getMaBienThe());
+
                         com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.DiscountDto discountDto = null;
                         java.math.BigDecimal giaSauGiam = bt.getGiaBan();
                         java.math.BigDecimal phanTramGiam = null;
@@ -850,37 +995,48 @@ public class ProductServiceImpl implements IProductService {
                         if (!discounts.isEmpty()) {
                                 // Lấy discount đầu tiên (hoặc có thể lọc theo ngày hiệu lực)
                                 BienTheGiamGia discount = discounts.get(0);
-                                com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = discount.getChuongTrinhGiamGia();
-                                
+                                com.noithat.qlnt.backend.entity.ChuongTrinhGiamGia chuongTrinh = discount
+                                                .getChuongTrinhGiamGia();
+
                                 // Kiểm tra chương trình có đang hiệu lực không
                                 java.time.LocalDateTime now = java.time.LocalDateTime.now();
-                                boolean isActive = (chuongTrinh.getNgayBatDau() == null || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
-                                                   (chuongTrinh.getNgayKetThuc() == null || !now.isAfter(chuongTrinh.getNgayKetThuc()));
+                                boolean isActive = (chuongTrinh.getNgayBatDau() == null
+                                                || !now.isBefore(chuongTrinh.getNgayBatDau())) &&
+                                                (chuongTrinh.getNgayKetThuc() == null
+                                                                || !now.isAfter(chuongTrinh.getNgayKetThuc()));
 
                                 if (isActive && discount.getGiaSauGiam() != null) {
                                         giaSauGiam = discount.getGiaSauGiam();
-                                        
+
                                         // Tính phần trăm giảm hoặc số tiền giảm
-                                        if (bt.getGiaBan() != null && bt.getGiaBan().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                                        if (bt.getGiaBan() != null
+                                                        && bt.getGiaBan().compareTo(java.math.BigDecimal.ZERO) > 0) {
                                                 soTienGiam = bt.getGiaBan().subtract(giaSauGiam);
-                                                phanTramGiam = soTienGiam.divide(bt.getGiaBan(), 4, java.math.RoundingMode.HALF_UP)
-                                                                        .multiply(new java.math.BigDecimal(100));
+                                                phanTramGiam = soTienGiam
+                                                                .divide(bt.getGiaBan(), 4,
+                                                                                java.math.RoundingMode.HALF_UP)
+                                                                .multiply(new java.math.BigDecimal(100));
                                         }
 
-                                        discountDto = com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.DiscountDto.builder()
+                                        discountDto = com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.DiscountDto
+                                                        .builder()
                                                         .maChuongTrinh(chuongTrinh.getMaChuongTrinhGiamGia())
                                                         .tenChuongTrinh(chuongTrinh.getTenChuongTrinh())
                                                         .loaiGiam(chuongTrinh.getLoaiGiamGia())
                                                         .giaTriGiam(chuongTrinh.getGiaTriGiam())
-                                                        .ngayBatDau(chuongTrinh.getNgayBatDau() != null ? chuongTrinh.getNgayBatDau().toString() : null)
-                                                        .ngayKetThuc(chuongTrinh.getNgayKetThuc() != null ? chuongTrinh.getNgayKetThuc().toString() : null)
+                                                        .ngayBatDau(chuongTrinh.getNgayBatDau() != null
+                                                                        ? chuongTrinh.getNgayBatDau().toString()
+                                                                        : null)
+                                                        .ngayKetThuc(chuongTrinh.getNgayKetThuc() != null
+                                                                        ? chuongTrinh.getNgayKetThuc().toString()
+                                                                        : null)
                                                         .build();
                                 }
                         }
 
                         // Build variant DTO
-                        com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.VariantDetailDto variantDto = 
-                                com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.VariantDetailDto.builder()
+                        com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.VariantDetailDto variantDto = com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.VariantDetailDto
+                                        .builder()
                                         .maBienThe(bt.getMaBienThe())
                                         .sku(bt.getSku())
                                         .giaBan(bt.getGiaBan())
@@ -904,41 +1060,42 @@ public class ProductServiceImpl implements IProductService {
                                 for (var btt : bt.getBienTheThuocTinhs()) {
                                         String tenThuocTinh = btt.getThuocTinh().getTenThuocTinh();
                                         String giaTri = btt.getGiaTri();
-                                        
+
                                         specsMap.putIfAbsent(tenThuocTinh, new java.util.LinkedHashSet<>());
                                         specsMap.get(tenThuocTinh).add(giaTri);
                                 }
                         }
                 }
 
-                List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.SpecificationDto> specDtos = 
-                        specsMap.entrySet().stream()
-                                .map(entry -> com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.SpecificationDto.builder()
-                                        .tenThuocTinh(entry.getKey())
-                                        .giaTriList(new java.util.ArrayList<>(entry.getValue()))
-                                        .build())
+                List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.SpecificationDto> specDtos = specsMap
+                                .entrySet().stream()
+                                .map(entry -> com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.SpecificationDto
+                                                .builder()
+                                                .tenThuocTinh(entry.getKey())
+                                                .giaTriList(new java.util.ArrayList<>(entry.getValue()))
+                                                .build())
                                 .collect(java.util.stream.Collectors.toList());
 
                 // Lấy sản phẩm liên quan (cùng danh mục hoặc bộ sưu tập)
                 List<com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.RelatedProductDto> relatedProducts = new java.util.ArrayList<>();
-                
+
                 // Tìm sản phẩm cùng danh mục hoặc bộ sưu tập
                 List<SanPham> relatedList = new java.util.ArrayList<>();
                 if (sp.getDanhMuc() != null) {
                         relatedList.addAll(sanPhamRepository.findByDanhMuc_MaDanhMuc(sp.getDanhMuc().getMaDanhMuc())
-                                .stream()
-                                .filter(p -> !p.getMaSanPham().equals(sp.getMaSanPham()))
-                                .limit(3)
-                                .collect(java.util.stream.Collectors.toList()));
+                                        .stream()
+                                        .filter(p -> !p.getMaSanPham().equals(sp.getMaSanPham()))
+                                        .limit(3)
+                                        .collect(java.util.stream.Collectors.toList()));
                 }
-                
+
                 if (relatedList.size() < 6 && sp.getBoSuuTap() != null) {
                         relatedList.addAll(sanPhamRepository.findByBoSuuTap_MaBoSuuTap(sp.getBoSuuTap().getMaBoSuuTap())
-                                .stream()
-                                .filter(p -> !p.getMaSanPham().equals(sp.getMaSanPham()) && 
-                                            !relatedList.contains(p))
-                                .limit(6 - relatedList.size())
-                                .collect(java.util.stream.Collectors.toList()));
+                                        .stream()
+                                        .filter(p -> !p.getMaSanPham().equals(sp.getMaSanPham()) &&
+                                                        !relatedList.contains(p))
+                                        .limit(6 - relatedList.size())
+                                        .collect(java.util.stream.Collectors.toList()));
                 }
 
                 for (SanPham relatedSp : relatedList) {
@@ -947,9 +1104,10 @@ public class ProductServiceImpl implements IProductService {
                         java.math.BigDecimal relGiaMax = null;
                         int relTongSoLuong = 0;
 
-                        List<BienTheSanPham> relVariants = relatedSp.getBienTheList() != null ? 
-                                relatedSp.getBienTheList() : new java.util.ArrayList<>();
-                        
+                        List<BienTheSanPham> relVariants = relatedSp.getBienTheList() != null
+                                        ? relatedSp.getBienTheList()
+                                        : new java.util.ArrayList<>();
+
                         for (BienTheSanPham relBt : relVariants) {
                                 if (relBt.getGiaBan() != null) {
                                         if (relGiaMin == null || relBt.getGiaBan().compareTo(relGiaMin) < 0) {
@@ -964,22 +1122,25 @@ public class ProductServiceImpl implements IProductService {
 
                         // Lấy ảnh chính
                         List<HinhAnhSanPham> relImages = hinhAnhSanPhamRepository
-                                .findBySanPhamMaSanPhamOrderByThuTuAsc(relatedSp.getMaSanPham());
+                                        .findBySanPhamMaSanPhamOrderByThuTuAsc(relatedSp.getMaSanPham());
                         String mainImage = relImages.isEmpty() ? null : relImages.get(0).getDuongDanHinhAnh();
 
                         relatedProducts.add(
-                                com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.RelatedProductDto.builder()
-                                        .maSanPham(relatedSp.getMaSanPham())
-                                        .tenSanPham(relatedSp.getTenSanPham())
-                                        .moTa(relatedSp.getMoTa())
-                                        .giaMin(relGiaMin)
-                                        .giaMax(relGiaMax)
-                                        .hinhAnh(mainImage)
-                                        .danhGia(danhGiaSanPhamRepository.findAverageByProductId(relatedSp.getMaSanPham()))
-                                        .soLuotDanhGia(danhGiaSanPhamRepository.countByProductId(relatedSp.getMaSanPham()).intValue())
-                                        .soLuongTon(relTongSoLuong)
-                                        .build()
-                        );
+                                        com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.RelatedProductDto
+                                                        .builder()
+                                                        .maSanPham(relatedSp.getMaSanPham())
+                                                        .tenSanPham(relatedSp.getTenSanPham())
+                                                        .moTa(relatedSp.getMoTa())
+                                                        .giaMin(relGiaMin)
+                                                        .giaMax(relGiaMax)
+                                                        .hinhAnh(mainImage)
+                                                        .danhGia(danhGiaSanPhamRepository.findAverageByProductId(
+                                                                        relatedSp.getMaSanPham()))
+                                                        .soLuotDanhGia(danhGiaSanPhamRepository
+                                                                        .countByProductId(relatedSp.getMaSanPham())
+                                                                        .intValue())
+                                                        .soLuongTon(relTongSoLuong)
+                                                        .build());
                 }
 
                 // Build response DTO
@@ -987,24 +1148,27 @@ public class ProductServiceImpl implements IProductService {
                                 .maSanPham(sp.getMaSanPham())
                                 .tenSanPham(sp.getTenSanPham())
                                 .moTa(sp.getMoTa())
-                                .danhMuc(sp.getDanhMuc() != null 
-                                        ? com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.CategoryDto.builder()
-                                                .maDanhMuc(sp.getDanhMuc().getMaDanhMuc())
-                                                .tenDanhMuc(sp.getDanhMuc().getTenDanhMuc())
-                                                .build()
-                                        : null)
-                                .nhaCungCap(sp.getNhaCungCap() != null 
-                                        ? com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.SupplierDto.builder()
-                                                .maNhaCungCap(sp.getNhaCungCap().getMaNhaCungCap())
-                                                .tenNhaCungCap(sp.getNhaCungCap().getTenNhaCungCap())
-                                                .build()
-                                        : null)
-                                .boSuuTap(sp.getBoSuuTap() != null 
-                                        ? com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.CollectionDto.builder()
-                                                .maBoSuuTap(sp.getBoSuuTap().getMaBoSuuTap())
-                                                .tenBoSuuTap(sp.getBoSuuTap().getTenBoSuuTap())
-                                                .build()
-                                        : null)
+                                .danhMuc(sp.getDanhMuc() != null
+                                                ? com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.CategoryDto
+                                                                .builder()
+                                                                .maDanhMuc(sp.getDanhMuc().getMaDanhMuc())
+                                                                .tenDanhMuc(sp.getDanhMuc().getTenDanhMuc())
+                                                                .build()
+                                                : null)
+                                .nhaCungCap(sp.getNhaCungCap() != null
+                                                ? com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.SupplierDto
+                                                                .builder()
+                                                                .maNhaCungCap(sp.getNhaCungCap().getMaNhaCungCap())
+                                                                .tenNhaCungCap(sp.getNhaCungCap().getTenNhaCungCap())
+                                                                .build()
+                                                : null)
+                                .boSuuTap(sp.getBoSuuTap() != null
+                                                ? com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.CollectionDto
+                                                                .builder()
+                                                                .maBoSuuTap(sp.getBoSuuTap().getMaBoSuuTap())
+                                                                .tenBoSuuTap(sp.getBoSuuTap().getTenBoSuuTap())
+                                                                .build()
+                                                : null)
                                 .bienThe(variantDtos)
                                 .hinhAnh(imageDtos)
                                 .giaMin(giaMin)
@@ -1012,19 +1176,26 @@ public class ProductServiceImpl implements IProductService {
                                 .giaGocMin(giaGocMin)
                                 .giaGocMax(giaGocMax)
                                 .tongSoLuong(tongSoLuong)
-                                                                .danhGia(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
-                                                                .soLuotDanhGia(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue())
-                                                                                                .danhGiaKhachHang(danhGiaSanPhamRepository.findBySanPham_MaSanPham(sp.getMaSanPham()).stream().map(dg -> {
-                                                                                                        var builder = com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ReviewDto.builder()
-                                                                                                                        .id(dg.getMaDanhGia())
-                                                                                                                        .tenKhachHang(dg.getKhachHang() != null ? dg.getKhachHang().getHoTen() : null)
-                                                                                                                        .danhGia(dg.getDiem())
-                                                                                                                        .tieuDe(dg.getTieuDe())
-                                                                                                                        .noiDung(dg.getNoiDung())
-                                                                                                                        .ngayDanhGia(dg.getNgayTao() != null ? dg.getNgayTao().toString() : null);
-                                                                                                        if (dg.getKhachHang() != null) builder.maKhachHang(dg.getKhachHang().getMaKhachHang());
-                                                                                                        return builder.build();
-                                                                                                }).collect(java.util.stream.Collectors.toList()))
+                                .danhGia(danhGiaSanPhamRepository.findAverageByProductId(sp.getMaSanPham()))
+                                .soLuotDanhGia(danhGiaSanPhamRepository.countByProductId(sp.getMaSanPham()).intValue())
+                                .danhGiaKhachHang(danhGiaSanPhamRepository.findBySanPham_MaSanPham(sp.getMaSanPham())
+                                                .stream().map(dg -> {
+                                                        var builder = com.noithat.qlnt.backend.dto.response.ProductDetailWithVariantsDto.ReviewDto
+                                                                        .builder()
+                                                                        .id(dg.getMaDanhGia())
+                                                                        .tenKhachHang(dg.getKhachHang() != null
+                                                                                        ? dg.getKhachHang().getHoTen()
+                                                                                        : null)
+                                                                        .danhGia(dg.getDiem())
+                                                                        .tieuDe(dg.getTieuDe())
+                                                                        .noiDung(dg.getNoiDung())
+                                                                        .ngayDanhGia(dg.getNgayTao() != null
+                                                                                        ? dg.getNgayTao().toString()
+                                                                                        : null);
+                                                        if (dg.getKhachHang() != null)
+                                                                builder.maKhachHang(dg.getKhachHang().getMaKhachHang());
+                                                        return builder.build();
+                                                }).collect(java.util.stream.Collectors.toList()))
                                 .thongSoKyThuat(specDtos)
                                 .sanPhamLienQuan(relatedProducts)
                                 .build();
@@ -1034,16 +1205,17 @@ public class ProductServiceImpl implements IProductService {
         @Transactional(readOnly = true)
         public java.util.List<com.noithat.qlnt.backend.dto.response.ProductBasicResponse> getBasicProducts() {
                 return sanPhamRepository.findAll().stream()
-                        .map(sp -> {
-                                Integer maDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getMaDanhMuc() : null;
-                                String tenDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getTenDanhMuc() : null;
-                                return new com.noithat.qlnt.backend.dto.response.ProductBasicResponse(
-                                        sp.getMaSanPham(),
-                                        sp.getTenSanPham(),
-                                        maDanhMuc,
-                                        tenDanhMuc
-                                );
-                        })
-                        .collect(java.util.stream.Collectors.toList());
+                                .map(sp -> {
+                                        Integer maDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getMaDanhMuc()
+                                                        : null;
+                                        String tenDanhMuc = sp.getDanhMuc() != null ? sp.getDanhMuc().getTenDanhMuc()
+                                                        : null;
+                                        return new com.noithat.qlnt.backend.dto.response.ProductBasicResponse(
+                                                        sp.getMaSanPham(),
+                                                        sp.getTenSanPham(),
+                                                        maDanhMuc,
+                                                        tenDanhMuc);
+                                })
+                                .collect(java.util.stream.Collectors.toList());
         }
 }

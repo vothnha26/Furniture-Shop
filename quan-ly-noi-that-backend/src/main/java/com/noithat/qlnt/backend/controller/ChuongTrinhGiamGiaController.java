@@ -127,6 +127,26 @@ public class ChuongTrinhGiamGiaController {
     }
 
     /**
+     * Cập nhật trạng thái chương trình giảm giá
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Map<String, Object>> updateStatus(
+            @PathVariable Integer id,
+            @RequestBody Map<String, String> request) {
+        String newStatus = request.get("trangThai");
+        if (newStatus == null || newStatus.trim().isEmpty()) {
+            throw new IllegalArgumentException("Trạng thái không được để trống");
+        }
+        
+        service.updateStatus(id, newStatus);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Cập nhật trạng thái thành công");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Xóa chương trình giảm giá
      */
     @DeleteMapping("/{id}")

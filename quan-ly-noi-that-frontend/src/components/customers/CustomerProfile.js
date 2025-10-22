@@ -36,11 +36,12 @@ const CustomerProfile = () => {
     address: '',
     dateOfBirth: '',
     gender: 'male',
-    vipLevel: 'bronze',
+    vipLevel: '', // will be set from maHang
     joinDate: '',
     totalOrders: 0,
     totalSpent: 0,
-    avatar: 'https://via.placeholder.com/150'
+    avatar: 'https://via.placeholder.com/150',
+    rewardPoints: 0 // will be set from khach hang
   });
 
   const [editProfile, setEditProfile] = useState(profile);
@@ -60,7 +61,12 @@ const CustomerProfile = () => {
         try {
           // Fetch fresh customer data from API
           const freshCustomerData = await api.get('/api/v1/khach-hang/me');
-          console.log('[CustomerProfile] Fresh customer data:', freshCustomerData);
+          // Log the full response object
+          console.log('[CustomerProfile] API response from /api/v1/khach-hang/me:', freshCustomerData);
+          // Log the .data property for clarity
+          if (freshCustomerData && freshCustomerData.data) {
+            console.log('[CustomerProfile] API response .data:', freshCustomerData.data);
+          }
 
           const customerData = freshCustomerData?.data || freshCustomerData;
 
@@ -71,11 +77,13 @@ const CustomerProfile = () => {
             address: customerData.diaChi || user.diaChi || user.address || '',
             dateOfBirth: customerData.ngaySinh || user.ngaySinh || user.dateOfBirth || '',
             gender: customerData.gioiTinh || user.gioiTinh || user.gender || 'male',
-            vipLevel: customerData.hangThanhVien?.tenHang?.toLowerCase() || user.hangThanhVien?.tenHang?.toLowerCase() || user.capDoThanhVien || user.vipLevel || 'bronze',
+            vipLevel: customerData.hangThanhVien?.maHangThanhVien || '',
+            hangThanhVien: customerData.hangThanhVien || null,
             joinDate: customerData.ngayThamGia || customerData.ngayTaoTaiKhoan || customerData.createdAt || user.ngayThamGia || user.createdAt || new Date().toISOString().split('T')[0],
             totalOrders: Number(customerData.tongDonHang || customerData.totalOrders || 0),
             totalSpent: Number(customerData.tongChiTieu || customerData.totalSpent || 0),
-            avatar: customerData.avatar || customerData.hinhAnh || user.avatar || 'https://via.placeholder.com/150'
+            avatar: customerData.avatar || customerData.hinhAnh || user.avatar || 'https://via.placeholder.com/150',
+            rewardPoints: Number(customerData.diemThuong || 0)
           };
 
           console.log('[CustomerProfile] Mapped profile:', userProfile);
@@ -90,26 +98,40 @@ const CustomerProfile = () => {
 
             if (customerId) {
               const ordersResponse = await api.get(`/api/v1/khach-hang/${customerId}/don-hang?limit=5&sort=desc`);
-              console.log('[CustomerProfile] Orders response:', ordersResponse);
+              // Log the full response for debugging
+              console.log('[CustomerProfile] Orders response (full):', ordersResponse);
 
-              const orders = ordersResponse.data?.orders || ordersResponse.data || ordersResponse || [];
+              // Try to get the array of orders from possible response shapes
+              let orders = [];
+              if (Array.isArray(ordersResponse)) {
+                orders = ordersResponse;
+              } else if (ordersResponse && Array.isArray(ordersResponse.data)) {
+                orders = ordersResponse.data;
+              } else if (ordersResponse && Array.isArray(ordersResponse.data?.orders)) {
+                orders = ordersResponse.data.orders;
+              } else if (ordersResponse && Array.isArray(ordersResponse.orders)) {
+                orders = ordersResponse.orders;
+              }
+              // Fallback: if still not array, try to convert object values to array
+              if (!Array.isArray(orders) && orders && typeof orders === 'object') {
+                orders = Object.values(orders);
+              }
+              if (!Array.isArray(orders)) orders = [];
+
               setRecentOrders(orders.slice(0, 5));
 
               const completed = orders.filter(o => o.trangThai === 'HOAN_THANH').length;
               const pending = orders.filter(o => o.trangThai === 'CHO_XU_LY' || o.trangThai === 'DANG_XU_LY').length;
               const canceled = orders.filter(o => o.trangThai === 'DA_HUY').length;
 
-              // Calculate reward points from total spent (100k VND = 10 points)
-              const rewardPoints = Math.floor(Number(userProfile.totalSpent || 0) / 100000) * 10;
-
               setStats({
                 completedOrders: completed,
                 pendingOrders: pending,
                 canceledOrders: canceled,
-                rewardPoints: rewardPoints
+                rewardPoints: userProfile.rewardPoints
               });
 
-              console.log('[CustomerProfile] Stats:', { completed, pending, canceled, rewardPoints });
+              console.log('[CustomerProfile] Stats:', { completed, pending, canceled, rewardPoints: userProfile.rewardPoints });
             }
           } catch (err) {
             console.error('Failed to fetch orders:', err);
@@ -127,15 +149,36 @@ const CustomerProfile = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const vipLevels = [
-    { value: 'bronze', label: 'Đồng', color: 'text-orange-600', bg: 'bg-orange-100', gradient: 'from-orange-400 to-orange-600' },
-    { value: 'silver', label: 'Bạc', color: 'text-gray-600', bg: 'bg-gray-100', gradient: 'from-gray-400 to-gray-600' },
-    { value: 'gold', label: 'Vàng', color: 'text-yellow-600', bg: 'bg-yellow-100', gradient: 'from-yellow-400 to-yellow-600' },
-    { value: 'platinum', label: 'Bạch kim', color: 'text-purple-600', bg: 'bg-purple-100', gradient: 'from-purple-400 to-purple-600' }
+  // Lấy label và màu từ dữ liệu backend (tenHang, mauSac)
+  const gradients = [
+    'from-orange-400 to-orange-600',
+    'from-gray-200 to-gray-400', // brighter for silver
+    'from-yellow-400 to-yellow-600',
+    'from-purple-400 to-purple-600',
+    'from-blue-400 to-blue-600',
+    'from-pink-400 to-pink-600',
+    'from-green-400 to-green-600',
+    'from-red-400 to-red-600'
   ];
 
-  const getVipInfo = (level) => {
-    return vipLevels.find(vip => vip.value === level) || vipLevels[0];
+  function getRandomGradient() {
+    return gradients[Math.floor(Math.random() * gradients.length)];
+  }
+
+  const getVipInfo = (hangThanhVien) => {
+    if (!hangThanhVien) return { label: 'Chưa xác định', gradient: getRandomGradient() };
+    let gradient = getRandomGradient();
+    if (hangThanhVien.mauSac) {
+      if (hangThanhVien.mauSac.startsWith('bg-')) {
+        gradient = `${hangThanhVien.mauSac} to-${hangThanhVien.mauSac.replace('bg-', '')}`;
+      } else {
+        gradient = hangThanhVien.mauSac;
+      }
+    }
+    return {
+      label: hangThanhVien.tenHang || 'Chưa xác định',
+      gradient
+    };
   };
 
   const formatPrice = (price) => {
@@ -294,7 +337,7 @@ const CustomerProfile = () => {
                   <IoTrophy className="w-5 h-5 opacity-70" />
                 </div>
                 <p className="text-sm opacity-90 mb-1">Điểm tích lũy</p>
-                <p className="text-3xl font-bold">{stats.rewardPoints}</p>
+                <p className="text-3xl font-bold">{profile.rewardPoints || stats.rewardPoints}</p>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -309,7 +352,8 @@ const CustomerProfile = () => {
               {/* VIP Status */}
               <div
                 onClick={() => navigate('/profile/benefits?tab=membership')}
-                className={`bg-gradient-to-br ${getVipInfo(profile.vipLevel).gradient} rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform cursor-pointer`}
+                className={`bg-gradient-to-br ${getVipInfo(profile.hangThanhVien).gradient} rounded-xl shadow-lg p-6 text-gray-900 transform hover:scale-105 transition-transform cursor-pointer`}
+                style={{ color: '#222' }}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-3 bg-white/20 rounded-lg">
@@ -318,7 +362,7 @@ const CustomerProfile = () => {
                   <span className="text-2xl">👑</span>
                 </div>
                 <p className="text-sm opacity-90 mb-1">Hạng thành viên</p>
-                <p className="text-3xl font-bold">{getVipInfo(profile.vipLevel).label}</p>
+                <p className="text-3xl font-bold">{getVipInfo(profile.hangThanhVien).label}</p>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

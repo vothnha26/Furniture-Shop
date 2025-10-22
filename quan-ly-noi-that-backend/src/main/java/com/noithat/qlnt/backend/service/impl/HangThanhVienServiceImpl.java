@@ -589,4 +589,35 @@ public class HangThanhVienServiceImpl implements IHangThanhVienService {
 
         return dto;
     }
+
+    @Override
+    public List<VipKhachHangDto> getKhachHangByHang(Integer maHangThanhVien) {
+        // Kiểm tra hạng thành viên có tồn tại không
+        HangThanhVien hang = hangThanhVienRepository.findById(maHangThanhVien)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy hạng thành viên với ID: " + maHangThanhVien));
+
+        // Lấy danh sách khách hàng thuộc hạng này
+        List<KhachHang> khachHangs = khachHangRepository.findByHangThanhVien_MaHangThanhVien(maHangThanhVien);
+
+        // Convert sang DTO
+        return khachHangs.stream()
+                .map(kh -> {
+                    VipKhachHangDto dto = new VipKhachHangDto();
+                    dto.setMaKhachHang(kh.getMaKhachHang());
+                    dto.setHoTen(kh.getHoTen());
+                    dto.setEmail(kh.getEmail());
+                    dto.setSoDienThoai(kh.getSoDienThoai());
+                    dto.setDiemThuong(kh.getDiemThuong());
+                    dto.setTongChiTieu(kh.getTongChiTieu());
+                    dto.setNgayThamGia(kh.getNgayTao() != null ? kh.getNgayTao().toString() : null);
+                    
+                    // Set thông tin hạng thành viên
+                    if (kh.getHangThanhVien() != null) {
+                        dto.setHangThanhVien(kh.getHangThanhVien().getTenHang());
+                    }
+                    
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
 }

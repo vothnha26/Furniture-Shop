@@ -39,6 +39,18 @@ public class ProductController {
         }
     }
 
+    // API so sánh tổng nhập/xuất theo sản phẩm (gộp các biến thể)
+    @PostMapping("/compare")
+    public ResponseEntity<?> compareProductsAggregate(@RequestBody java.util.List<Integer> productIds) {
+        try {
+            var result = productService.compareProductsAggregate(productIds);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
     // New endpoint: lightweight product list for category assignment UI
     @GetMapping("/basic")
     public ResponseEntity<?> getBasicProducts() {
@@ -101,6 +113,14 @@ public class ProductController {
     @PutMapping("/{id}")
     public ResponseEntity<SanPham> updateSanPham(@PathVariable Integer id, @Valid @RequestBody SanPhamRequestDto dto) {
         return ResponseEntity.ok(productService.updateSanPham(id, dto));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<SanPham> patchSanPham(
+            @PathVariable Integer id,
+            @Valid @RequestBody com.noithat.qlnt.backend.dto.request.SanPhamPatchRequestDto request) {
+        SanPham updatedProduct = productService.patchSanPham(id, request);
+        return ResponseEntity.ok(updatedProduct);
     }
 
     /**
@@ -188,7 +208,8 @@ public class ProductController {
                     maNhaCungCap,
                     maDanhMuc,
                     maBoSuuTap,
-                    diemThuong);
+                    diemThuong,
+                    null); // trangThai will default to ACTIVE in service
 
             // Gọi service
             var result = productService.createSanPhamWithImages(

@@ -219,6 +219,26 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
     }
 
     @Override
+    public List<LichSuTonKho> getAllStockHistoryNhap() {
+        return lichSuTonKhoRepository.findAllNhapOrderByThoiGianThucHienDesc();
+    }
+
+    @Override
+    public List<LichSuTonKho> getStockHistoryNhapBetween(LocalDateTime from, LocalDateTime to) {
+        return lichSuTonKhoRepository.findNhapBetweenOrderByThoiGianThucHienDesc(from, to);
+    }
+
+    @Override
+    public List<LichSuTonKho> getAllStockHistory() {
+        return lichSuTonKhoRepository.findAllOrderByThoiGianThucHienDesc();
+    }
+
+    @Override
+    public List<LichSuTonKho> getStockHistoryBetween(LocalDateTime from, LocalDateTime to) {
+        return lichSuTonKhoRepository.findAllBetweenOrderByThoiGianThucHienDesc(from, to);
+    }
+
+    @Override
     public boolean isAvailableForSale(Integer maBienThe, Integer quantity) {
         Boolean result = bienTheSanPhamRepository.isAvailableForSale(maBienThe, quantity);
         return result != null && result;

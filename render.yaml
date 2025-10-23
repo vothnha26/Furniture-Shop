@@ -3,9 +3,9 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
-    
-    # (Khuyến nghị) Tối ưu cho Monorepo
-    dockerfilePath: Dockerfile 
+
+    # SỬA LỖI: Căn chỉnh thụt lề cho 2 dòng này
+    dockerfilePath: Dockerfile
     buildContext: ./quan-ly-noi-that-backend
 
     buildFilter:
@@ -13,9 +13,8 @@ services:
         - quan-ly-noi-that-backend/**
     envVars:
       - key: SERVER_PORT
-        value: 8080 
-      
+        value: 8080
+
       # (1) URL TRỎ ĐẾN AZURE
       - key: SPRING_DATASOURCE_URL
-        # Đảm bảo giữ nguyên các tham số 'encrypt=true' v.v.
         value: jdbc:sqlserver://qlnt-api-server-2025.database.windows.net:1433;database=qlnt_db_azure;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;

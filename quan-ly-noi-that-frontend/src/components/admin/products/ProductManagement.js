@@ -1199,7 +1199,7 @@ const ProductManagement = () => {
                       <div className="aspect-square bg-gray-100 relative">
                         {product.hinhAnhs && product.hinhAnhs.length > 0 ? (
                           <img
-                            src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'}${product.hinhAnhs[0].duongDanHinhAnh}`}
+                            src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}${product.hinhAnhs[0].duongDanHinhAnh}`}
                             alt={product.tenSanPham}
                             className="w-full h-full object-cover"
                           />
@@ -1633,7 +1633,7 @@ const ProductManagement = () => {
                     {selectedProduct.hinhAnhs.map((image, index) => (
                       <div key={image.maHinhAnh || index} className="relative aspect-square">
                         <img
-                          src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'}${image.duongDanHinhAnh}`}
+                          src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}${image.duongDanHinhAnh}`}
                           alt={image.moTa || `Ảnh ${index + 1}`}
                           className="w-full h-full object-cover rounded-lg"
                         />

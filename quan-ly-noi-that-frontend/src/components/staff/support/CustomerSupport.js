@@ -195,7 +195,7 @@ const CustomerSupport = () => {
   const connectStomp = () => {
     if (stompRef.current && stompRef.current.connected) return;
 
-    const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
+    const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
     const sockUrl = base.replace(/\/$/, '') + '/ws-notifications';
 
     const client = new Client({

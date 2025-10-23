@@ -1,9 +1,9 @@
 // Simple API wrapper using fetch
-// - Reads base URL from REACT_APP_API_BASE_URL or defaults to http://localhost:8080
+// - Reads base URL from REACT_APP_API_BASE_URL or defaults to http://localhost:8081
 // - Attaches JSON headers and optional Authorization header from localStorage('authToken')
 // - Exposes helper functions: get, post, put, del
 
-const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
 
 function buildUrl(path, query) {
   try {

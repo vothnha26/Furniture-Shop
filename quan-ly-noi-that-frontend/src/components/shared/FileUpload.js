@@ -171,7 +171,7 @@ const FileUpload = ({
                 // Existing image from server - prepend base URL if needed
                 imageUrl = file.duongDanHinhAnh.startsWith('http') 
                   ? file.duongDanHinhAnh 
-                  : `http://localhost:8080${file.duongDanHinhAnh}`;
+                  : `http://localhost:8081${file.duongDanHinhAnh}`;
               }
               
               return (

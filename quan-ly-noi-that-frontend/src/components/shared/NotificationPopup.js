@@ -64,7 +64,7 @@ const NotificationPopup = () => {
     }
 
     // Lấy baseURL từ api client nếu có, fallback sang current origin
-    const baseURL = api?.defaults?.baseURL || `${window.location.protocol}//${window.location.hostname}:8080`;
+    const baseURL = api?.defaults?.baseURL || `${window.location.protocol}//${window.location.hostname}:8081`;
     // Backend SockJS endpoint is registered at /ws-notifications
     const wsUrl = `${baseURL.replace(/\/$/, '')}/ws-notifications`;
 

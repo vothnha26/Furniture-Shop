@@ -5,8 +5,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, NavLink, useL
 import AccountManagement from './components/admin/system/AccountManagement';
 import AttributeManagement from './components/admin/products/AttributeManagement';
 import AttributeValueManagement from './components/admin/products/AttributeValueManagement';
-import BackendExplorer from './components/admin/system/BackendExplorer';
-import BackupRestore from './components/admin/system/BackupRestore';
 import CategoryManagement from './components/admin/products/CategoryManagement';
 import CollectionManagement from './components/admin/products/CollectionManagement';
 import CustomerManagement from './components/admin/customers/CustomerManagement';
@@ -30,10 +28,6 @@ import CustomerNotifications from './components/customers/CustomerNotifications'
 import CustomerOrders from './components/customers/CustomerOrders';
 import CustomerOrderTracking from './components/customers/CustomerOrderTracking';
 import CustomerProfile from './components/customers/CustomerProfile';
-import CustomerOrderConfirmation from './components/customers/CustomerOrderConfirmation';
-import CustomerAddresses from './components/customers/CustomerAddresses';
-import CustomerVouchers from './components/customers/CustomerVouchers';
-import CustomerLoyalty from './components/customers/CustomerLoyalty';
 import CustomerBenefits from './components/customers/CustomerBenefits';
 import CustomerLayout from './components/customers/CustomerLayout';
 import CustomerCart from './components/customers/CustomerCart';
@@ -363,7 +357,7 @@ const App = () => {
             {/* Shopping Cart & Checkout - require authentication */}
             <Route path="/cart" element={<ProtectedRoute><CustomerLayout><CustomerCart /></CustomerLayout></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><CustomerLayout><CustomerCheckout /></CustomerLayout></ProtectedRoute>} />
-            <Route path="/checkout/success" element={<ProtectedRoute><CustomerLayout><CustomerOrderConfirmation /></CustomerLayout></ProtectedRoute>} />
+            <Route path="/checkout/success" element={<ProtectedRoute><CustomerLayout><CustomerCheckout /></CustomerLayout></ProtectedRoute>} />
             <Route path="/checkout/cancel" element={<ProtectedRoute><CustomerLayout><CustomerCheckout /></CustomerLayout></ProtectedRoute>} />
 
             {/* Customer Profile & Account */}
@@ -371,12 +365,11 @@ const App = () => {
             <Route path="/account" element={<Navigate to="/profile" replace />} />
             <Route path="/profile/edit" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
             <Route path="/profile/password" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
-            <Route path="/profile/addresses" element={<CustomerLayout><CustomerAddresses /></CustomerLayout>} />
+            <Route path="/profile/addresses" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
             <Route path="/profile/benefits" element={<CustomerLayout><CustomerBenefits /></CustomerLayout>} />
 
             {/* Additional customer pages */}
-            <Route path="/vouchers" element={<CustomerLayout><CustomerVouchers /></CustomerLayout>} />
-            <Route path="/loyalty" element={<CustomerLayout><CustomerLoyalty /></CustomerLayout>} />
+            <Route path="/vouchers" element={<CustomerLayout><CustomerProfile /></CustomerLayout>} />
             <Route path="/benefits" element={<Navigate to="/profile/benefits" replace />} />
             <Route path="/promotions" element={<Navigate to="/profile/benefits" replace />} />
             <Route path="/points" element={<Navigate to="/profile/benefits" replace />} />
@@ -527,20 +520,11 @@ const App = () => {
               <Route path="settings/email" element={<Settings />} />
               <Route path="settings/sms" element={<Settings />} />
 
-              {/* Backup & Restore */}
-              <Route path="backup" element={<BackupRestore />} />
-              <Route path="backup/create" element={<BackupRestore />} />
-              <Route path="backup/restore" element={<BackupRestore />} />
-              <Route path="backup/schedule" element={<BackupRestore />} />
-
               {/* Notifications */}
               <Route path="notifications" element={<Notifications />} />
               <Route path="emails" element={<EmailCampaign />} />
               <Route path="notifications/send" element={<Notifications />} />
 
-              {/* Backend explorer */}
-              <Route path="backend-explorer" element={<BackendExplorer />} />
-              <Route path="api-explorer" element={<Navigate to="/admin/backend-explorer" replace />} />
             </Route>
 
 

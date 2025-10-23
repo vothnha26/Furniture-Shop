@@ -2,11 +2,12 @@
 // - Attaches JSON headers and optional Authorization header from localStorage('authToken')
 // - Exposes helper functions: get, post, put, del
 // BASE_URL priority:
-//   1) REACT_APP_API_BASE_URL (if set at build time)
+//   1) REACT_APP_API_BASE_URL (if set at build time via .env or Vercel)
 //   2) If running on localhost -> http://localhost:8081
-//   3) Otherwise -> production Render URL https://furniture-backend-ltpp.onrender.com
+//   3) Otherwise -> production backend URL https://furniture-backend-bege.onrender.com
 export const BASE_URL = (() => {
   try {
+    // Priority 1: Check if REACT_APP_API_BASE_URL is set (from .env or Vercel)
     const env = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_BASE_URL) || null;
     if (env && String(env).trim()) {
       return String(env).trim().replace(/\/$/, '');
@@ -14,13 +15,15 @@ export const BASE_URL = (() => {
   } catch (_) {
     // ignore
   }
+  
+  // Priority 2: Auto-detect based on hostname
   try {
     const host = window.location?.hostname;
     const isLocal = host === 'localhost' || host === '127.0.0.1' || (host && host.endsWith('.local'));
-    return isLocal ? 'http://localhost:8081' : 'https://furniture-backend-ltpp.onrender.com';
+    return isLocal ? 'http://localhost:8081' : 'https://furniture-backend-bege.onrender.com';
   } catch (_) {
-    // If window is not available (e.g. during build), fall back to production URL
-    return 'https://furniture-backend-ltpp.onrender.com';
+    // Priority 3: Fallback to production URL if window is not available (e.g. during build)
+    return 'https://furniture-backend-bege.onrender.com';
   }
 })();
 

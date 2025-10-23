@@ -3,18 +3,19 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
-    dockerfilePath: quan-ly-noi-that-backend/Dockerfile
-    # buildContext: (Đã xóa để tránh lỗi trước đó)
+    
+    # (Khuyến nghị) Tối ưu cho Monorepo
+    dockerfilePath: Dockerfile 
+    buildContext: ./quan-ly-noi-that-backend
+
     buildFilter:
       paths:
         - quan-ly-noi-that-backend/**
     envVars:
-      # FIX 1: Thêm SERVER_PORT để Render phát hiện ứng dụng đang lắng nghe trên 8080
       - key: SERVER_PORT
         value: 8080 
+      
+      # (1) URL TRỎ ĐẾN AZURE
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:sqlserver://103.199.36.147:1433;databaseName=qlnt_db;encrypt=false
-      - key: SPRING_DATASOURCE_USERNAME
-        value: sa
-      - key: SPRING_DATASOURCE_PASSWORD
-        value: nhacc123@
+        # Đảm bảo giữ nguyên các tham số 'encrypt=true' v.v.
+        value: jdbc:sqlserver://qlnt-api-server-2025.database.windows.net:1433;database=qlnt_db_azure;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;

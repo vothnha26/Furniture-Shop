@@ -4,7 +4,6 @@ services:
     runtime: docker
     plan: free
 
-    # SỬA LỖI: Căn chỉnh thụt lề cho 2 dòng này
     dockerfilePath: Dockerfile
     buildContext: ./quan-ly-noi-that-backend
 

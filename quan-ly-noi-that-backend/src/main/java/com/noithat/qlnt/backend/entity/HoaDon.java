@@ -17,7 +17,7 @@ public class HoaDon {
     @JoinColumn(name = "MaDonHang", nullable = false, unique = true)
     private DonHang donHang;
 
-    @Column(name = "SoHoaDon", unique = true, columnDefinition = "NVARCHAR(50)")
+    @Column(name = "SoHoaDon", unique = true, nullable = false, length = 50, columnDefinition = "NVARCHAR(50) NOT NULL")
     private String soHoaDon;
 
     @Column(name = "NgayXuat")

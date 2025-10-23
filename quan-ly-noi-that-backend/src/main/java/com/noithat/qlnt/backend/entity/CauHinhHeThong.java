@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CauHinhHeThong {
     @Id
-    @Column(name = "config_key", columnDefinition = "NVARCHAR(100)")
+    @Column(name = "config_key", nullable = false, length = 100, columnDefinition = "NVARCHAR(100) NOT NULL")
     private String configKey;
 
     @Column(name = "config_value", columnDefinition = "NVARCHAR(4000)")

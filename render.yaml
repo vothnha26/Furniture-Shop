@@ -5,7 +5,7 @@ services:
     plan: free
 
     dockerfilePath: Dockerfile
-    buildContext: ./quan-ly-noi-that-backend
+    buildContext: quan-ly-noi-that-backend/Dockerfile
 
     buildFilter:
       paths:

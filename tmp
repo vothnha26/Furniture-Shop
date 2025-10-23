@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: furniture-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: quan-ly-noi-that-backend/Dockerfile
+
+    # buildContext: (Đã xóa để tránh lỗi trước đó)
+
+    buildFilter:
+      paths:
+        - quan-ly-noi-that-backend/**
+
+    envVars:
+      - key: SERVER_PORT
+        value: 8080
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:sqlserver://103.199.36.147:1433;databaseName=qlnt_db;encrypt=false

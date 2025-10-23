@@ -80,6 +80,7 @@ public class DanhMucController {
     @PostMapping
     public ResponseEntity<DanhMuc> createDanhMuc(@RequestBody DanhMucDto dto) {
         DanhMuc newCategory = danhMucService.createDanhMuc(dto);
+        logger.info("Created category id={}", newCategory.getMaDanhMuc());
         return new ResponseEntity<>(newCategory, HttpStatus.CREATED);
     }
 
@@ -89,6 +90,7 @@ public class DanhMucController {
     @PutMapping("/{id}")
     public ResponseEntity<DanhMuc> updateDanhMuc(@PathVariable Integer id, @RequestBody DanhMucDto dto) {
         DanhMuc updatedCategory = danhMucService.updateDanhMuc(id, dto);
+        logger.info("Updated category id={}", updatedCategory.getMaDanhMuc());
         return ResponseEntity.ok(updatedCategory);
     }
 
@@ -105,6 +107,7 @@ public class DanhMucController {
             sanPhamRepository.save(sp);
         }
         danhMucService.deleteDanhMuc(id);
+        logger.info("Deleted category id={}", id);
         return ResponseEntity.noContent().build();
     }
 
@@ -130,6 +133,7 @@ public class DanhMucController {
     @PostMapping("/{childId}/parents/{parentId}")
     public ResponseEntity<Void> linkParentToChild(@PathVariable Integer childId, @PathVariable Integer parentId) {
         danhMucService.linkParentToChild(childId, parentId);
+        logger.info("Linked parent {} -> child {}", parentId, childId);
         return ResponseEntity.ok().build();
     }
 
@@ -139,6 +143,7 @@ public class DanhMucController {
     @DeleteMapping("/{childId}/parents/{parentId}")
     public ResponseEntity<Void> unlinkParentFromChild(@PathVariable Integer childId, @PathVariable Integer parentId) {
         danhMucService.unlinkParentFromChild(childId, parentId);
+        logger.info("Unlinked parent {} from child {}", parentId, childId);
         return ResponseEntity.noContent().build();
     }
 }

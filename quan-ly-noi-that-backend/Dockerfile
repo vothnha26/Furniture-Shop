@@ -1,9 +1,9 @@
 # Giai đoạn Build: Sử dụng Maven với Temurin 17
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
-# Vẫn giữ nguyên đường dẫn có tiền tố để đảm bảo tìm thấy tệp từ gốc repo
-COPY quan-ly-noi-that-backend/pom.xml .
-COPY quan-ly-noi-that-backend/src ./src
+# Copy các file từ build context (đã là thư mục quan-ly-noi-that-backend)
+COPY pom.xml .
+COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Giai đoạn Runtime: Sử dụng Temurin JRE 17 nhẹ hơn

@@ -3,7 +3,8 @@ services:
     name: furniture-backend
     runtime: docker
     plan: free
-    dockerfilePath: quan-ly-noi-that-backend/Dockerfile
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./quan-ly-noi-that-backend
 
     buildFilter:
       paths:

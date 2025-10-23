@@ -2,8 +2,14 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-COPY quan-ly-noi-that-backend/pom.xml .
-COPY quan-ly-noi-that-backend/src ./src
+COPY pom.xml .
+
+# Tải dependencies
+RUN mvn dependency:go-offline
+
+COPY src ./src
+
+# (4) Chạy build
 RUN mvn clean package -DskipTests
 
 # Giai đoạn Runtime: Sử dụng Temurin JRE 17 nhẹ hơn

@@ -18,13 +18,13 @@ public class TaiKhoan implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maTaiKhoan;
 
-    @Column(name = "TenDangNhap", nullable = false, unique = true)
+    @Column(name = "TenDangNhap", nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
     private String tenDangNhap;
 
-    @Column(name = "MatKhauHash", nullable = false)
+    @Column(name = "MatKhauHash", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String matKhauHash;
 
-    @Column(name = "Email", nullable = false, unique = true)
+    @Column(name = "Email", nullable = false, unique = true, columnDefinition = "NVARCHAR(255)")
     private String email;
 
     @ManyToOne(fetch = FetchType.EAGER) // Eager fetch for roles
@@ -32,6 +32,7 @@ public class TaiKhoan implements UserDetails {
     private VaiTro vaiTro;
 
     // Fields for OTP and account status
+    @Column(columnDefinition = "NVARCHAR(10)")
     private String otp;
     private LocalDateTime otpGeneratedTime;
     private boolean enabled = false; // Tài khoản chưa được kích hoạt ban đầu

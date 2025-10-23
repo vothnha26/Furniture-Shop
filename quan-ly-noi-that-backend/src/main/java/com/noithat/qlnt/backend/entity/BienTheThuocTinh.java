@@ -28,6 +28,6 @@ public class BienTheThuocTinh implements Serializable {
     @JsonIgnoreProperties({"-"})
     private ThuocTinh thuocTinh;
 
-    @Column(name = "GiaTri")
+    @Column(name = "GiaTri", columnDefinition = "NVARCHAR(255)")
     private String giaTri;
 }

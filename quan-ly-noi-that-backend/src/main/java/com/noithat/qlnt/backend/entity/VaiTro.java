@@ -11,6 +11,6 @@ public class VaiTro {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maVaiTro;
 
-    @Column(name = "TenVaiTro", nullable = false, unique = true)
+    @Column(name = "TenVaiTro", nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
     private String tenVaiTro;
 }

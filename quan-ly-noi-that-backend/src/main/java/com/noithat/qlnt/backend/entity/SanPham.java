@@ -13,10 +13,10 @@ public class SanPham {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maSanPham;
 
-    @Column(name = "TenSanPham", nullable = false)
+    @Column(name = "TenSanPham", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenSanPham;
 
-    @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
+    @Column(name = "MoTa", columnDefinition = "TEXT")
     private String moTa;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,6 +40,6 @@ public class SanPham {
     @Column(name = "DiemThuong", nullable = false)
     private Integer diemThuong = 0;
     
-    @Column(name = "TrangThai", length = 50, nullable = false)
+    @Column(name = "TrangThai", columnDefinition = "NVARCHAR(50)", nullable = false)
     private String trangThai = "ACTIVE"; // ACTIVE, INACTIVE, DISCONTINUED
 }

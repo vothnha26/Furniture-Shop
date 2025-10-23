@@ -19,14 +19,14 @@ public class BoSuuTap {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maBoSuuTap;
 
-    @Column(name = "TenBoSuuTap", nullable = false)
+    @Column(name = "TenBoSuuTap", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenBoSuuTap;
 
-    @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
+    @Column(name = "MoTa", columnDefinition = "TEXT")
     private String moTa;
 
     // Optional main image path for the collection (relative URL, e.g. /uploads/collections/{id}/file.jpg)
-    @Column(name = "HinhAnh")
+    @Column(name = "HinhAnh", columnDefinition = "NVARCHAR(500)")
     private String hinhAnh;
 
     // Quan hệ OneToMany: Một bộ sưu tập có nhiều sản phẩm (1-N)

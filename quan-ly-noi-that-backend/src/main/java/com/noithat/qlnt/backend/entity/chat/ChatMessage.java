@@ -17,7 +17,7 @@ public class ChatMessage {
     @JoinColumn(name = "session_id", nullable = false)
     private ChatSession session;
 
-    @Column(length = 10)
+    @Column(columnDefinition = "NVARCHAR(10)")
     private String senderType; // 'customer' or 'staff'
 
     private Integer senderId;

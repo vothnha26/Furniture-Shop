@@ -18,16 +18,16 @@ public class Voucher {
     @Column(name = "ma_voucher")
     private Integer maVoucher;
 
-    @Column(name = "ma_code")
+    @Column(name = "ma_code", columnDefinition = "NVARCHAR(50)")
     private String maCode;
     
-    @Column(name = "ten_voucher")
+    @Column(name = "ten_voucher", columnDefinition = "NVARCHAR(255)")
     private String tenVoucher;
     
-    @Column(name = "mo_ta")
+    @Column(name = "mo_ta", columnDefinition = "TEXT")
     private String moTa;
 
-    @Column(name = "loai_giam_gia", length = 20)
+    @Column(name = "loai_giam_gia", columnDefinition = "NVARCHAR(20)")
     private String loaiGiamGia; // 'PERCENTAGE' hoặc 'FIXED'
 
     @Column(name = "gia_tri_giam", precision = 18, scale = 2)
@@ -51,7 +51,7 @@ public class Voucher {
     private Integer soLuongDaSuDung = 0;
     
     // Voucher status: one of "CHUA_BAT_DAU", "DANG_HOAT_DONG", "DA_HET_HAN"
-    @Column(name = "trang_thai")
+    @Column(name = "trang_thai", columnDefinition = "NVARCHAR(50)")
     private String trangThai = "DANG_HOAT_DONG";
 
     @Column(name = "ap_dung_cho_moi_nguoi")

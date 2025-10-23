@@ -27,7 +27,7 @@ public class DanhGiaSanPham {
     @Column(name = "Diem", nullable = false)
     private Integer diem; // 1..5
 
-    @Column(name = "TieuDe")
+    @Column(name = "TieuDe", columnDefinition = "NVARCHAR(255)")
     private String tieuDe;
 
     @Column(name = "NoiDung", columnDefinition = "NVARCHAR(MAX)")

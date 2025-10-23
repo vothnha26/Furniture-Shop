@@ -19,13 +19,13 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CauHinhHeThong {
     @Id
-    @Column(name = "config_key", length = 100)
+    @Column(name = "config_key", columnDefinition = "NVARCHAR(100)")
     private String configKey;
 
-    @Column(name = "config_value", length = 4000)
+    @Column(name = "config_value", columnDefinition = "NVARCHAR(4000)")
     private String configValue;
 
-    @Column(name = "mo_ta", length = 1000)
+    @Column(name = "mo_ta", columnDefinition = "TEXT")
     private String moTa;
 
     @Column(name = "ngay_cap_nhat")

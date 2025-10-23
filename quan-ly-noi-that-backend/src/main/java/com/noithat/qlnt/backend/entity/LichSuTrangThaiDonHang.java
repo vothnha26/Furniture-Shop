@@ -19,25 +19,25 @@ public class LichSuTrangThaiDonHang {
     @JoinColumn(name = "MaDonHang", nullable = false)
     private DonHang donHang;
     
-    @Column(name = "TrangThaiCu")
+    @Column(name = "TrangThaiCu", columnDefinition = "NVARCHAR(50)")
     private String trangThaiCu;
     
-    @Column(name = "TrangThaiMoi", nullable = false)
+    @Column(name = "TrangThaiMoi", nullable = false, columnDefinition = "NVARCHAR(50)")
     private String trangThaiMoi;
     
-    @Column(name = "LyDoThayDoi")
+    @Column(name = "LyDoThayDoi", columnDefinition = "NVARCHAR(255)")
     private String lyDoThayDoi;
     
-    @Column(name = "NguoiThayDoi", nullable = false)
+    @Column(name = "NguoiThayDoi", nullable = false, columnDefinition = "NVARCHAR(100)")
     private String nguoiThayDoi;
     
     @Column(name = "ThoiGianThayDoi", nullable = false)
     private LocalDateTime thoiGianThayDoi = LocalDateTime.now();
     
-    @Column(name = "GhiChu")
+    @Column(name = "GhiChu", columnDefinition = "NVARCHAR(255)")
     private String ghiChu;
     
-    @Column(name = "ViTriHienTai")
+    @Column(name = "ViTriHienTai", columnDefinition = "NVARCHAR(100)")
     private String viTriHienTai; // Vị trí hiện tại của đơn hàng (kho, đang giao, etc.)
     
     // Constructor for easy creation

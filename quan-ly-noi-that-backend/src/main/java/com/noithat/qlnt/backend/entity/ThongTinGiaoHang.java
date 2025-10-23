@@ -18,12 +18,12 @@ public class ThongTinGiaoHang {
     private DonHang donHang;
 
     // ----- THÔNG TIN VẬN HÀNH (Được admin cập nhật sau) -----
-    @Column(name = "DonViVanChuyen")
+    @Column(name = "DonViVanChuyen", columnDefinition = "NVARCHAR(100)")
     private String donViVanChuyen; // Ví dụ: "Giao Hàng Tiết Kiệm"
 
-    @Column(name = "MaVanDon")
+    @Column(name = "MaVanDon", columnDefinition = "NVARCHAR(100)")
     private String maVanDon; // Mã để theo dõi đơn hàng
 
-    @Column(name = "TrangThaiGiaoHang")
+    @Column(name = "TrangThaiGiaoHang", columnDefinition = "NVARCHAR(50)")
     private String trangThaiGiaoHang; // Ví dụ: "Đang lấy hàng", "Đang giao hàng"
 }

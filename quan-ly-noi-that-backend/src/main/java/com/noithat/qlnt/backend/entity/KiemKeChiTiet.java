@@ -34,10 +34,10 @@ public class KiemKeChiTiet {
     @Column(name = "GiaTriChenhLech", precision = 15, scale = 2)
     private BigDecimal giaTriChenhLech;
     
-    @Column(name = "LyDoChenhLech")
+    @Column(name = "LyDoChenhLech", columnDefinition = "NVARCHAR(255)")
     private String lyDoChenhLech;
     
-    @Column(name = "NguoiKiemKe")
+    @Column(name = "NguoiKiemKe", columnDefinition = "NVARCHAR(100)")
     private String nguoiKiemKe;
     
     @Column(name = "ThoiGianKiemKe")
@@ -47,7 +47,7 @@ public class KiemKeChiTiet {
     @Enumerated(EnumType.STRING)
     private TrangThaiKiemKeChiTiet trangThai = TrangThaiKiemKeChiTiet.CHUA_KIEM_KE;
     
-    @Column(name = "GhiChu")
+    @Column(name = "GhiChu", columnDefinition = "NVARCHAR(255)")
     private String ghiChu;
     
     public enum TrangThaiKiemKeChiTiet {

@@ -25,7 +25,7 @@ public class HinhAnhSanPham {
     @JoinColumn(name = "MaSanPham", nullable = false)
     private SanPham sanPham;
 
-    @Column(name = "DuongDanHinhAnh", nullable = false, length = 500)
+    @Column(name = "DuongDanHinhAnh", nullable = false, columnDefinition = "NVARCHAR(500)")
     private String duongDanHinhAnh;
 
     @Column(name = "ThuTu")
@@ -34,7 +34,7 @@ public class HinhAnhSanPham {
     @Column(name = "LaAnhChinh")
     private Boolean laAnhChinh = false; // Đánh dấu ảnh chính
 
-    @Column(name = "MoTa", length = 255)
+    @Column(name = "MoTa", columnDefinition = "NVARCHAR(255)")
     private String moTa;
 
     @Column(name = "NgayTao")

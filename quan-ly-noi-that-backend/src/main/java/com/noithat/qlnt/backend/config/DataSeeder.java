@@ -3,7 +3,7 @@ package com.noithat.qlnt.backend.config;
 import com.noithat.qlnt.backend.entity.*;
 import com.noithat.qlnt.backend.repository.*;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
+import com.noithat.qlnt.backend.repository.KhachHangRepository;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,10 +32,10 @@ public class DataSeeder {
             ThuocTinhRepository thuocTinhRepository,
             BienTheThuocTinhRepository bienTheThuocTinhRepository,
             VaiTroRepository vaiTroRepository,
-            com.noithat.qlnt.backend.repository.KhachHangRepository khachHangRepository,
-            com.noithat.qlnt.backend.repository.DanhGiaSanPhamRepository danhGiaSanPhamRepository,
-            com.noithat.qlnt.backend.repository.ThongBaoRepository thongBaoRepository,
-            com.noithat.qlnt.backend.repository.TaiKhoanRepository taiKhoanRepository,
+            KhachHangRepository khachHangRepository,
+            DanhGiaSanPhamRepository danhGiaSanPhamRepository,
+            ThongBaoRepository thongBaoRepository,
+            TaiKhoanRepository taiKhoanRepository,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         return args -> {
             // Skip if data already exists

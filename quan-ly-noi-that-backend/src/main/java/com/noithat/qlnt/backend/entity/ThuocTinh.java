@@ -14,6 +14,6 @@ public class ThuocTinh {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maThuocTinh;
 
-    @Column(name = "TenThuocTinh", nullable = false, unique = true)
+    @Column(name = "TenThuocTinh", nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
     private String tenThuocTinh;
 }

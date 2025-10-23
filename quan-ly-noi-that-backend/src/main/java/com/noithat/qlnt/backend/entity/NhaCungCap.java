@@ -11,6 +11,6 @@ public class NhaCungCap {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maNhaCungCap;
 
-    @Column(name = "TenNhaCungCap", nullable = false)
+    @Column(name = "TenNhaCungCap", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenNhaCungCap;
 }

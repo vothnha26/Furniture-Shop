@@ -18,7 +18,7 @@ public class HangThanhVien {
     @Column(name = "ma_hang_thanh_vien")
     private Integer maHangThanhVien;
 
-    @Column(name = "ten_hang", nullable = false, unique = true)
+    @Column(name = "ten_hang", nullable = false, unique = true, columnDefinition = "NVARCHAR(100)")
     private String tenHang;
 
     @Column(name = "diem_toi_thieu", nullable = false)
@@ -27,13 +27,13 @@ public class HangThanhVien {
     @Column(name = "mo_ta", columnDefinition = "TEXT")
     private String moTa; // Mô tả hạng thành viên
 
-    @Column(name = "mau_sac")
+    @Column(name = "mau_sac", columnDefinition = "NVARCHAR(20)")
     private String mauSac; // Màu sắc hiển thị UI (hex color)
 
     @Column(name = "trang_thai")
     private Boolean trangThai = true; // Trạng thái kích hoạt
 
-    @Column(name = "icon")
+    @Column(name = "icon", columnDefinition = "NVARCHAR(50)")
     private String icon; // Tên icon cho frontend
 
     @OneToMany(mappedBy = "hangThanhVien", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

@@ -18,6 +18,6 @@ public class CanhBaoTonKho {
 	@Column(name = "MucCanhBao")
 	private Integer mucCanhBao;
 
-	@Column(name = "GhiChu")
+	@Column(name = "GhiChu", columnDefinition = "NVARCHAR(255)")
 	private String ghiChu;
 }

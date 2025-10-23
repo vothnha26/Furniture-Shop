@@ -32,10 +32,10 @@ public class DanhMuc {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maDanhMuc;
 
-    @Column(name = "TenDanhMuc", nullable = false, unique = true)
+    @Column(name = "TenDanhMuc", nullable = false, unique = true, columnDefinition = "NVARCHAR(255)")
     private String tenDanhMuc;
 
-    @Column(name = "MoTa")
+    @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
     // Adjacency-list: single parent reference

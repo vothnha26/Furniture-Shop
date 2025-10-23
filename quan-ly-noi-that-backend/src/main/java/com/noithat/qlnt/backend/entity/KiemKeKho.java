@@ -15,10 +15,10 @@ public class KiemKeKho {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer maKiemKe;
     
-    @Column(name = "TenKiemKe", nullable = false)
+    @Column(name = "TenKiemKe", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenKiemKe;
     
-    @Column(name = "MoTa")
+    @Column(name = "MoTa", columnDefinition = "TEXT")
     private String moTa;
     
     @Column(name = "TrangThai", nullable = false)
@@ -31,19 +31,19 @@ public class KiemKeKho {
     @Column(name = "NgayKetThuc")
     private LocalDateTime ngayKetThuc;
     
-    @Column(name = "NguoiTao", nullable = false)
+    @Column(name = "NguoiTao", nullable = false, columnDefinition = "NVARCHAR(100)")
     private String nguoiTao;
     
     @Column(name = "NgayTao", nullable = false)
     private LocalDateTime ngayTao = LocalDateTime.now();
     
-    @Column(name = "NguoiDuyet")
+    @Column(name = "NguoiDuyet", columnDefinition = "NVARCHAR(100)")
     private String nguoiDuyet;
     
     @Column(name = "NgayDuyet")
     private LocalDateTime ngayDuyet;
     
-    @Column(name = "GhiChu")
+    @Column(name = "GhiChu", columnDefinition = "NVARCHAR(255)")
     private String ghiChu;
     
     // One-to-many relationship with KiemKeChiTiet

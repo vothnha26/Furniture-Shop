@@ -36,10 +36,10 @@ public class ThongBao {
     @Column(name = "MaThongBao")
     private Integer maThongBao;
     
-    @Column(name = "Loai", nullable = false, length = 50)
+    @Column(name = "Loai", nullable = false, columnDefinition = "NVARCHAR(50)")
     private String loai;
     
-    @Column(name = "TieuDe", nullable = false, length = 255)
+    @Column(name = "TieuDe", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tieuDe;
     
     @Column(name = "NoiDung", nullable = false, columnDefinition = "NVARCHAR(MAX)")
@@ -60,7 +60,7 @@ public class ThongBao {
     @JoinColumn(name = "NguoiNhanId", referencedColumnName = "maKhachHang", insertable = false, updatable = false)
     private KhachHang khachHang;
     
-    @Column(name = "LoaiNguoiNhan", nullable = false, length = 20)
+    @Column(name = "LoaiNguoiNhan", nullable = false, columnDefinition = "NVARCHAR(20)")
     private String loaiNguoiNhan;
     
     @Builder.Default
@@ -73,17 +73,17 @@ public class ThongBao {
     @Column(name = "NgayXoa")
     private LocalDateTime ngayXoa;
     
-    @Column(name = "DuongDanHanhDong", length = 500)
+    @Column(name = "DuongDanHanhDong", columnDefinition = "NVARCHAR(500)")
     private String duongDanHanhDong;
     
     @Builder.Default
-    @Column(name = "DoUuTien", nullable = false, length = 20)
+    @Column(name = "DoUuTien", nullable = false, columnDefinition = "NVARCHAR(20)")
     private String doUuTien = "normal";
     
     @Column(name = "LienKetId")
     private Integer lienKetId;
     
-    @Column(name = "LoaiLienKet", length = 50)
+    @Column(name = "LoaiLienKet", columnDefinition = "NVARCHAR(50)")
     private String loaiLienKet;
     
     /**

@@ -17,7 +17,7 @@ public class GiaoDichThanhToan {
     @JoinColumn(name = "MaDonHang", nullable = false)
     private DonHang donHang;
 
-    @Column(name = "PhuongThuc", nullable = false)
+    @Column(name = "PhuongThuc", nullable = false, columnDefinition = "NVARCHAR(50)")
     private String phuongThuc;
 
     @Column(name = "SoTien", precision = 18, scale = 2, nullable = false)
@@ -26,6 +26,6 @@ public class GiaoDichThanhToan {
     @Column(name = "NgayGiaoDich")
     private LocalDateTime ngayGiaoDich;
 
-    @Column(name = "TrangThai", nullable = false)
+    @Column(name = "TrangThai", nullable = false, columnDefinition = "NVARCHAR(50)")
     private String trangThai;
 }

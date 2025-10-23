@@ -19,10 +19,10 @@ public class DonHang {
     private LocalDateTime ngayDatHang = LocalDateTime.now();
 
     // ----- TRẠNG THÁI -----
-    @Column(name = "TrangThaiDonHang")
+    @Column(name = "TrangThaiDonHang", columnDefinition = "NVARCHAR(50)")
     private String trangThaiDonHang = "CHO_XU_LY"; // Trạng thái xử lý: CHO_XU_LY, DANG_GIAO_HANG, HOAN_THANH, DA_HUY
 
-    @Column(name = "TrangThaiThanhToan")
+    @Column(name = "TrangThaiThanhToan", columnDefinition = "NVARCHAR(50)")
     private String trangThaiThanhToan = "UNPAID"; // Trạng thái thanh toán: UNPAID, PAID, FAILED...
 
     // ----- THÔNG TIN THANH TOÁN (Lưu chi tiết tại thời điểm mua) -----
@@ -51,19 +51,19 @@ public class DonHang {
     private Integer diemThuongNhanDuoc = 0; // Điểm sẽ tích lũy được từ đơn này
 
     // ----- THÔNG TIN GIAO HÀNG (Lưu lại thông tin khách nhập) -----
-    @Column(name = "TenNguoiNhan", length = 100)
+    @Column(name = "TenNguoiNhan", columnDefinition = "NVARCHAR(100)")
     private String tenNguoiNhan;
 
-    @Column(name = "SoDienThoaiNhan", length = 20)
+    @Column(name = "SoDienThoaiNhan", columnDefinition = "NVARCHAR(20)")
     private String soDienThoaiNhan;
 
-    @Column(name = "DiaChiGiaoHang", length = 255)
+    @Column(name = "DiaChiGiaoHang", columnDefinition = "NVARCHAR(255)")
     private String diaChiGiaoHang;
 
-    @Column(name = "PhuongThucThanhToan", nullable = false)
+    @Column(name = "PhuongThucThanhToan", nullable = false, columnDefinition = "NVARCHAR(50)")
     private String phuongThucThanhToan;
     
-    @Column(length = 255)
+    @Column(columnDefinition = "NVARCHAR(255)")
     private String ghiChu;
     
     // ----- CÁC MỐI QUAN HỆ -----

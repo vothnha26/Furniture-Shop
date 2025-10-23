@@ -26,16 +26,16 @@ public class LichSuTonKho {
     @Column(name = "SoLuongSau", nullable = false)
     private Integer soLuongSau;
     
-    @Column(name = "LoaiGiaoDich", nullable = false)
+    @Column(name = "LoaiGiaoDich", nullable = false, columnDefinition = "NVARCHAR(50)")
     private String loaiGiaoDich; // NHAP_KHO, XUAT_KHO, DAT_TRUOC, BAN_HANG, TRA_HANG, DIEU_CHINH
     
-    @Column(name = "MaThamChieu")
+    @Column(name = "MaThamChieu", columnDefinition = "NVARCHAR(100)")
     private String maThamChieu; // Order ID, Import ID, etc.
     
-    @Column(name = "LyDo")
+    @Column(name = "LyDo", columnDefinition = "NVARCHAR(255)")
     private String lyDo;
     
-    @Column(name = "NguoiThucHien")
+    @Column(name = "NguoiThucHien", columnDefinition = "NVARCHAR(100)")
     private String nguoiThucHien;
     
     @Column(name = "ThoiGianThucHien", nullable = false)

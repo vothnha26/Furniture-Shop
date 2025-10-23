@@ -15,10 +15,10 @@ public class NhanVien {
     @JoinColumn(name = "MaTaiKhoan", nullable = false, unique = true)
     private TaiKhoan taiKhoan;
 
-    @Column(name = "HoTen", nullable = false)
+    @Column(name = "HoTen", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String hoTen;
 
-    @Column(name = "ChucVu")
+    @Column(name = "ChucVu", columnDefinition = "NVARCHAR(100)")
     private String chucVu;
 
     @OneToOne(mappedBy = "staff", fetch = FetchType.LAZY)

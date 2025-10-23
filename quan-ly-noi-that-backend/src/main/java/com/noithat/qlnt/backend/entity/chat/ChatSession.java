@@ -24,7 +24,7 @@ public class ChatSession {
     @JoinColumn(name = "staff_id")
     private NhanVien staff;
 
-    @Column(length = 20)
+    @Column(columnDefinition = "NVARCHAR(20)")
     private String status = "waiting"; // waiting (chờ nhận) / active (đang chat) / closed (đã đóng)
 
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -8,7 +8,7 @@
 //   2) If running on localhost -> http://localhost:8081
 //   3) Otherwise -> production Render URL https://furniture-backend-ltpp.onrender.com
 export const BASE_URL = (() => {
-  const env = process.env.REACT_APP_API_BASE_URL;
+  const env = 'https://furniture-backend-ltpp.onrender.com';
   if (env && String(env).trim()) return String(env).trim();
   try {
     const host = window.location?.hostname;

@@ -136,7 +136,6 @@ public class AuthenticationService {
                 try {
                     emailService.sendOtpEmail(request.getEmail(), taiKhoan.getOtp());
                 } catch (org.springframework.mail.MailException | MessagingException e) {
-                    logger.warn("Failed to send OTP email to {}: {}", request.getEmail(), e.getMessage());
                     // Do not expose internal mail errors to client; return a controlled error
                     throw new IllegalStateException("Không thể gửi email xác thực. Vui lòng thử lại sau.");
                 }
@@ -157,8 +156,6 @@ public class AuthenticationService {
                                     .getBean(com.noithat.qlnt.backend.repository.NhanVienRepository.class);
                             repo.save(nv);
                         } catch (Exception ex) {
-                            logger.warn("Failed to persist NhanVien for account {}: {}", taiKhoan.getTenDangNhap(),
-                                    ex.getMessage());
                         }
                     }
                 } catch (Exception ignored) {
@@ -220,7 +217,6 @@ public class AuthenticationService {
         try {
             emailService.sendOtpEmail(email, otp);
         } catch (org.springframework.mail.MailException | MessagingException e) {
-            logger.warn("Failed to send forgot-password OTP to {}: {}", email, e.getMessage());
             throw new IllegalStateException("Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.");
         }
 

@@ -36,10 +36,8 @@ public class QuanLyTonKhoService {
      */
     public boolean importStock(Integer maBienThe, Integer quantity, String nguoiThucHien, String lyDo) {
         try {
-            System.out.println("DEBUG: importStock called with maBienThe=" + maBienThe + ", quantity=" + quantity);
             Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
             if (optionalBienThe.isEmpty()) {
-                System.out.println("DEBUG: BienTheSanPham not found with id=" + maBienThe);
                 return false;
             }
             
@@ -57,10 +55,8 @@ public class QuanLyTonKhoService {
             );
             lichSuTonKhoRepository.save(lichSu);
             
-            System.out.println("DEBUG: importStock completed successfully");
             return true;
         } catch (Exception e) {
-            System.out.println("DEBUG: importStock failed with exception: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -71,20 +67,16 @@ public class QuanLyTonKhoService {
      */
     public boolean exportStock(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien, String lyDo) {
         try {
-            System.out.println("DEBUG: exportStock called with maBienThe=" + maBienThe + ", quantity=" + quantity);
             Optional<BienTheSanPham> optionalBienThe = bienTheSanPhamRepository.findById(maBienThe);
             if (optionalBienThe.isEmpty()) {
-                System.out.println("DEBUG: BienTheSanPham not found with id=" + maBienThe);
                 return false;
             }
             
             BienTheSanPham bienThe = optionalBienThe.get();
             Integer soLuongTruoc = bienThe.getSoLuongTon();
-            System.out.println("DEBUG: Current stock=" + soLuongTruoc + ", requested quantity=" + quantity);
             
             // Kiểm tra đủ hàng để xuất
             if (soLuongTruoc < quantity) {
-                System.out.println("DEBUG: Not enough stock. Current=" + soLuongTruoc + ", requested=" + quantity);
                 return false;
             }
             
@@ -99,10 +91,8 @@ public class QuanLyTonKhoService {
             );
             lichSuTonKhoRepository.save(lichSu);
             
-            System.out.println("DEBUG: exportStock completed successfully. New stock=" + bienThe.getSoLuongTon());
             return true;
         } catch (Exception e) {
-            System.out.println("DEBUG: exportStock failed with exception: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -113,7 +103,6 @@ public class QuanLyTonKhoService {
      */
     public boolean reserveProduct(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
         // Reservation feature removed; keep API but not supported
-        logger.warn("reserveProduct called but reservation is not supported. maBienThe={}", maBienThe);
         return false;
     }
     
@@ -122,7 +111,6 @@ public class QuanLyTonKhoService {
      */
     public boolean releaseReservation(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
         // Release reservation not supported after removal
-        logger.warn("releaseReservation called but reservation is not supported. maBienThe={}", maBienThe);
         return false;
     }
     
@@ -155,7 +143,6 @@ public class QuanLyTonKhoService {
             );
             lichSuTonKhoRepository.save(lichSu);
             
-            System.out.println("DEBUG: confirmSale completed successfully");
             return true;
         } catch (Exception e) {
             logger.error("confirmSale failed: {}", e.getMessage());
@@ -292,8 +279,6 @@ public class QuanLyTonKhoService {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Lấy thông tin tồn kho cho biến thể: {}", maBienThe);
-            
             Optional<BienTheSanPham> bienTheOpt = bienTheSanPhamRepository.findById(maBienThe);
             if (!bienTheOpt.isPresent()) {
                 response.put("success", false);
@@ -316,7 +301,6 @@ public class QuanLyTonKhoService {
             response.put("message", "Lấy thông tin tồn kho thành công");
             response.put("data", stockInfo);
             
-            logger.info("Thông tin tồn kho: {}", stockInfo);
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {

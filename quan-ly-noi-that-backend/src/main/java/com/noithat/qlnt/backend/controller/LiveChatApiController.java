@@ -62,8 +62,6 @@ public class LiveChatApiController {
     public ResponseEntity<List<Map<String, Object>>> listChats(
             @RequestParam(required = false) String status) {
         try {
-            logger.info("Listing chats with status filter: {}", status);
-            
             // Limit visibility: staff only sees sessions assigned to them OR waiting sessions
             NhanVien currentStaff = getCurrentStaff();
             if (currentStaff == null) {
@@ -95,8 +93,6 @@ public class LiveChatApiController {
                     }
                 }
             }
-            
-            logger.debug("Found {} chat sessions", sessions.size());
 
             List<Map<String, Object>> result = new ArrayList<>();
             
@@ -129,7 +125,6 @@ public class LiveChatApiController {
                                     customer.put("tenDangNhap", null);
                                 }
                             } catch (Exception e) {
-                                logger.debug("No tenDangNhap for customer {}", session.getCustomer().getMaKhachHang());
                                 customer.put("tenDangNhap", null);
                             }
                             
@@ -137,14 +132,12 @@ public class LiveChatApiController {
                             customer.put("soDienThoai", session.getCustomer().getSoDienThoai());
                             sessionData.put("customer", customer);
                         } catch (Exception e) {
-                            logger.warn("Failed to map customer for session {}: {}", session.getId(), e.getMessage());
                             sessionData.put("customer", Map.of(
                                 "maKhachHang", session.getCustomer().getMaKhachHang(),
                                 "hoTen", "Khách hàng"
                             ));
                         }
                     } else {
-                        logger.warn("Session {} has no customer", session.getId());
                         sessionData.put("customer", null);
                     }
                     
@@ -155,7 +148,6 @@ public class LiveChatApiController {
                             sessionData.put("staffName", session.getStaff().getHoTen() != null ? 
                                 session.getStaff().getHoTen() : "Nhân viên");
                         } catch (Exception e) {
-                            logger.warn("Failed to map staff for session {}: {}", session.getId(), e.getMessage());
                             sessionData.put("staffId", null);
                             sessionData.put("staffName", null);
                         }
@@ -171,7 +163,6 @@ public class LiveChatApiController {
                             sessionData.put("lastMessage", lastMsg.getContent() != null ? lastMsg.getContent() : "");
                             sessionData.put("lastMessageTime", lastMsg.getSentAt());
                         } catch (Exception e) {
-                            logger.debug("Failed to get last message for session {}", session.getId());
                             sessionData.put("lastMessage", null);
                             sessionData.put("lastMessageTime", null);
                         }
@@ -190,7 +181,6 @@ public class LiveChatApiController {
                 }
             }
             
-            logger.info("Successfully retrieved {} chat sessions", result.size());
             return ResponseEntity.ok(result);
         } catch (Exception ex) {
             logger.error("Failed to list chats", ex);
@@ -206,11 +196,8 @@ public class LiveChatApiController {
     @GetMapping("/session/{sessionId}")
     public ResponseEntity<Map<String, Object>> getSessionDetail(@PathVariable Integer sessionId) {
         try {
-            logger.info("Getting session detail for session {}", sessionId);
-            
             ChatSession session = chatSessionRepository.findById(sessionId).orElse(null);
             if (session == null) {
-                logger.warn("Session {} not found", sessionId);
                 return ResponseEntity.notFound().build();
             }
 
@@ -224,17 +211,12 @@ public class LiveChatApiController {
             if (!isWaiting) {
                 if (session.getStaff() == null ||
                         !session.getStaff().getMaNhanVien().equals(currentStaff.getMaNhanVien())) {
-                    logger.warn("Staff {} forbidden to access session {} owned by {}", 
-                        currentStaff.getMaNhanVien(), sessionId,
-                        session.getStaff() != null ? session.getStaff().getMaNhanVien() : null);
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
                 }
             }
 
             List<ChatMessage> messages = chatMessageRepository
                 .findBySession_IdOrderBySentAtAsc(sessionId);
-            
-            logger.debug("Found {} messages for session {}", messages.size(), sessionId);
 
             Map<String, Object> result = new HashMap<>();
             result.put("id", session.getId());
@@ -260,8 +242,6 @@ public class LiveChatApiController {
                             customer.put("tenDangNhap", null);
                         }
                     } catch (Exception e) {
-                        logger.warn("Failed to get tenDangNhap for customer {}: {}", 
-                            session.getCustomer().getMaKhachHang(), e.getMessage());
                         customer.put("tenDangNhap", null);
                     }
                     
@@ -276,7 +256,6 @@ public class LiveChatApiController {
                     ));
                 }
             } else {
-                logger.warn("Session {} has no customer", sessionId);
                 result.put("customer", null);
             }
 
@@ -315,7 +294,6 @@ public class LiveChatApiController {
             }
             result.put("messages", messageList);
 
-            logger.info("Successfully retrieved session {} with {} messages", sessionId, messageList.size());
             return ResponseEntity.ok(result);
         } catch (Exception ex) {
             logger.error("Failed to get session detail " + sessionId, ex);
@@ -362,8 +340,6 @@ public class LiveChatApiController {
             // Check: Staff có quá nhiều chat active không (giới hạn 5 chat/staff)
             StaffSession staffSession = staffSessionRepository.findById(staff.getMaNhanVien()).orElse(null);
             if (staffSession != null && staffSession.getActiveChats() >= 5) {
-                logger.warn("Staff {} already has {} active chats, cannot claim more", 
-                    staff.getMaNhanVien(), staffSession.getActiveChats());
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("error", "You already have maximum number of active chats (5)",
                                 "currentChats", staffSession.getActiveChats()));
@@ -396,8 +372,6 @@ public class LiveChatApiController {
             statusUpdate.put("staffId", staff.getMaNhanVien());
             statusUpdate.put("staffName", staff.getHoTen());
             messagingTemplate.convertAndSend("/topic/live-chat/sessions", statusUpdate);
-
-            logger.info("Staff {} claimed session {}", staff.getMaNhanVien(), sessionId);
 
             return ResponseEntity.ok(Map.of(
                 "status", "success",

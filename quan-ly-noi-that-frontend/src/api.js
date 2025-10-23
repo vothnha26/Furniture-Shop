@@ -97,11 +97,8 @@ async function request(method, path, { body, query, headers } = {}) {
     opts.body = isFormData || typeof body === 'string' ? body : JSON.stringify(body);
   }
 
-  // Debug: log outgoing request headers for auth troubleshooting
-  try {
-    // avoid logging bodies that may contain sensitive data
-    console.debug('[api] ->', method, url, { headers: opts.headers, credentials: opts.credentials });
-  } catch (e) {}
+  // Tắt debug logging để giảm lag - chỉ bật khi cần debug
+  // console.debug('[api] ->', method, url, { headers: opts.headers, credentials: opts.credentials });
 
   const res = await fetch(url, opts);
 
@@ -115,7 +112,7 @@ async function request(method, path, { body, query, headers } = {}) {
       try {
         const text = await res.text();
         data = text;
-        console.debug('[api] Warning: invalid JSON response, raw text:', text);
+        // console.debug('[api] Warning: invalid JSON response, raw text:', text);
       } catch (tErr) {
         data = null;
       }
@@ -128,11 +125,13 @@ async function request(method, path, { body, query, headers } = {}) {
     const err = new Error(`HTTP ${res.status} ${res.statusText}`);
     err.status = res.status;
     err.data = data;
-    try { console.debug('[api] <- ERROR', method, url, { status: res.status, body: data }); } catch (e) {}
+    // Chỉ log error khi cần debug
+    // console.debug('[api] <- ERROR', method, url, { status: res.status, body: data });
     throw err;
   }
 
-  try { console.debug('[api] <-', method, url, { status: res.status, body: data }); } catch (e) {}
+  // Tắt success logging
+  // console.debug('[api] <-', method, url, { status: res.status, body: data });
 
   return data;
 }

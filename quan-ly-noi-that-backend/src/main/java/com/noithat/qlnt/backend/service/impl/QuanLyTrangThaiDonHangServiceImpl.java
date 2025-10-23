@@ -77,8 +77,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
         // Check if transition is valid
         if (!canChangeStatus(maDonHang, trangThaiMoi)) {
             // Log and return false so controller can return a 400 response instead of 500
-            System.out.println("Invalid status transition attempted for order " + maDonHang + ": '" + trangThaiCu
-                    + "' -> '" + trangThaiMoi + "'");
             return false;
         }
 
@@ -137,9 +135,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
                                 : java.math.BigDecimal.ZERO;
                         kh.setTongChiTieu(currentSpending.add(orderTotal));
                         // kh.setDiemThuong(maDonHang);
-                        System.out.println("✅ Updated customer stats for order " + donHang.getMaDonHang()
-                                + ": tongDonHang=" + kh.getTongDonHang()
-                                + ", tongChiTieu=" + kh.getTongChiTieu());
                     }
                     khachHangRepository.save(kh);
                 }
@@ -185,8 +180,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
             // Log but do not fail the status update; side-effect failures should be
             // investigated separately. In a future change we may want to make these
             // operations more robust and transactional across services.
-            System.out.println(
-                    "Warning: side-effect during status change failed for order " + maDonHang + ": " + ex.getMessage());
         }
 
         return true;
@@ -205,8 +198,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
         if (IQuanLyTrangThaiDonHangService.HUY_BO.equals(trangThaiMoi)) {
             if (HOAN_THANH.equals(trangThaiCu) || HUY_BO.equals(trangThaiCu)) {
                 // Already finished or already canceled -> cannot cancel
-                System.out.println(
-                        "Cannot cancel order " + maDonHang + " because current status is final: " + trangThaiCuRaw);
                 return false;
             }
             // Allow cancellation from other states
@@ -217,17 +208,11 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
         if (!VALID_TRANSITIONS.containsKey(trangThaiCu)) {
             // If the stored status is unknown, log for diagnostics and disallow
             // non-cancellation transitions
-            System.out.println("Unknown current order status for order " + maDonHang + ": '" + trangThaiCuRaw
-                    + "' (normalized='" + trangThaiCu + "')");
             return false;
         }
 
         // Check if new status is in the list of valid transitions
         boolean allowed = VALID_TRANSITIONS.get(trangThaiCu).contains(trangThaiMoi);
-        if (!allowed) {
-            System.out.println("Invalid transition attempted for order " + maDonHang + ": '" + trangThaiCu + "' -> '"
-                    + trangThaiMoi + "'");
-        }
         return allowed;
     }
 

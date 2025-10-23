@@ -99,7 +99,7 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/api/v1/auth/authenticate', credentials);
 
       const authToken = response?.data?.token || response?.data?.accessToken || response?.data?.access_token || response?.data?.jwt || response?.data?.idToken || response?.token || null;
-      console.debug('[AuthContext] login: extracted token:', !!authToken);
+      // console.debug('[AuthContext] login: extracted token:', !!authToken);
       
       // CRITICAL: Set token in memory AND localStorage synchronously BEFORE any profile calls
       if (authToken) {
@@ -107,7 +107,7 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('authToken', authToken);
           api.setAuthToken(authToken); // set in-memory immediately
           setToken(authToken);
-          console.debug('[AuthContext] login: token set in localStorage and api cache');
+          // console.debug('[AuthContext] login: token set in localStorage and api cache');
         } catch (e) {
           console.error('[AuthContext] login: failed to set token:', e);
         }
@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }) => {
       }
 
   const sessionPresent = hasSessionCookie();
-  console.debug('[AuthContext] login: session cookie present?', sessionPresent);
+  // console.debug('[AuthContext] login: session cookie present?', sessionPresent);
       
       // If we have neither token nor session, return minimal user from response
       if (!authToken && !sessionPresent) {
@@ -137,10 +137,10 @@ export const AuthProvider = ({ children }) => {
       // Now fetch profile - token is already set, so Authorization header will be present
       try {
         if (sessionPresent) {
-          console.debug('[AuthContext] login: calling /api/v1/auth/me (session)');
+          // console.debug('[AuthContext] login: calling /api/v1/auth/me (session)');
           const authMe = await api.get('/api/v1/auth/me');
           const authMeData = authMe?.data ?? authMe;
-          console.debug('[AuthContext] login: /api/v1/auth/me returned', !!authMeData);
+          // console.debug('[AuthContext] login: /api/v1/auth/me returned', !!authMeData);
           if (authMeData) {
             setUser(authMeData);
             // persist ma_khach_hang early if present so checkout and voucher logic can read it
@@ -163,10 +163,10 @@ export const AuthProvider = ({ children }) => {
         }
 
   // Token path: call /auth/me first to get account info (works for all roles)
-  console.debug('[AuthContext] login: calling /api/v1/auth/me (token already set)');
+  // console.debug('[AuthContext] login: calling /api/v1/auth/me (token already set)');
   const userResp = await api.get('/api/v1/auth/me');
   const userData = userResp?.data ?? userResp;
-  console.debug('[AuthContext] login: /api/v1/auth/me returned', !!userData, 'role:', userData?.vaiTro);
+  // console.debug('[AuthContext] login: /api/v1/auth/me returned', !!userData, 'role:', userData?.vaiTro);
 
         if (userData) {
           // If USER role, fetch additional customer details from /khach-hang/me
@@ -175,10 +175,10 @@ export const AuthProvider = ({ children }) => {
 
           if (userRole === 'USER') {
             try {
-              console.debug('[AuthContext] login: USER role detected, fetching customer details from /api/v1/khach-hang/me');
+              // console.debug('[AuthContext] login: USER role detected, fetching customer details from /api/v1/khach-hang/me');
               const customerResp = await api.get('/api/v1/khach-hang/me');
               const customerData = customerResp?.data ?? customerResp;
-              console.debug('[AuthContext] login: /api/v1/khach-hang/me returned', !!customerData);
+              // console.debug('[AuthContext] login: /api/v1/khach-hang/me returned', !!customerData);
               // Merge: account info + customer details
               finalUserData = { ...userData, ...customerData };
             } catch (custErr) {

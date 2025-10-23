@@ -72,27 +72,21 @@ public class KhachHangController {
     // session/token)
     @GetMapping("/me")
     public ResponseEntity<KhachHang> getMyProfile(java.security.Principal principal) {
-        // Check principal early and return 401 immediately if not authenticated
         if (principal == null) {
-            System.err.println("[KhachHangController] /me called with null principal - not authenticated");
             return ResponseEntity.status(401).build();
         }
         
         String username = principal.getName();
-        System.out.println("[KhachHangController] /me called for user: " + username);
         
         // First try to find customer by linked account username (TaiKhoan.tenDangNhap)
         try {
             java.util.Optional<KhachHang> maybe = khachHangRepository
                     .findByTaiKhoan_TenDangNhap(username);
-            System.out.println("[KhachHangController] Repository lookup result: " + maybe);
             if (maybe != null && maybe.isPresent()) {
-                System.out.println("[KhachHangController] Found customer by tenDangNhap: " + maybe.get().getMaKhachHang());
                 return ResponseEntity.ok(maybe.get());
             }
         } catch (Exception ex) {
             // log and continue to phone fallback
-            System.err.println("[KhachHangController] repo lookup failed: " + ex.getMessage());
             ex.printStackTrace();
         }
 
@@ -100,14 +94,11 @@ public class KhachHangController {
         try {
             KhachHang byPhone = khachHangService.findBySoDienThoai(username);
             if (byPhone != null) {
-                System.out.println("[KhachHangController] Found customer by phone: " + byPhone.getMaKhachHang());
                 return ResponseEntity.ok(byPhone);
             }
         } catch (Exception ex) {
-            System.err.println("[KhachHangController] phone lookup failed: " + ex.getMessage());
         }
 
-        System.err.println("[KhachHangController] No customer found for username: " + username);
         return ResponseEntity.status(404).build();
     }
 
@@ -145,7 +136,6 @@ public class KhachHangController {
                 return ResponseEntity.ok(updated);
             }
         } catch (Exception ex) {
-            System.err.println("[KhachHangController] update profile failed: " + ex.getMessage());
             ex.printStackTrace();
         }
         
@@ -167,7 +157,6 @@ public class KhachHangController {
                 return ResponseEntity.ok(updated);
             }
         } catch (Exception ex) {
-            System.err.println("[KhachHangController] phone update failed: " + ex.getMessage());
         }
         
         return ResponseEntity.status(404).build();

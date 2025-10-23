@@ -142,8 +142,6 @@ public class ProductServiceImpl implements IProductService {
                                         .build();
                 }
 
-                System.out.println("ACXYZZXY" + col);
-
                 java.util.List<ProductDetailDto.VariantDto> variantDtos = java.util.Optional
                                 .ofNullable(sp.getBienTheList())
                                 .orElseGet(java.util.Collections::emptyList)
@@ -416,8 +414,6 @@ public class ProductServiceImpl implements IProductService {
                 List<com.noithat.qlnt.backend.entity.HinhAnhSanPham> savedImages = new java.util.ArrayList<>();
                 if (images != null && images.length > 0) {
                         try {
-                                System.out.println("[DEBUG] createSanPhamWithImages - received images length: "
-                                                + images.length);
                                 // Tạo thư mục lưu ảnh
                                 String uploadDir = "uploads/products/" + sanPham.getMaSanPham();
                                 java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
@@ -427,18 +423,6 @@ public class ProductServiceImpl implements IProductService {
 
                                 for (int i = 0; i < images.length; i++) {
                                         org.springframework.web.multipart.MultipartFile file = images[i];
-
-                                        // Debug info per file
-                                        try {
-                                                System.out.println("[DEBUG] file[" + i + "] name="
-                                                                + file.getOriginalFilename()
-                                                                + ", contentType=" + file.getContentType() + ", size="
-                                                                + file.getSize()
-                                                                + ", isEmpty=" + file.isEmpty());
-                                        } catch (Exception ex) {
-                                                System.out.println("[DEBUG] cannot read file metadata for index " + i
-                                                                + ": " + ex.getMessage());
-                                        }
 
                                         if (file.isEmpty())
                                                 continue;

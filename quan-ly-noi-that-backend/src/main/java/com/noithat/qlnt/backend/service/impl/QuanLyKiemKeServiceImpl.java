@@ -78,14 +78,12 @@ public class QuanLyKiemKeServiceImpl implements IQuanLyKiemKeService {
 
             // 🔹 Kiểm tra trạng thái phiếu kiểm kê
             if (kiemKeKho.getTrangThai() != KiemKeKho.TrangThaiKiemKe.DANG_CHUAN_BI) {
-                logger.warn("KiemKeKho is not in DANG_CHUAN_BI state. Current state: {}", kiemKeKho.getTrangThai());
                 return false;
             }
 
             // 🔹 Kiểm tra sản phẩm đã tồn tại chưa
             Boolean exists = kiemKeChiTietRepository.existsByKiemKeKhoAndBienTheSanPham(maKiemKe, maBienThe);
             if (exists != null && exists) {
-                logger.warn("Product already exists in inventory check. maKiemKe={}, maBienThe={}", maKiemKe, maBienThe);
                 return false;
             }
 
@@ -93,7 +91,6 @@ public class QuanLyKiemKeServiceImpl implements IQuanLyKiemKeService {
             KiemKeChiTiet chiTiet = new KiemKeChiTiet(kiemKeKho, bienThe, bienThe.getSoLuongTon());
             kiemKeChiTietRepository.save(chiTiet);
             
-            logger.info("Successfully added product to inventory check. maKiemKe={}, maBienThe={}", maKiemKe, maBienThe);
             return true;
         } catch (Exception e) {
             logger.error("Error adding product to inventory check maKiemKe={} maBienThe={}", maKiemKe, maBienThe, e);

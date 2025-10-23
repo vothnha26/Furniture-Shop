@@ -25,8 +25,8 @@ public class WebSocketPresenceListener {
     private final StaffSessionRepository staffSessionRepository;
 
     public WebSocketPresenceListener(TaiKhoanRepository taiKhoanRepository,
-                                     NhanVienRepository nhanVienRepository,
-                                     StaffSessionRepository staffSessionRepository) {
+            NhanVienRepository nhanVienRepository,
+            StaffSessionRepository staffSessionRepository) {
         this.taiKhoanRepository = taiKhoanRepository;
         this.nhanVienRepository = nhanVienRepository;
         this.staffSessionRepository = staffSessionRepository;
@@ -38,14 +38,15 @@ public class WebSocketPresenceListener {
             StompHeaderAccessor sha = StompHeaderAccessor.wrap(event.getMessage());
             var principal = sha.getUser();
             if (principal == null) {
-                logger.debug("WebSocket connect: no principal present (anonymous)");
+                // logger.debug("WebSocket connect: no principal present (anonymous)");
                 return;
             }
 
             String principalName = principal.getName();
             Integer principalNumeric = null;
 
-            // Try to extract numeric staff id from principal if present (some auth tokens expose claims)
+            // Try to extract numeric staff id from principal if present (some auth tokens
+            // expose claims)
             try {
                 var pObj = principal;
                 var clazz = pObj.getClass();
@@ -54,18 +55,23 @@ public class WebSocketPresenceListener {
                     Object claims = m.invoke(pObj);
                     if (claims instanceof java.util.Map) {
                         @SuppressWarnings("unchecked")
-                        var map = (java.util.Map<String,Object>) claims;
+                        var map = (java.util.Map<String, Object>) claims;
                         Object maybe = map.get("maNhanVien");
-                        if (maybe == null) maybe = map.get("staffId");
+                        if (maybe == null)
+                            maybe = map.get("staffId");
                         if (maybe != null) {
-                            try { principalNumeric = Integer.valueOf(String.valueOf(maybe)); } catch (Exception ex) {}
+                            try {
+                                principalNumeric = Integer.valueOf(String.valueOf(maybe));
+                            } catch (Exception ex) {
+                            }
                         }
                     }
                 } catch (NoSuchMethodException ignore) {
                     // not a JWT-like principal
                 }
             } catch (Exception ex) {
-                logger.debug("Failed to introspect principal for numeric id: {}", ex.getMessage());
+                // logger.debug("Failed to introspect principal for numeric id: {}",
+                // ex.getMessage());
             }
 
             NhanVien staff = null;
@@ -79,12 +85,14 @@ public class WebSocketPresenceListener {
                         staff = nhanVienRepository.findByTaiKhoan(tkOpt.get()).orElse(null);
                     }
                 } catch (Exception e) {
-                    logger.debug("presence: error resolving TaiKhoan for principalName={}: {}", principalName, e.getMessage());
+                    // logger.debug("presence: error resolving TaiKhoan for principalName={}: {}",
+                    // principalName, e.getMessage());
                 }
             }
 
             if (staff == null) {
-                logger.debug("WebSocket connect: authenticated principal is not a staff or cannot be resolved: {}", principalName);
+                // logger.debug("WebSocket connect: authenticated principal is not a staff or
+                // cannot be resolved: {}", principalName);
                 return;
             }
 
@@ -99,7 +107,6 @@ public class WebSocketPresenceListener {
             ss.setIsOnline(true);
             ss.setLastPing(LocalDateTime.now());
             staffSessionRepository.save(ss);
-            logger.info("WebSocketPresence: staff {} connected via websocket, staffSession updated/created", staff.getMaNhanVien());
         } catch (Exception e) {
             logger.error("WebSocketPresence: error handling connect event: {}", e.getMessage(), e);
         }
@@ -111,7 +118,7 @@ public class WebSocketPresenceListener {
             StompHeaderAccessor sha = StompHeaderAccessor.wrap(event.getMessage());
             var principal = sha.getUser();
             if (principal == null) {
-                logger.debug("WebSocket disconnect: no principal present");
+                // logger.debug("WebSocket disconnect: no principal present");
                 return;
             }
             String principalName = principal.getName();
@@ -125,16 +132,22 @@ public class WebSocketPresenceListener {
                     Object claims = m.invoke(pObj);
                     if (claims instanceof java.util.Map) {
                         @SuppressWarnings("unchecked")
-                        var map = (java.util.Map<String,Object>) claims;
+                        var map = (java.util.Map<String, Object>) claims;
                         Object maybe = map.get("maNhanVien");
-                        if (maybe == null) maybe = map.get("staffId");
+                        if (maybe == null)
+                            maybe = map.get("staffId");
                         if (maybe != null) {
-                            try { principalNumeric = Integer.valueOf(String.valueOf(maybe)); } catch (Exception ex) {}
+                            try {
+                                principalNumeric = Integer.valueOf(String.valueOf(maybe));
+                            } catch (Exception ex) {
+                            }
                         }
                     }
-                } catch (NoSuchMethodException ignore) {}
+                } catch (NoSuchMethodException ignore) {
+                }
             } catch (Exception ex) {
-                logger.debug("Failed to introspect principal for numeric id on disconnect: {}", ex.getMessage());
+                // logger.debug("Failed to introspect principal for numeric id on disconnect:
+                // {}", ex.getMessage());
             }
 
             NhanVien staff = null;
@@ -148,12 +161,14 @@ public class WebSocketPresenceListener {
                         staff = nhanVienRepository.findByTaiKhoan(tkOpt.get()).orElse(null);
                     }
                 } catch (Exception e) {
-                    logger.debug("presence disconnect: error resolving TaiKhoan for principalName={}: {}", principalName, e.getMessage());
+                    // logger.debug("presence disconnect: error resolving TaiKhoan for
+                    // principalName={}: {}", principalName, e.getMessage());
                 }
             }
 
             if (staff == null) {
-                logger.debug("WebSocket disconnect: authenticated principal is not a staff or cannot be resolved: {}", principalName);
+                // logger.debug("WebSocket disconnect: authenticated principal is not a staff or
+                // cannot be resolved: {}", principalName);
                 return;
             }
 
@@ -162,9 +177,6 @@ public class WebSocketPresenceListener {
                 ss.setIsOnline(false);
                 ss.setLastPing(LocalDateTime.now());
                 staffSessionRepository.save(ss);
-                logger.info("WebSocketPresence: staff {} disconnected, staffSession updated", staff.getMaNhanVien());
-            } else {
-                logger.debug("WebSocket disconnect: no StaffSession found for staff {}", staff.getMaNhanVien());
             }
         } catch (Exception e) {
             logger.error("WebSocketPresence: error handling disconnect event: {}", e.getMessage(), e);

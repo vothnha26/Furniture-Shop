@@ -80,7 +80,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
                 .build();
         try {
             ThongBao saved = thongBaoRepository.saveAndFlush(thongBao);
-            logger.info("[ThongBaoService] Đã lưu ThongBao id={} title='{}'", saved.getMaThongBao(), saved.getTieuDe());
             return saved;
         } catch (Exception e) {
             logger.error("[ThongBaoService] Lỗi khi lưu ThongBao: {}", e.getMessage(), e);
@@ -139,17 +138,12 @@ public class ThongBaoServiceImpl implements IThongBaoService {
         try {
             if (nguoiNhanId == null) {
                 // Nếu không có ID, chỉ lấy thông báo cho ALL
-                System.out.println("[ThongBaoService] Getting ALL notifications");
                 List<ThongBao> result = thongBaoRepository.findByLoaiNguoiNhanAndNgayXoaIsNullOrderByNgayTaoDesc("ALL");
-                System.out.println("[ThongBaoService] Found " + (result != null ? result.size() : 0) + " ALL notifications");
                 return result != null ? result : List.of();
             }
-            System.out.println("[ThongBaoService] Getting notifications for user: " + nguoiNhanId + ", type: " + loaiNguoiNhan);
             List<ThongBao> result = thongBaoRepository.findNotificationsForUser(nguoiNhanId, loaiNguoiNhan);
-            System.out.println("[ThongBaoService] Found " + (result != null ? result.size() : 0) + " notifications");
             return result != null ? result : List.of();
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Error getting notifications: " + e.getMessage());
             e.printStackTrace();
             return List.of();
         }
@@ -183,7 +177,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             nguoiNhanId = 0; // Dummy value
         }
         int updated = thongBaoRepository.markAllAsReadForUser(nguoiNhanId, loaiNguoiNhan, LocalDateTime.now());
-        System.out.println("[ThongBaoService] Đã đánh dấu " + updated + " thông báo là đã đọc");
     }
     
     @Override
@@ -237,7 +230,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
         try {
             DonHang donHang = donHangRepository.findById(maDonHang).orElse(null);
             if (donHang == null) {
-                System.err.println("[ThongBaoService] Không tìm thấy đơn hàng ID: " + maDonHang);
                 return;
             }
             
@@ -255,11 +247,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             request.setLoaiLienKet("DON_HANG");
             
             ThongBao created = create(request);
-            if (created != null) {
-                logger.info("[ThongBaoService] Đã tạo thông báo đơn hàng mới id={} for order={}", created.getMaThongBao(), maDonHang);
-            } else {
-                logger.warn("[ThongBaoService] create returned null when creating order notification for order={}", maDonHang);
-            }
             // Push to websocket subscribers (customer-specific or broadcast)
             try {
                 if ("ALL".equalsIgnoreCase(request.getLoaiNguoiNhan())) {
@@ -268,11 +255,8 @@ public class ThongBaoServiceImpl implements IThongBaoService {
                     notificationPublisher.publishToCustomer(request.getNguoiNhanId(), created);
                 }
             } catch (Exception ex) {
-                // Don't fail notification creation if push errors occur
-                System.err.println("[ThongBaoService] Lỗi khi publish websocket notification: " + ex.getMessage());
             }
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo đơn hàng: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -292,9 +276,7 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             request.setLoaiLienKet("SAN_PHAM");
             
             ThongBao created = create(request);
-            logger.info("[ThongBaoService] Đã tạo cảnh báo tồn kho id={} for product={} remaining={}", created != null ? created.getMaThongBao() : null, tenSanPham, soLuongTon);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo cảnh báo tồn kho: " + e.getMessage());
         }
     }
     
@@ -314,7 +296,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             
             ThongBao created = create(request);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo hết hàng: " + e.getMessage());
         }
     }
     
@@ -334,7 +315,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             
             create(request);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo VIP: " + e.getMessage());
         }
     }
     
@@ -355,7 +335,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             ThongBao created = create(request);
             publishIfCustomerFacing(request, created);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo thanh toán: " + e.getMessage());
         }
     }
 
@@ -368,7 +347,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
                 notificationPublisher.publishToCustomer(request.getNguoiNhanId(), created);
             }
         } catch (Exception ex) {
-            System.err.println("[ThongBaoService] Lỗi khi publish websocket notification: " + ex.getMessage());
         }
     }
     
@@ -389,7 +367,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             ThongBao created = create(request);
             publishIfCustomerFacing(request, created);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo trạng thái: " + e.getMessage());
         }
     }
     
@@ -410,7 +387,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             ThongBao created = create(request);
             publishIfCustomerFacing(request, created);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo hủy đơn: " + e.getMessage());
         }
     }
     
@@ -427,7 +403,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
             
             return create(request);
         } catch (Exception e) {
-            System.err.println("[ThongBaoService] Lỗi khi tạo thông báo tổng quát: " + e.getMessage());
             throw e;
         }
     }
@@ -439,7 +414,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
     public int xoaThongBaoCu() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
         int deleted = thongBaoRepository.softDeleteOldNotifications(LocalDateTime.now(), cutoffDate);
-        System.out.println("[ThongBaoService] Đã soft delete " + deleted + " thông báo cũ (>30 ngày)");
         return deleted;
     }
     
@@ -448,7 +422,6 @@ public class ThongBaoServiceImpl implements IThongBaoService {
     public int xoaVinhVienThongBaoCu() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(90);
         int deleted = thongBaoRepository.permanentlyDeleteOldNotifications(cutoffDate);
-        System.out.println("[ThongBaoService] Đã xóa vĩnh viễn " + deleted + " thông báo (đã soft delete >90 ngày)");
         return deleted;
     }
     

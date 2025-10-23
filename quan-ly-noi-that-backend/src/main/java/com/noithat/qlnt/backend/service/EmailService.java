@@ -41,9 +41,6 @@ public class EmailService {
      * Gửi email marketing/campaign đến nhiều khách hàng
      */
     public EmailSendResponse sendMarketingEmail(EmailSendRequest request) {
-        System.out.println("[EmailService] Starting email send process...");
-        System.out.println("  - Recipients type: " + request.getRecipients());
-        
         // Validate request
         if (request.getSubject() == null || request.getSubject().trim().isEmpty()) {
             throw new IllegalArgumentException("Tiêu đề email không được để trống");
@@ -59,15 +56,12 @@ public class EmailService {
         List<String> emailList;
         try {
             emailList = getEmailListByRecipients(request.getRecipients(), request.getManualList());
-            System.out.println("[EmailService] Found " + emailList.size() + " email addresses");
         } catch (Exception e) {
-            System.err.println("[EmailService] Error getting email list: " + e.getMessage());
             e.printStackTrace();
             throw new IllegalArgumentException("Không thể lấy danh sách email: " + e.getMessage());
         }
         
         if (emailList.isEmpty()) {
-            System.out.println("[EmailService] No email addresses found");
             return new EmailSendResponse(false, "Không tìm thấy email nào để gửi", 0, 0);
         }
         
@@ -77,28 +71,21 @@ public class EmailService {
         // Gửi email từng cái
         for (String email : emailList) {
             if (email == null || email.trim().isEmpty()) {
-                System.out.println("[EmailService] Skipping empty email address");
                 totalFailed++;
                 continue;
             }
             
             try {
-                System.out.println("[EmailService] Sending email to: " + email);
                 sendEmail(email, request.getSubject(), request.getBody());
                 totalSent++;
-                System.out.println("[EmailService] Successfully sent email to: " + email);
             } catch (Exception e) {
                 totalFailed++;
-                // Log lỗi nhưng tiếp tục gửi các email khác
-                System.err.println("[EmailService] Failed to send email to: " + email);
-                System.err.println("[EmailService] Error: " + e.getMessage());
                 e.printStackTrace();
             }
         }
         
         boolean success = totalFailed == 0;
         String message = String.format("Đã gửi %d/%d email thành công", totalSent, emailList.size());
-        System.out.println("[EmailService] Email send process completed: " + message);
         
         return new EmailSendResponse(success, message, totalSent, totalFailed);
     }
@@ -109,24 +96,19 @@ public class EmailService {
     private List<String> getEmailListByRecipients(String recipients, List<String> manualList) {
         List<String> emailList = new ArrayList<>();
         
-        System.out.println("[EmailService] Getting email list for recipients type: " + recipients);
-        
         try {
             switch (recipients.toLowerCase().trim()) {
                 case "all":
                     // Tất cả khách hàng
-                    System.out.println("[EmailService] Fetching all customers...");
                     emailList = khachHangRepository.findAll()
                         .stream()
                         .filter(kh -> kh != null && kh.getEmail() != null && !kh.getEmail().trim().isEmpty())
                         .map(KhachHang::getEmail)
                         .collect(Collectors.toList());
-                    System.out.println("[EmailService] Found " + emailList.size() + " customers with valid emails");
                     break;
                     
                 case "customers":
                     // Khách hàng đã mua (có tổng đơn hàng > 0)
-                    System.out.println("[EmailService] Fetching customers who have purchased...");
                     emailList = khachHangRepository.findAll()
                         .stream()
                         .filter(kh -> kh != null 
@@ -136,12 +118,10 @@ public class EmailService {
                             && kh.getTongDonHang() > 0)
                         .map(KhachHang::getEmail)
                         .collect(Collectors.toList());
-                    System.out.println("[EmailService] Found " + emailList.size() + " customers who have purchased");
                     break;
                     
                 case "vip":
                     // Khách hàng VIP (trangThaiVip = true)
-                    System.out.println("[EmailService] Fetching VIP customers...");
                     emailList = khachHangRepository.findAll()
                         .stream()
                         .filter(kh -> kh != null 
@@ -150,19 +130,14 @@ public class EmailService {
                             && Boolean.TRUE.equals(kh.getTrangThaiVip()))
                         .map(KhachHang::getEmail)
                         .collect(Collectors.toList());
-                    System.out.println("[EmailService] Found " + emailList.size() + " VIP customers");
                     break;
                     
                 case "manual":
                     // Danh sách thủ công
-                    System.out.println("[EmailService] Using manual email list...");
                     if (manualList != null && !manualList.isEmpty()) {
                         emailList = manualList.stream()
                             .filter(email -> email != null && !email.trim().isEmpty())
                             .collect(Collectors.toList());
-                        System.out.println("[EmailService] Manual list contains " + emailList.size() + " valid emails");
-                    } else {
-                        System.out.println("[EmailService] WARNING: Manual list is empty or null");
                     }
                     break;
                     
@@ -170,7 +145,6 @@ public class EmailService {
                     throw new IllegalArgumentException("Loại người nhận không hợp lệ: " + recipients);
             }
         } catch (Exception e) {
-            System.err.println("[EmailService] Error in getEmailListByRecipients: " + e.getMessage());
             e.printStackTrace();
             throw e;
         }
@@ -185,8 +159,6 @@ public class EmailService {
         if (to == null || to.trim().isEmpty()) {
             throw new IllegalArgumentException("Email address is empty");
         }
-        
-        System.out.println("[EmailService] Creating email message for: " + to);
         
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -214,16 +186,12 @@ public class EmailService {
             
             helper.setText(htmlContent, true);
             
-            System.out.println("[EmailService] Sending email via JavaMailSender...");
             mailSender.send(message);
-            System.out.println("[EmailService] Email sent successfully to: " + to);
             
         } catch (MessagingException e) {
-            System.err.println("[EmailService] MessagingException while sending email: " + e.getMessage());
             e.printStackTrace();
             throw new Exception("Lỗi gửi email (MessagingException): " + e.getMessage(), e);
         } catch (Exception e) {
-            System.err.println("[EmailService] Exception while sending email: " + e.getMessage());
             e.printStackTrace();
             throw new Exception("Lỗi gửi email: " + e.getMessage(), e);
         }

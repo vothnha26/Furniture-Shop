@@ -14,11 +14,12 @@ import java.util.List;
 
 /**
  * DataSeeder để khởi tạo dữ liệu mẫu cho hệ thống quản lý nội thất
+ * DISABLED - Không sử dụng nữa
  */
 @Configuration
 public class DataSeeder {
 
-    @Bean
+    // @Bean - Đã tắt DataSeeder
     @Transactional
     CommandLineRunner initDatabase(
             NhaCungCapRepository nhaCungCapRepository,

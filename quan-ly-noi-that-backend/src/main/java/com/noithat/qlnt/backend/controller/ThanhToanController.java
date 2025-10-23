@@ -82,7 +82,6 @@ public class ThanhToanController {
     @PostMapping(value = "/tao-don-hang", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> taoDonHangTuUser(@RequestBody ThongTinGiaoHangRequest request) {
         try {
-            System.out.println("[taoDonHangTuUser] Incoming request: maKhachHang=" + request.getMaKhachHang() + ", phuongThucThanhToan=" + request.getPhuongThucThanhToan());
             ThanhToanResponse resp = thanhToanService.taoDonHangTuUser(request);
             return ResponseEntity.ok(resp);
         } catch (Exception e) {

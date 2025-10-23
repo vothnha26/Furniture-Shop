@@ -57,12 +57,6 @@ public class QuanLyTrangThaiDonHangController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            System.out.println("DEBUG: Cập nhật trạng thái đơn hàng");
-            System.out.println("  - Mã đơn hàng: " + maDonHang);
-            System.out.println("  - Trạng thái mới: " + trangThaiMoi);
-            System.out.println("  - Người cập nhật: " + nguoiCapNhat);
-            System.out.println("  - Ghi chú: " + ghiChu);
-
             boolean success = orderStatusService.changeOrderStatus(maDonHang, trangThaiMoi, nguoiCapNhat, ghiChu);
 
             if (success) {
@@ -133,7 +127,6 @@ public class QuanLyTrangThaiDonHangController {
 
         try {
             // Log incoming payload for diagnostics
-            System.out.println("[confirmOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Xác nhận đơn hàng");
 
@@ -178,7 +171,6 @@ public class QuanLyTrangThaiDonHangController {
 
         try {
             // Log incoming payload for diagnostics
-            System.out.println("[prepareOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Bắt đầu chuẩn bị đơn hàng");
 
@@ -222,7 +214,6 @@ public class QuanLyTrangThaiDonHangController {
 
         try {
             // Log incoming payload for diagnostics
-            System.out.println("[shipOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Bắt đầu giao hàng");
 
@@ -266,7 +257,6 @@ public class QuanLyTrangThaiDonHangController {
 
         try {
             // Log incoming payload for diagnostics (optional payload)
-            System.out.println("[completeOrder] Incoming payload: " + request);
 
             orderStatusService.capNhatTrangThai(maDonHang,
                     IQuanLyTrangThaiDonHangService.HOAN_THANH,
@@ -301,7 +291,6 @@ public class QuanLyTrangThaiDonHangController {
 
         try {
             // Log incoming payload for diagnostics
-            System.out.println("[cancelOrder] Incoming payload: " + request);
             String nguoiThayDoi = (String) request.get("nguoiThayDoi");
             String ghiChu = (String) request.getOrDefault("ghiChu", "Hủy đơn hàng");
 

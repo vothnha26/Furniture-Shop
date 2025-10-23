@@ -98,7 +98,6 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
         try {
                 // Reservation functionality was removed (soLuongDatTruoc field removed).
                 // Keep API but return false to indicate reservation is not supported.
-                logger.warn("reserveProduct called but reservation feature was removed. maBienThe={}", maBienThe);
                 return false;
         } catch (Exception e) {
             return false;
@@ -109,7 +108,6 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
     public boolean releaseReservation(Integer maBienThe, Integer quantity, String maThamChieu, String nguoiThucHien) {
         try {
                 // Release reservation not supported after removing reservation fields.
-                logger.warn("releaseReservation called but reservation feature was removed. maBienThe={}", maBienThe);
                 return false;
         } catch (Exception e) {
             return false;
@@ -270,8 +268,6 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            logger.info("Lấy thông tin tồn kho cho biến thể: {}", maBienThe);
-
             Optional<BienTheSanPham> bienTheOpt = bienTheSanPhamRepository.findById(maBienThe);
             if (!bienTheOpt.isPresent()) {
                 response.put("success", false);
@@ -293,7 +289,6 @@ public class QuanLyTonKhoServiceImpl implements IQuanLyTonKhoService {
             response.put("message", "Lấy thông tin tồn kho thành công");
             response.put("data", stockInfo);
 
-            logger.info("Thông tin tồn kho: {}", stockInfo);
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {

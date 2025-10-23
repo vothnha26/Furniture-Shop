@@ -155,17 +155,6 @@ public class HinhAnhSanPhamController {
             @RequestParam(value = "laAnhChinh", required = false) Boolean[] laAnhChinhArray) {
         
         try {
-            System.out.println("[DEBUG] uploadImages called for productId=" + productId + ", images.length=" + (images == null ? 0 : images.length));
-            if (images != null && images.length > 0) {
-                for (int i = 0; i < images.length; i++) {
-                    try {
-                        System.out.println("[DEBUG] incoming file[" + i + "] name=" + images[i].getOriginalFilename()
-                                + ", contentType=" + images[i].getContentType() + ", size=" + images[i].getSize());
-                    } catch (Exception ex) {
-                        System.out.println("[DEBUG] cannot read incoming file metadata: " + ex.getMessage());
-                    }
-                }
-            }
             // Tạo thư mục lưu ảnh nếu chưa có
             String uploadDir = "uploads/products/" + productId;
             Path uploadPath = Paths.get(uploadDir);
@@ -238,7 +227,6 @@ public class HinhAnhSanPhamController {
             java.io.PrintWriter pw = new java.io.PrintWriter(sw);
             e.printStackTrace(pw);
             String stack = sw.toString();
-            System.out.println("[ERROR] uploadImages exception: " + stack);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(java.util.Map.of("error", "Lỗi khi upload ảnh", "exception", stack));
         }

@@ -133,30 +133,25 @@ public class ThongBaoController {
         try {
             if (principal == null) {
                 // Không có user, chỉ lấy ALL
-                System.out.println("[StaffNotifications] No principal, returning ALL notifications");
                 List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(null, "ALL");
                 return ResponseEntity.ok(notifications != null ? notifications : List.of());
             }
             
             String username = principal.getName();
-            System.out.println("[StaffNotifications] Username: " + username);
             NhanVien nv = nhanVienRepository.findByTaiKhoan_TenDangNhap(username).orElse(null);
             
             if (nv != null) {
                 // Nhân viên: lấy thông báo STAFF + ALL
-                System.out.println("[StaffNotifications] Found staff ID: " + nv.getMaNhanVien());
                 List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(nv.getMaNhanVien(), "STAFF");
                 return ResponseEntity.ok(notifications != null ? notifications : List.of());
             }
             
             // Fallback: lấy ALL
-            System.out.println("[StaffNotifications] Staff not found, returning ALL notifications");
             List<ThongBaoResponse> notifications = thongBaoService.getNotificationsForUserWithResponse(null, "ALL");
             return ResponseEntity.ok(notifications != null ? notifications : List.of());
         } catch (Exception e) {
-            System.err.println("[StaffNotifications] Error: " + e.getMessage());
             e.printStackTrace();
-            return ResponseEntity.ok(List.of()); // Return empty list on error instead of 500
+            return ResponseEntity.ok(List.of());
         }
     }
 

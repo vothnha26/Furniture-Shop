@@ -65,9 +65,6 @@ public class ChatServiceImpl implements ChatService {
                 }
             }
             
-            logger.info("Customer {} already has active/waiting session {}, returning existing session. Prevented spam attempt.", 
-                       customer.getMaKhachHang(), latestSession.getId());
-            
             // Lưu tin nhắn mới vào session hiện tại nếu có
             if (firstMessage != null && !firstMessage.trim().isEmpty()) {
                 saveMessage(latestSession.getId(), "customer", customer.getMaKhachHang(), firstMessage);
@@ -82,8 +79,6 @@ public class ChatServiceImpl implements ChatService {
         session.setStatus("waiting");  // Frontend expect "waiting", not "pending"
         session.setCreatedAt(LocalDateTime.now());
         session = chatSessionRepository.save(session);
-        
-        logger.info("Created new chat session {} for customer {}", session.getId(), customer.getMaKhachHang());
 
         // 3) Tự động assign cho staff online có ít chat nhất
         NhanVien assignedStaff = findAvailableStaff();
@@ -95,10 +90,6 @@ public class ChatServiceImpl implements ChatService {
             
             // Tăng số chat đang xử lý của staff
             updateStaffChatCount(assignedStaff.getMaNhanVien(), 1);
-            
-            logger.info("Auto-assigned session {} to staff {}", session.getId(), assignedStaff.getMaNhanVien());
-        } else {
-            logger.info("No available staff found, session {} remains in waiting status", session.getId());
         }
 
         // 4) Lưu tin nhắn đầu tiên nếu có
@@ -132,7 +123,6 @@ public class ChatServiceImpl implements ChatService {
         msg.setSentAt(LocalDateTime.now());
         
         ChatMessage saved = chatMessageRepository.save(msg);
-        logger.debug("Saved message {} for session {}", saved.getId(), sessionId);
         
         return saved;
     }
@@ -146,7 +136,6 @@ public class ChatServiceImpl implements ChatService {
 
         ChatSession session = chatSessionRepository.findById(sessionId).orElse(null);
         if (session == null) {
-            logger.warn("Attempted to end non-existent session {}", sessionId);
             return;
         }
 
@@ -159,10 +148,6 @@ public class ChatServiceImpl implements ChatService {
             // Giảm số chat đang xử lý của staff
             if (session.getStaff() != null) {
                 updateStaffChatCount(session.getStaff().getMaNhanVien(), -1);
-                logger.info("Closed session {} and decreased chat count for staff {}", 
-                        sessionId, session.getStaff().getMaNhanVien());
-            } else {
-                logger.info("Closed session {}", sessionId);
             }
         } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | org.hibernate.StaleObjectStateException ex) {
             logger.error("Optimistic locking error when closing session {}: {}", sessionId, ex.getMessage());
@@ -179,12 +164,9 @@ public class ChatServiceImpl implements ChatService {
             
             if (available != null && !available.isEmpty()) {
                 StaffSession chosen = available.get(0);
-                logger.debug("Found available staff: {} with {} active chats", 
-                           chosen.getStaffId(), chosen.getActiveChats());
                 return chosen.getStaff();
             }
             
-            logger.debug("No online staff available");
             return null;
         } catch (Exception ex) {
             logger.error("Error finding available staff", ex);
@@ -211,16 +193,12 @@ public class ChatServiceImpl implements ChatService {
                     staffSession.setActiveChats(Math.max(0, delta));
                     staffSession.setLastPing(LocalDateTime.now());
                     staffSessionRepository.save(staffSession);
-                    logger.debug("Created StaffSession for staff {} with activeChats {}", staffId, staffSession.getActiveChats());
-                } else {
-                    logger.warn("Cannot create StaffSession: staff {} not found", staffId);
                 }
             } else {
                 int newCount = Math.max(0, staffSession.getActiveChats() + delta);
                 staffSession.setActiveChats(newCount);
                 staffSession.setLastPing(LocalDateTime.now());
                 staffSessionRepository.save(staffSession);
-                logger.debug("Updated staff {} chat count to {}", staffId, newCount);
             }
         } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | org.hibernate.StaleObjectStateException ex) {
             logger.error("Optimistic locking error updating staff chat count for staff {}: {}", staffId, ex.getMessage());

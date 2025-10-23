@@ -320,7 +320,6 @@ public class ChatController {
                 messagingTemplate.convertAndSend("/topic/staff/" + staffId, payload);
             }
 
-            logger.info("Session {} closed successfully", sessionId);
             return ResponseEntity.ok(Map.of("status", "closed", "sessionId", sessionId));
         } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | org.hibernate.StaleObjectStateException ex) {
             logger.error("Optimistic locking error when closing session {}: {}", sessionId, ex.getMessage());
@@ -348,7 +347,6 @@ public class ChatController {
             String content = (String) payload.get("content");
 
             if (content == null || content.trim().isEmpty()) {
-                logger.warn("Empty message content received for session {}", sessionId);
                 return;
             }
 
@@ -356,7 +354,6 @@ public class ChatController {
             if ("staff".equalsIgnoreCase(senderType)) {
                 ChatSession s = chatSessionRepository.findById(sessionId).orElse(null);
                 if (s == null || s.getStaff() == null) {
-                    logger.warn("Reject message: invalid session or no staff assigned for session {}", sessionId);
                     return;
                 }
 
@@ -381,13 +378,11 @@ public class ChatController {
                         }
                     }
                 } catch (Exception e) {
-                    logger.warn("Failed to derive staffId from security context: {}", e.getMessage());
                 }
 
                 // Prefer authenticated staffId; fallback to payload only if matches assigned
                 Integer effectiveStaffId = authStaffId != null ? authStaffId : senderId;
                 if (effectiveStaffId == null || !s.getStaff().getMaNhanVien().equals(effectiveStaffId)) {
-                    logger.warn("Reject message: staff {} not owner of session {}", effectiveStaffId, sessionId);
                     return;
                 }
 
@@ -408,8 +403,6 @@ public class ChatController {
             broadcast.put("sentAt", saved.getSentAt());
 
             messagingTemplate.convertAndSend("/topic/chat/session-" + sessionId, broadcast);
-
-            logger.debug("Message sent and broadcasted for session {}", sessionId);
         } catch (Exception ex) {
             logger.error("Failed to send message for session " + sessionId, ex);
         }
@@ -466,7 +459,6 @@ public class ChatController {
                         }
                     }
                 } catch (Exception e) {
-                    logger.warn("Failed to derive staffId from security context: {}", e.getMessage());
                 }
 
                 // Prefer authenticated staffId; fallback to payload only if matches assigned
@@ -501,7 +493,6 @@ public class ChatController {
             response.put("senderId", saved.getSenderId());
             response.put("sentAt", saved.getSentAt());
 
-            logger.info("Message sent via REST API for session {}", sessionId);
             return ResponseEntity.ok(response);
         } catch (Exception ex) {
             logger.error("Failed to send message via REST for session " + sessionId, ex);
@@ -529,7 +520,6 @@ public class ChatController {
             }
 
             chatMessageRepository.delete(message);
-            logger.info("Deleted message {} from session {}", messageId, message.getSession().getId());
 
             return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa tin nhắn"));
         } catch (Exception ex) {
@@ -554,11 +544,9 @@ public class ChatController {
             // Xóa tất cả tin nhắn của session trước
             List<ChatMessage> messages = chatMessageRepository.findBySession_IdOrderBySentAtAsc(sessionId);
             chatMessageRepository.deleteAll(messages);
-            logger.info("Deleted {} messages from session {}", messages.size(), sessionId);
 
             // Xóa session
             chatSessionRepository.delete(session);
-            logger.info("Deleted chat session {}", sessionId);
 
             return ResponseEntity.ok(Map.of("success", true, "message", "Đã xóa phiên chat"));
         } catch (Exception ex) {

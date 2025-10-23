@@ -31,7 +31,6 @@ public class VipBenefitMigrationRunner implements ApplicationRunner {
                 if (exists != null && !exists.isEmpty())
                     continue;
 
-                logger.info("Migrated benefits for HangThanhVien {}", hang.getMaHangThanhVien());
             } catch (Exception e) {
                 logger.error("Migration error for hang {}: {}", hang.getMaHangThanhVien(), e.getMessage());
             }

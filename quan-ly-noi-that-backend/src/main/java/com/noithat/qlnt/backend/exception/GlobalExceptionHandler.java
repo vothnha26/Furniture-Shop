@@ -143,10 +143,6 @@ public class GlobalExceptionHandler {
         body.put("message", "Đã xảy ra lỗi không mong muốn");
         body.put("details", ex.getMessage());
         
-        // Log lỗi để debug
-        System.err.println("=== UNHANDLED EXCEPTION ===");
-        System.err.println("Type: " + ex.getClass().getName());
-        System.err.println("Message: " + ex.getMessage());
         ex.printStackTrace();
         
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);

@@ -11,6 +11,6 @@ services:
         
     envVars:
       - key: PORT
-        value: 10000
+        value: 8081
       - key: SPRING_DATASOURCE_URL
         value: jdbc:sqlserver://qlnt-api-server-2025.database.windows.net:1433;database=qlnt_db_azure;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;

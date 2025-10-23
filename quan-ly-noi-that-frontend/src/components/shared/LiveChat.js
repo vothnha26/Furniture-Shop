@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  IoChatbubbles, 
-  IoSend, 
-  IoClose, 
-  IoPersonCircle, 
+import {
+  IoChatbubbles,
+  IoSend,
+  IoClose,
+  IoPersonCircle,
   IoCheckmarkDone,
   IoRefresh,
   IoSearch,
@@ -13,7 +13,7 @@ import {
 } from 'react-icons/io5';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
-import api from '../../api';
+import api, { BASE_URL } from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 
 const LiveChat = () => {
@@ -26,7 +26,7 @@ const LiveChat = () => {
   const [tabBadges, setTabBadges] = useState({ waiting: 0, active: 0 });
   const [highlightId, setHighlightId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const messagesEndRef = useRef(null);
   const stompRef = useRef(null);
   const subscriptionRef = useRef(null); // Track current subscription
@@ -55,14 +55,14 @@ const LiveChat = () => {
         });
       }
     } catch (e) {
-      console.error('Poll messages error:', e);
+
     }
   }, [selectedSession?.id]);
 
   // Start/stop polling when session changes
   useEffect(() => {
     const currentInterval = pollIntervalRef.current;
-    
+
     // Clear any existing polling interval
     if (currentInterval) {
       clearInterval(currentInterval);
@@ -87,7 +87,7 @@ const LiveChat = () => {
             if (latest?.status === 'active' && ownerId && String(ownerId) !== String(staffId)) {
               // Stop listening and clear selection
               if (subscriptionRef.current) {
-                try { subscriptionRef.current.unsubscribe(); } catch (e) {}
+                try { subscriptionRef.current.unsubscribe(); } catch (e) { }
                 subscriptionRef.current = null;
               }
               setSelectedSession(null);
@@ -97,7 +97,7 @@ const LiveChat = () => {
                 loadSessionsRef.current();
               }
               // Optional notice
-              try { alert('Phiên chat này đã được nhân viên khác nhận.'); } catch (e) {}
+              try { alert('Phiên chat này đã được nhân viên khác nhận.'); } catch (e) { }
               return;
             }
             // Update local session status if it changed
@@ -153,14 +153,14 @@ const LiveChat = () => {
     return () => {
       // Cleanup subscriptions
       if (subscriptionRef.current) {
-        try { subscriptionRef.current.unsubscribe(); } catch (e) {}
+        try { subscriptionRef.current.unsubscribe(); } catch (e) { }
       }
       const currentPollInterval = pollIntervalRef.current;
       if (currentPollInterval) {
         clearInterval(currentPollInterval);
       }
       if (stompRef.current) {
-        try { stompRef.current.deactivate(); } catch (e) {}
+        try { stompRef.current.deactivate(); } catch (e) { }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,15 +184,14 @@ const LiveChat = () => {
   const connectStomp = () => {
     if (stompRef.current?.connected) return;
 
-    const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
-    const sockUrl = base.replace(/\/$/, '') + '/ws-notifications';
+    const sockUrl = `${String(BASE_URL || '').replace(/\/$/, '')}/ws-notifications`;
 
     const client = new Client({
       webSocketFactory: () => new SockJS(sockUrl),
       reconnectDelay: 5000,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
-      debug: () => {}
+      debug: () => { }
     });
 
     const subscribeStaffNotifications = () => {
@@ -208,7 +207,7 @@ const LiveChat = () => {
 
       // Unsubscribe old staff topic
       if (staffSubscriptionRef.current?.sub) {
-        try { staffSubscriptionRef.current.sub.unsubscribe(); } catch (e) {}
+        try { staffSubscriptionRef.current.sub.unsubscribe(); } catch (e) { }
         staffSubscriptionRef.current = { id: null, sub: null };
       }
 
@@ -241,7 +240,7 @@ const LiveChat = () => {
             }
           }
         } catch (e) {
-          console.error('Error parsing staff notification:', e);
+
         }
       });
 
@@ -249,14 +248,12 @@ const LiveChat = () => {
     };
 
     client.onConnect = () => {
-      console.log('[LiveChat] STOMP connected');
-
       // Subscribe (or resubscribe) to staff notifications with latest user
       subscribeStaffNotifications();
     };
 
     client.onStompError = (frame) => {
-      console.error('[LiveChat] STOMP error:', frame);
+
     };
 
     stompRef.current = client;
@@ -281,7 +278,7 @@ const LiveChat = () => {
         }
         // Unsubscribe old and subscribe new
         if (staffSubscriptionRef.current?.sub) {
-          try { staffSubscriptionRef.current.sub.unsubscribe(); } catch (e) {}
+          try { staffSubscriptionRef.current.sub.unsubscribe(); } catch (e) { }
           staffSubscriptionRef.current = { id: null, sub: null };
         }
         const sub = client.subscribe(`/topic/staff/${currentStaffId}`, (msg) => {
@@ -306,10 +303,10 @@ const LiveChat = () => {
                 new Notification('Chat mới', { body: `Khách: ${data.customerName || ''}`.trim(), icon: '/favicon.ico' });
               }
             }
-          } catch (e) { console.error('Error parsing staff notification:', e); }
+          } catch (e) { }
         });
         staffSubscriptionRef.current = { id: currentStaffId, sub };
-      } catch {}
+      } catch { }
     }
   }, [user, filter]);
 
@@ -320,7 +317,6 @@ const LiveChat = () => {
       const response = await api.get('/api/v1/live-chat', { query });
       setSessions(response || []);
     } catch (err) {
-      console.error('Failed to load sessions:', err);
     } finally {
       setLoading(false);
     }
@@ -334,19 +330,19 @@ const LiveChat = () => {
           subscriptionRef.current.unsubscribe();
           subscriptionRef.current = null;
         } catch (e) {
-          console.error('Failed to unsubscribe:', e);
+          
         }
       }
 
       const response = await api.get(`/api/v1/live-chat/session/${sessionId}`);
       setSelectedSession(response);
-      
+
       // Load messages
       const messagesResponse = await api.get(`/chat/session/${sessionId}/messages`);
       setMessages(messagesResponse || []);
 
-  // Only subscribe to live messages if this session is active AND owned by current staff
-  const staffId = staffIdRef.current;
+      // Only subscribe to live messages if this session is active AND owned by current staff
+      const staffId = staffIdRef.current;
       const ownerId = response?.staff?.maNhanVien || response?.staff?.id;
       const canSubscribe = response?.status === 'active' && ownerId && String(ownerId) === String(staffId);
 
@@ -390,17 +386,16 @@ const LiveChat = () => {
               return [...prev, newMsg];
             });
           } catch (e) {
-            console.error('Error parsing message:', e);
+            
           }
         });
       }
 
       // Mark as read
-      await api.put(`/api/v1/live-chat/session/${sessionId}/mark-read`).catch(() => {});
+      await api.put(`/api/v1/live-chat/session/${sessionId}/mark-read`).catch(() => { });
     } catch (err) {
-      console.error('Failed to load session detail:', err);
       // If forbidden (e.g., another staff owns it), inform and refresh
-      try { alert('Bạn không có quyền xem phiên chat này. Có thể đã được nhân viên khác nhận.'); } catch (e) {}
+      try { alert('Bạn không có quyền xem phiên chat này. Có thể đã được nhân viên khác nhận.'); } catch (e) { }
     }
   };
 
@@ -410,7 +405,6 @@ const LiveChat = () => {
       await loadSessions();
       await loadSessionDetail(sessionId);
     } catch (err) {
-      console.error('Failed to claim session:', err);
       alert('Không thể nhận chat này. Có thể đã được nhân viên khác nhận.');
     }
   };
@@ -419,24 +413,12 @@ const LiveChat = () => {
     if (!newMessage.trim() || !selectedSession) return;
 
     const content = newMessage.trim();
-    
-    // Debug: log entire user object to see what fields are available
-    console.log('[LiveChat] User object:', user);
-    
+
     const staffId = user?.maNhanVien || user?.ma_nhan_vien || user?.id || user?.maTaiKhoan;
-    
+
     setNewMessage('');
 
-    // Debug logging
-    console.log('[LiveChat] Sending message:', {
-      sessionId: selectedSession.id,
-      staffId: staffId,
-      connected: stompRef.current?.connected,
-      content: content.substring(0, 50)
-    });
-
     if (!staffId) {
-      console.error('[LiveChat] No staffId available in user object!');
       alert('Không tìm thấy thông tin nhân viên. Vui lòng đăng nhập lại.');
       return;
     }
@@ -454,18 +436,17 @@ const LiveChat = () => {
           destination: `/app/chat.send/${selectedSession.id}`,
           body: JSON.stringify(payload)
         });
-        console.log('[LiveChat] Message sent via WebSocket');
+
         return;
       } catch (e) {
-        console.error('[LiveChat] STOMP send failed, falling back to API:', e);
+
       }
     }
 
     // Fallback to REST API if WebSocket not connected or failed
     try {
-      console.log('[LiveChat] Using REST API fallback');
       const response = await api.post(`/chat/session/${selectedSession.id}/message`, payload);
-      
+
       // Manually add message to UI since WebSocket didn't broadcast it
       const newMsg = {
         id: response.id || Date.now(),
@@ -474,17 +455,15 @@ const LiveChat = () => {
         senderId: staffId,
         sentAt: response.sentAt || new Date().toISOString()
       };
-      
+
       setMessages(prev => {
         if (prev.some(m => String(m.id) === String(newMsg.id))) {
           return prev;
         }
         return [...prev, newMsg];
       });
-      
-      console.log('[LiveChat] Message sent via API');
+
     } catch (err) {
-      console.error('[LiveChat] Failed to send message:', err);
       alert('Không thể gửi tin nhắn. Vui lòng thử lại.');
       // Restore message to input if failed
       setNewMessage(content);
@@ -493,7 +472,7 @@ const LiveChat = () => {
 
   const handleCloseSession = async () => {
     if (!selectedSession) return;
-    
+
     if (!window.confirm('Bạn có chắc muốn kết thúc phiên chat này?')) return;
 
     try {
@@ -502,7 +481,6 @@ const LiveChat = () => {
       setMessages([]);
       await loadSessions();
     } catch (err) {
-      console.error('Failed to close session:', err);
       alert('Không thể kết thúc phiên chat');
     }
   };
@@ -515,14 +493,13 @@ const LiveChat = () => {
       // Remove message from local state
       setMessages(prev => prev.filter(m => m.id !== messageId));
     } catch (err) {
-      console.error('Failed to delete message:', err);
       alert('Không thể xóa tin nhắn. Vui lòng thử lại.');
     }
   };
 
   const handleDeleteSession = async () => {
     if (!selectedSession) return;
-    
+
     if (!window.confirm('Bạn có chắc muốn xóa phiên chat này? Tất cả tin nhắn sẽ bị xóa vĩnh viễn.')) return;
 
     try {
@@ -532,7 +509,6 @@ const LiveChat = () => {
       setMessages([]);
       await loadSessions();
     } catch (err) {
-      console.error('Failed to delete session:', err);
       alert('Không thể xóa phiên chat. Vui lòng thử lại.');
     }
   };
@@ -548,7 +524,7 @@ const LiveChat = () => {
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now - date;
-    
+
     if (diff < 60000) return 'Vừa xong';
     if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`;
     if (diff < 86400000) return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -561,7 +537,7 @@ const LiveChat = () => {
       waiting: 'bg-yellow-100 text-yellow-700',
       closed: 'bg-gray-100 text-gray-700'
     };
-    
+
     const labels = {
       active: 'Đang chat',
       waiting: 'Chờ nhận',
@@ -581,14 +557,14 @@ const LiveChat = () => {
     return customerName.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-    // Count sessions per customer to detect spam
-    const getCustomerSessionCount = (customerId) => {
-      if (!customerId) return 0;
-      return sessions.filter(s => 
-        s.customer?.maKhachHang === customerId && 
-        (s.status === 'active' || s.status === 'waiting')
-      ).length;
-    };
+  // Count sessions per customer to detect spam
+  const getCustomerSessionCount = (customerId) => {
+    if (!customerId) return 0;
+    return sessions.filter(s =>
+      s.customer?.maKhachHang === customerId &&
+      (s.status === 'active' || s.status === 'waiting')
+    ).length;
+  };
 
   return (
     <div className="h-[calc(100vh-4rem)] flex bg-gray-50">
@@ -600,7 +576,7 @@ const LiveChat = () => {
             <IoChatbubbles className="h-6 w-6 text-blue-500" />
             Live Chat
           </h2>
-          
+
           {/* Search */}
           <div className="relative mb-3">
             <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -617,11 +593,10 @@ const LiveChat = () => {
           <div className="flex gap-2">
             <button
               onClick={() => setFilter('active')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                filter === 'active'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${filter === 'active'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               <span className="inline-flex items-center gap-2">
                 Đang chat
@@ -634,11 +609,10 @@ const LiveChat = () => {
             </button>
             <button
               onClick={() => setFilter('waiting')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                filter === 'waiting'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${filter === 'waiting'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               <span className="inline-flex items-center gap-2">
                 Chờ nhận
@@ -651,11 +625,10 @@ const LiveChat = () => {
             </button>
             <button
               onClick={() => setFilter('all')}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                filter === 'all'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${filter === 'all'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               Tất cả
             </button>
@@ -679,9 +652,8 @@ const LiveChat = () => {
                 <div
                   key={session.id}
                   onClick={() => loadSessionDetail(session.id)}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedSession?.id === session.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                  } ${highlightId === session.id ? 'ring-2 ring-blue-400/50 rounded-md bg-blue-50' : ''}`}
+                  className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${selectedSession?.id === session.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                    } ${highlightId === session.id ? 'ring-2 ring-blue-400/50 rounded-md bg-blue-50' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0">
@@ -720,9 +692,9 @@ const LiveChat = () => {
                       <p className="text-xs text-gray-500 mb-1">
                         Mã KH: {session.customer?.maKhachHang || 'N/A'}
                       </p>
-                        <p className="text-sm text-gray-600 truncate">
-                          {session.lastMessage || 'Chưa có tin nhắn'}
-                        </p>
+                      <p className="text-sm text-gray-600 truncate">
+                        {session.lastMessage || 'Chưa có tin nhắn'}
+                      </p>
                       {session.status === 'waiting' && (
                         <button
                           onClick={(e) => {
@@ -821,7 +793,7 @@ const LiveChat = () => {
                   }
 
                   const isStaff = message.senderType === 'staff';
-                  
+
                   return (
                     <div
                       key={message.id}
@@ -834,11 +806,10 @@ const LiveChat = () => {
                           </div>
                         )}
                         <div
-                          className={`px-4 py-2 rounded-2xl ${
-                            isStaff
-                              ? 'bg-blue-500 text-white rounded-br-sm'
-                              : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
-                          }`}
+                          className={`px-4 py-2 rounded-2xl ${isStaff
+                            ? 'bg-blue-500 text-white rounded-br-sm'
+                            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
+                            }`}
                         >
                           <p className="text-sm break-words leading-relaxed">{message.content}</p>
                           <div className={`flex items-center gap-1 mt-1 ${isStaff ? 'justify-end' : 'justify-start'}`}>

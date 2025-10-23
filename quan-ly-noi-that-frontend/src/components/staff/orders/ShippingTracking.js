@@ -54,7 +54,6 @@ const ShippingTracking = () => {
       const data = await api.get(`/api/v1/van-chuyen/tracking/${trackingNumber}`);
       setSearchResult(mapShippingFromApi(data));
     } catch (err) {
-      console.error('Tracking search error', err);
       setError(err);
       setSearchResult(null);
     } finally {
@@ -92,7 +91,7 @@ const ShippingTracking = () => {
           })));
         }
       } catch (err) {
-        console.error('Fetch orders error', err);
+        
       }
     };
     fetchOrders();
@@ -151,9 +150,7 @@ const ShippingTracking = () => {
       timeline: [...selectedOrder.timeline, newTimelineEntry]
     };
 
-    // Update the orders array (in real app, this would be an API call)
-    console.log('Updated order:', updatedOrder);
-    
+    // Update the orders array (in real app, this would be an API call)    
     setShowUpdateModal(false);
     setSelectedOrder(null);
     setNewStatus('');

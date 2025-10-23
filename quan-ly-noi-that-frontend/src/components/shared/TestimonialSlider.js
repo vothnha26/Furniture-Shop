@@ -45,7 +45,7 @@ const TestimonialSlider = () => {
         }
         if (mounted && result.length > 0) setItems(result);
       } catch (e) {
-        console.error('TestimonialSlider fetch error', e);
+
       } finally {
         if (mounted) setIsLoading(false);
       }

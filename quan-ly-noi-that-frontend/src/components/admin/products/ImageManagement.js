@@ -20,7 +20,6 @@ const ImageManagement = ({ productId: propProductId }) => {
       const data = await api.get(`/api/products/${productId}/images`);
       setImages(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.error('Fetch images error', e);
       setImages([]);
     } finally {
       setLoading(false);
@@ -41,7 +40,6 @@ const ImageManagement = ({ productId: propProductId }) => {
       setNewImageUrl('');
       setNewIsMain(false);
     } catch (err) {
-      console.error('Add image error', err);
       alert('Lỗi khi thêm hình ảnh: ' + (err.message || err));
     }
   };
@@ -52,7 +50,6 @@ const ImageManagement = ({ productId: propProductId }) => {
       await api.del(`/api/images/${id}`);
       setImages(prev => prev.filter(i => i.maHinhAnh !== id));
     } catch (e) {
-      console.error('Delete image error', e);
       alert('Lỗi khi xóa');
     }
   };

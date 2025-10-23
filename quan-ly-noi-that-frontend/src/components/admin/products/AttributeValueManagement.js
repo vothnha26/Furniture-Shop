@@ -48,7 +48,6 @@ const AttributeValueManagement = () => {
           setAttributeValues(valuesData.map(mapAttributeValueFromApi));
         }
       } catch (err) {
-        console.error('Fetch data error', err);
         setError('Không thể tải dữ liệu thuộc tính');
       } finally {
         setIsLoading(false);
@@ -149,7 +148,6 @@ const AttributeValueManagement = () => {
 
       closeModal();
     } catch (err) {
-      console.error('Submit attribute value error', err);
       showToast('Có lỗi xảy ra khi lưu giá trị thuộc tính', 'error');
     }
   };
@@ -185,7 +183,6 @@ const AttributeValueManagement = () => {
         setAttributeValues(valuesData.map(mapAttributeValueFromApi));
       }
     } catch (err) {
-      console.error('Delete attribute value error', err);
       showToast('Có lỗi xảy ra khi xóa giá trị thuộc tính', 'error');
     } finally {
       setShowConfirmDialog(false);

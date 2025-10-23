@@ -49,7 +49,6 @@ const CategoryManagement = () => {
   setCategories(flat);
       }
     } catch (err) {
-      console.error('Fetch categories error', err);
       showToast('Không thể tải danh sách danh mục', 'error');
     }
   }, []);
@@ -148,7 +147,6 @@ const CategoryManagement = () => {
       }
       closeModal();
     } catch (err) {
-      console.error('Save category error', err);
       showToast(err.data?.message || 'Lỗi khi lưu danh mục', 'error');
     }
   };
@@ -200,7 +198,6 @@ const CategoryManagement = () => {
       await loadCategories();
       showToast('Xóa danh mục thành công');
     } catch (err) {
-      console.error('Delete category error', err);
       showToast(err.data?.message || 'Lỗi khi xóa danh mục', 'error');
     } finally {
       setShowConfirmDialog(false);

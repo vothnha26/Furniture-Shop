@@ -52,8 +52,6 @@ const CustomerOrderTracking = () => {
       if (!data) throw new Error('Không tìm thấy thông tin vận đơn');
       return mapTrackingFromApi(data);
     } catch (err) {
-      // attach original error for debugging
-      console.warn('searchOrderTracking error', err);
       throw new Error('Không tìm thấy thông tin vận đơn');
     }
   };
@@ -92,7 +90,6 @@ const CustomerOrderTracking = () => {
         continue;
       }
     }
-    console.warn('searchOrderById error: no endpoint returned data for', orderId);
     throw new Error('Không tìm thấy đơn hàng');
   };
 

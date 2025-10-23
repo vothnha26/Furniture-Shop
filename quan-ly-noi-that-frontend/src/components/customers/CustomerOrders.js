@@ -119,7 +119,6 @@ const CustomerOrders = () => {
       setOrders((Array.isArray(list) ? list : []).map(mapOrderFromApi));
     } catch (error) {
       setError('Không thể tải đơn hàng');
-      console.error('Error fetching customer orders:', error);
     } finally {
       setLoading(false);
     }
@@ -135,7 +134,6 @@ const CustomerOrders = () => {
       const raw = response && typeof response === 'object' && 'data' in response ? response.data : response;
       return mapOrderFromApi(raw);
     } catch (error) {
-      console.error('Error fetching order detail', error);
       throw new Error('Không thể tải chi tiết đơn hàng');
     }
   };
@@ -163,7 +161,6 @@ const CustomerOrders = () => {
       const updatedRaw = raw?.order ?? raw;
       return mapOrderFromApi(updatedRaw);
     } catch (error) {
-      console.error('cancelOrder error', error);
       // bubble meaningful server message when available
       const msg = error?.data?.message || error?.message || 'Không thể hủy đơn hàng';
       throw new Error(msg);
@@ -191,7 +188,6 @@ const CustomerOrders = () => {
       }
       setError('');
     } catch (err) {
-      console.error('confirmReceive error', err);
       const msg = err?.data?.message || err?.message || 'Không thể xác nhận nhận hàng';
       setError(msg);
     }
@@ -267,12 +263,10 @@ const CustomerOrders = () => {
         setSelectedOrder(merged);
       } catch (e) {
         // if tracking fetch fails, still show basic details
-        console.warn('Could not fetch tracking for order', order.id, e);
         setSelectedOrder(detail);
       }
       setShowOrderDetail(true);
     } catch (err) {
-      console.error('Failed to fetch order detail', err);
       setError('Không thể tải chi tiết đơn hàng');
     }
   };
@@ -285,7 +279,6 @@ const CustomerOrders = () => {
       setSelectedOrder(order);
       setShowTracking(true);
     } catch (err) {
-      console.error('Failed to fetch tracking info', err);
       setError('Không thể lấy thông tin vận chuyển');
     }
   };
@@ -306,7 +299,6 @@ const CustomerOrders = () => {
         setSelectedOrder(updated);
       }
     } catch (err) {
-      console.error('Failed to cancel order', err);
       const msg = err?.message || 'Không thể hủy đơn hàng';
       setError(msg);
     } finally {

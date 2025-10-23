@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { IoChatbubbles, IoTime, IoCheckmarkCircle, IoClose, IoAdd, IoEye, IoCreate, IoTrash, IoCall, IoMail, IoPerson } from 'react-icons/io5';
-import api from '../../../api';
+import api, { BASE_URL } from '../../../api';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -84,7 +84,7 @@ const CustomerSupport = () => {
         try { stompRef.current.deactivate(); } catch (e) {}
       }
     };
-  }, []);
+  }, [connectStomp]);
 
   const statusConfig = {
     open: { color: 'text-blue-600', bg: 'bg-blue-100', icon: IoTime, label: 'Mở' },
@@ -128,7 +128,6 @@ const CustomerSupport = () => {
   // directly use setShowCreateTicketModal(true) where needed
 
   const handleSaveTicket = () => {
-    console.log('Creating new ticket:', newTicket);
     setShowCreateTicketModal(false);
     setNewTicket({
       customer: '',
@@ -161,7 +160,6 @@ const CustomerSupport = () => {
   };
 
   const handleSaveEditTicket = () => {
-    console.log('Updating ticket:', selectedTicket);
     setShowEditTicketModal(false);
     setSelectedTicket(null);
   };
@@ -187,16 +185,14 @@ const CustomerSupport = () => {
       }
 
       // fallback: local UI update and API call
-      console.log('Sending message (fallback):', newMessage);
       setNewMessage('');
     }
   };
 
-  const connectStomp = () => {
+  const connectStomp = useCallback(() => {
     if (stompRef.current && stompRef.current.connected) return;
 
-    const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
-    const sockUrl = base.replace(/\/$/, '') + '/ws-notifications';
+  const sockUrl = `${String(BASE_URL || '').replace(/\/$/, '')}/ws-notifications`;
 
     const client = new Client({
       webSocketFactory: () => new SockJS(sockUrl),
@@ -272,7 +268,7 @@ const CustomerSupport = () => {
 
     stompRef.current = client;
     client.activate();
-  };
+  }, [user, tickets]);
 
   const getTicketResponses = (ticketId) => {
     const t = tickets.find(t => (t.id || t.ticketNumber) === ticketId || (t.id && t.id.toString() === ticketId?.toString()));

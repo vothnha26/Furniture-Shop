@@ -244,7 +244,6 @@ const InventoryAlerts = () => {
       // Also refresh overview history based on freshly mapped alerts (for fallback aggregation)
       try { await fetchOverviewHistory(mapped); } catch (_) { }
     } catch (err) {
-      console.error('Fetch alerts error', err);
       setError(err);
     } finally {
       setIsLoading(false);

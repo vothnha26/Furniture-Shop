@@ -51,7 +51,6 @@ const LoyaltyPointsHistory = () => {
           setPointsHistory(data.map(mapPointsHistoryFromApi));
         }
       } catch (err) {
-        console.error('Fetch points history error', err);
         setError(err);
       } finally {
         setIsLoading(false);

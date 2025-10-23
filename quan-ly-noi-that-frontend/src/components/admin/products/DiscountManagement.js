@@ -104,7 +104,7 @@ const DiscountManagement = () => {
             }));
           }
         } catch (e) {
-          console.error('Failed to fetch products', e);
+
         }
 
         if (!mounted) return;
@@ -112,7 +112,6 @@ const DiscountManagement = () => {
         setFilteredPrograms(mappedPrograms);
         setProducts(productsList);
       } catch (err) {
-        console.error('Fetch discount programs error', err);
         setError(err);
       } finally {
         if (mounted) setIsLoading(false);
@@ -147,7 +146,6 @@ const DiscountManagement = () => {
       }
       return [];
     } catch (err) {
-      console.error('Failed to fetch variants for product', maSanPham, err);
       return [];
     } finally {
       setIsLoadingVariants(false);
@@ -189,7 +187,6 @@ const DiscountManagement = () => {
               local = [];
             }
           } catch (err) {
-            console.error('Failed to fetch variants for product (effect)', ma, err);
             local = [];
           } finally {
             setIsLoadingVariants(false);
@@ -289,9 +286,7 @@ const DiscountManagement = () => {
       else if (type === 'info') Toast.show(message, 'info');
       else Toast.show(message, 'success');
     } catch (e) {
-      // fallback: no-op
-      // eslint-disable-next-line no-console
-      console.warn('Toast API not available', e);
+
     }
   };
 
@@ -519,7 +514,7 @@ const DiscountManagement = () => {
           });
           setProductVariants(prev => ({ ...prev, ...newMap }));
         } catch (e) {
-          console.error('Failed to prefetch variants for edit', e);
+          
         } finally {
           setIsLoadingVariants(false);
         }
@@ -546,7 +541,6 @@ const DiscountManagement = () => {
       setEditingProgram(detail);
       setShowModal(true);
     } catch (err) {
-      console.error('Failed to load program details for edit', err);
       showToast('Không thể tải chi tiết chương trình', 'error');
     } finally {
       setIsLoading(false);
@@ -594,7 +588,7 @@ const DiscountManagement = () => {
               }));
             }
           } catch (err) {
-            console.error('Failed to fetch variants for product', product.maSanPham, err);
+            
           } finally {
             setIsLoadingVariants(false);
           }
@@ -620,7 +614,6 @@ const DiscountManagement = () => {
       showToast(`Đã ${newStatus === 'active' ? 'kích hoạt' : 'vô hiệu hóa'} chương trình thành công`, 'success');
       await reloadDiscountPrograms();
     } catch (error) {
-      console.error('Failed to toggle program status:', error);
       showToast('Không thể thay đổi trạng thái chương trình', 'error');
     } finally {
       setIsLoading(false);
@@ -645,7 +638,6 @@ const DiscountManagement = () => {
         setSelectedProgram(mapped);
         setShowVariantModal(true);
       } catch (err) {
-        console.error('Failed to load program details for view', err);
         showToast('Không thể tải chi tiết chương trình', 'error');
       } finally {
         setIsLoading(false);
@@ -682,7 +674,6 @@ const DiscountManagement = () => {
       setDiscountPrograms(mapped);
       setError(null);
     } catch (err) {
-      console.error('Error reloading discount programs:', err);
       showToast('Không thể tải lại danh sách chương trình', 'error');
       setError(err);
     } finally {
@@ -846,7 +837,6 @@ const DiscountManagement = () => {
       setShowModal(false);
       resetForm();
     } catch (error) {
-      console.error('Failed to save discount program:', error);
       showToast(
         error.response?.data?.message || 'Có lỗi xảy ra khi lưu chương trình giảm giá',
         'error'

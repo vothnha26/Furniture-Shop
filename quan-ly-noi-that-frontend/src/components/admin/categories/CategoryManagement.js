@@ -36,7 +36,6 @@ const CategoryManagement = () => {
       setCategories(categoryList);
     } catch (err) {
       setError(err.message || 'Không thể tải danh sách danh mục');
-      console.error('Error fetching categories:', err);
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +54,6 @@ const CategoryManagement = () => {
       resetForm();
     } catch (err) {
       alert('Lỗi thêm danh mục: ' + (err.message || 'Unknown error'));
-      console.error('Add category error:', err);
     }
   };
 
@@ -74,7 +72,6 @@ const CategoryManagement = () => {
       resetForm();
     } catch (err) {
       alert('Lỗi cập nhật danh mục: ' + (err.message || 'Unknown error'));
-      console.error('Edit category error:', err);
     }
   };
 
@@ -87,7 +84,6 @@ const CategoryManagement = () => {
       setCategoryToDelete(null);
     } catch (err) {
       alert('Lỗi xóa danh mục: ' + (err.message || 'Unknown error'));
-      console.error('Delete category error:', err);
     }
   };
 

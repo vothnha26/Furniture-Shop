@@ -33,7 +33,6 @@ const AttributeManagement = () => {
           setAttributes(data.map(mapAttributeFromApi));
         }
       } catch (err) {
-        console.error('Fetch attributes error', err);
         setError('Không thể tải danh sách thuộc tính');
       } finally {
         setIsLoading(false);
@@ -120,7 +119,6 @@ const AttributeManagement = () => {
 
       closeModal();
     } catch (err) {
-      console.error('Submit attribute error', err);
       showToast('Có lỗi xảy ra khi lưu thuộc tính', 'error');
     }
   };
@@ -155,7 +153,6 @@ const AttributeManagement = () => {
         setAttributes(data.map(mapAttributeFromApi));
       }
     } catch (err) {
-      console.error('Delete attribute error', err);
       showToast('Có lỗi xảy ra khi xóa thuộc tính', 'error');
     } finally {
       setShowConfirmDialog(false);

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import api from '../../api';
 import { IoCloudUpload, IoImage, IoDocument, IoClose, IoCheckmark } from 'react-icons/io5';
 
 const FileUpload = ({
@@ -75,7 +76,6 @@ const FileUpload = ({
           await onUpload(multiple ? validFiles : validFiles[0]);
         }
       } catch (error) {
-        console.error('Upload error:', error);
         alert('Có lỗi xảy ra khi tải lên file');
       } finally {
         setUploading(false);
@@ -169,9 +169,9 @@ const FileUpload = ({
                 imageUrl = URL.createObjectURL(file);
               } else if (file.duongDanHinhAnh) {
                 // Existing image from server - prepend base URL if needed
-                imageUrl = file.duongDanHinhAnh.startsWith('http') 
-                  ? file.duongDanHinhAnh 
-                  : `http://localhost:8081${file.duongDanHinhAnh}`;
+                imageUrl = file.duongDanHinhAnh.startsWith('http')
+                  ? file.duongDanHinhAnh
+                  : api.buildUrl(file.duongDanHinhAnh);
               }
               
               return (

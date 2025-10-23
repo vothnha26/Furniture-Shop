@@ -16,7 +16,6 @@ const AdminCreateOrder = () => {
       const res = await api.get(`/api/v1/admin/san-pham/search?q=${encodeURIComponent(query)}`);
       setResults(res || []);
     } catch (err) {
-      console.error('Search error', err);
       setResults([]);
     }
   };
@@ -49,7 +48,6 @@ const AdminCreateOrder = () => {
       setResults([]);
       setQuery('');
     } catch (err) {
-      console.error('Create order error', err);
       alert('Tạo đơn lỗi: ' + (err?.data?.message || err.message));
     } finally {
       setCreating(false);

@@ -11,9 +11,7 @@ import {
 } from 'react-icons/io5';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import api from '../../../api';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+import api, { BASE_URL } from '../../../api';
 
 const AdminNotificationPopup = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -39,16 +37,12 @@ const AdminNotificationPopup = ({ user }) => {
   };
 
   // Fetch notifications from API
-  useEffect(() => {
-    console.log('[AdminNotificationPopup] Initializing for user:', user);
-    
+  useEffect(() => {    
     // Initial fetch
     const fetchNotifications = async () => {
       try {
-        console.log('[AdminNotificationPopup] Fetching admin notifications...');
         const response = await api.get('/api/v1/thong-bao/admin/me');
         const data = response?.data ?? response;
-        console.log('[AdminNotificationPopup] Received notifications:', data);
         setNotifications(normalizeNotifications(data));
       } catch (error) {
         console.error('[AdminNotificationPopup] Error fetching notifications:', error);
@@ -58,22 +52,16 @@ const AdminNotificationPopup = ({ user }) => {
     fetchNotifications();
 
     // WebSocket connection for real-time updates
-    console.log('[AdminNotificationPopup] Setting up WebSocket connection');
-    const socket = new SockJS(`${API_BASE_URL}/ws-notifications`);
+  const wsUrl = `${String(BASE_URL || '').replace(/\/$/, '')}/ws-notifications`;
+  const socket = new SockJS(wsUrl);
     const stompClient = new Client({
-      webSocketFactory: () => socket,
-      debug: (str) => console.log('[AdminNotificationPopup STOMP]', str),
-      reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
+      webSocketFactory: () => socket
     });
 
     stompClient.onConnect = () => {
-      console.log('[AdminNotificationPopup] WebSocket connected!');
       
       // Subscribe to ALL notifications
       stompClient.subscribe('/topic/thong-bao/all', (message) => {
-        console.log('[AdminNotificationPopup] Received ALL notification:', message.body);
         try {
           const notification = JSON.parse(message.body);
           const normalized = normalizeNotifications([notification])[0];
@@ -82,13 +70,11 @@ const AdminNotificationPopup = ({ user }) => {
           console.error('[AdminNotificationPopup] Error parsing notification:', e);
         }
       });
-      console.log('[AdminNotificationPopup] Subscribed to: /topic/thong-bao/all');
 
       // Subscribe to ADMIN notifications
       if (user?.maTaiKhoan || user?.id) {
         const adminId = user.maTaiKhoan || user.id;
         stompClient.subscribe(`/topic/thong-bao/admin/${adminId}`, (message) => {
-          console.log('[AdminNotificationPopup] Received ADMIN notification:', message.body);
           try {
             const notification = JSON.parse(message.body);
             const normalized = normalizeNotifications([notification])[0];
@@ -97,7 +83,6 @@ const AdminNotificationPopup = ({ user }) => {
             console.error('[AdminNotificationPopup] Error parsing ADMIN notification:', e);
           }
         });
-        console.log('[AdminNotificationPopup] Subscribed to: /topic/thong-bao/admin/' + adminId);
       }
     };
 
@@ -115,7 +100,6 @@ const AdminNotificationPopup = ({ user }) => {
     // Fallback polling every 30s
     const startPolling = () => {
       if (pollerRef.current) return;
-      console.log('[AdminNotificationPopup] Starting fallback polling');
       pollerRef.current = setInterval(() => {
         api.get('/api/v1/thong-bao/admin/me').then(res => {
           const data = res?.data ?? res;
@@ -126,7 +110,6 @@ const AdminNotificationPopup = ({ user }) => {
     startPolling();
 
     return () => {
-      console.log('[AdminNotificationPopup] Cleaning up WebSocket and polling');
       if (stompRef.current) {
         stompRef.current.deactivate();
         stompRef.current = null;
@@ -187,7 +170,6 @@ const AdminNotificationPopup = ({ user }) => {
   };
 
   const markAsRead = (id) => {
-    console.log('[AdminNotificationPopup] Marking notification as read:', id);
     api.put(`/api/v1/thong-bao/${id}/danh-dau-da-doc`).then(() => {
       setNotifications(notifications.map(notif =>
         notif.id === id ? { ...notif, read: true } : notif
@@ -198,9 +180,7 @@ const AdminNotificationPopup = ({ user }) => {
   };
 
   const markAllAsRead = () => {
-    console.log('[AdminNotificationPopup] Đánh dấu tất cả thông báo admin là đã đọc');
     api.put('/api/v1/thong-bao/admin/danh-dau-tat-ca-da-doc').then(() => {
-      console.log('[AdminNotificationPopup] Thành công! Cập nhật UI');
       setNotifications(notifications.map(notif => ({ ...notif, read: true })));
       setIsOpen(false);
     }).catch(err => {
@@ -210,7 +190,6 @@ const AdminNotificationPopup = ({ user }) => {
 
   const deleteNotification = (id, e) => {
     e.stopPropagation();
-    console.log('[AdminNotificationPopup] Deleting notification:', id);
     api.delete(`/api/v1/thong-bao/${id}`).then(() => {
       setNotifications(notifications.filter(notif => notif.id !== id));
     }).catch(err => {

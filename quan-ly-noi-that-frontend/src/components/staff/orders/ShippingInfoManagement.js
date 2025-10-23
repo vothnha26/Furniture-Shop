@@ -54,7 +54,6 @@ const ShippingInfoManagement = () => {
       setShippingInfos(response.data.map(mapShippingInfoFromApi));
     } catch (error) {
       setError('Không thể tải thông tin giao hàng');
-      console.error('Error fetching shipping infos:', error);
     } finally {
       setLoading(false);
     }

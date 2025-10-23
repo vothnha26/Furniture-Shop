@@ -144,7 +144,7 @@ const CustomerShop = () => {
         const mapped = productList.map(mapProductFromApi);
         setProducts(mapped);
       } catch (err) {
-        console.error('Failed to fetch products:', err);
+        
       } finally {
         setIsLoading(false);
       }
@@ -191,7 +191,7 @@ const CustomerShop = () => {
         const catList = Array.isArray(data) ? data : [];
         setApiCategories(catList);
       } catch (err) {
-        console.error('Failed to fetch categories:', err);
+        
       }
     };
     fetchCategories();
@@ -206,7 +206,7 @@ const CustomerShop = () => {
         const supList = Array.isArray(data) ? data : [];
         setApiSuppliers(supList);
       } catch (err) {
-        console.error('Failed to fetch suppliers:', err);
+        
       }
     };
     fetchSuppliers();
@@ -334,7 +334,6 @@ const CustomerShop = () => {
         }));
       }
     } catch (error) {
-      console.error('❌ [CustomerShop] Lỗi khi thao tác yêu thích:', error);
       alert('Có lỗi xảy ra. Vui lòng thử lại!');
     }
   };

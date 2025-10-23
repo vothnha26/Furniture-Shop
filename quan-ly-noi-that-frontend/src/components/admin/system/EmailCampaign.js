@@ -77,12 +77,7 @@ const EmailCampaign = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      console.log('[EmailCampaign] Fetching customers from /api/v1/khach-hang...');
       const res = await api.get('/api/v1/khach-hang');
-        console.log('[EmailCampaign] Response type:', typeof res);
-        console.log('[EmailCampaign] Response is Array?:', Array.isArray(res));
-        console.log('[EmailCampaign] Response:', res);
-        console.log('[EmailCampaign] Response keys:', Object.keys(res || {}));
       
         // api.js trả về data trực tiếp (không có .data wrapper)
       let data = [];
@@ -96,8 +91,6 @@ const EmailCampaign = () => {
           console.error('[EmailCampaign] Unexpected response format:', res);
       }
       
-      console.log('[EmailCampaign] Parsed data length:', data.length);
-      console.log('[EmailCampaign] Parsed data:', data);
       setCustomers(data);
       setFilteredCustomers(data);
     } catch (e) {
@@ -111,7 +104,6 @@ const EmailCampaign = () => {
 
   const fetchTiers = async () => {
     try {
-      console.log('[EmailCampaign] Fetching tiers from /api/hang-thanh-vien/all ...');
       const res = await api.get('/api/hang-thanh-vien/all');
       const list = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
       // Sắp xếp theo điểm tối thiểu nếu có, fallback theo tên
@@ -153,13 +145,10 @@ const EmailCampaign = () => {
         recipients,
         manualList: recipients === 'manual' ? selectedEmails : []
       };
-
-      console.log('[EmailCampaign] Sending email with payload:', payload);
       
       const endpoint = '/api/admin/emails/send';
       const res = await api.post(endpoint, { body: payload });
       
-      console.log('[EmailCampaign] Email sent successfully:', res);
       setResult({ ok: true, data: res });
       
       // Reset selected emails sau khi gửi thành công

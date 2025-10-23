@@ -116,7 +116,6 @@ const Settings = () => {
       setSettings(mapSettingsFromApi(response.data));
     } catch (error) {
       setError('Không thể tải cài đặt');
-      console.error('Error fetching settings:', error);
     } finally {
       setLoading(false);
     }

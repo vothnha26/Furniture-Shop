@@ -1,15 +1,19 @@
 // Simple API wrapper using fetch
-// - Reads base URL from REACT_APP_API_BASE_URL or defaults to http://localhost:8081
 // - Attaches JSON headers and optional Authorization header from localStorage('authToken')
 // - Exposes helper functions: get, post, put, del
-// Simple API wrapper using fetch
-// - BASE_URL priority:
-//   1) REACT_APP_API_BASE_URL (if set)
+// BASE_URL priority:
+//   1) REACT_APP_API_BASE_URL (if set at build time)
 //   2) If running on localhost -> http://localhost:8081
 //   3) Otherwise -> production Render URL https://furniture-backend-ltpp.onrender.com
 export const BASE_URL = (() => {
-  const env = 'https://furniture-backend-ltpp.onrender.com';
-  if (env && String(env).trim()) return String(env).trim();
+  try {
+    const env = (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_BASE_URL) || null;
+    if (env && String(env).trim()) {
+      return String(env).trim().replace(/\/$/, '');
+    }
+  } catch (_) {
+    // ignore
+  }
   try {
     const host = window.location?.hostname;
     const isLocal = host === 'localhost' || host === '127.0.0.1' || (host && host.endsWith('.local'));

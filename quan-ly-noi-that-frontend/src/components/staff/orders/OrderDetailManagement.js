@@ -64,7 +64,7 @@ const OrderDetailManagement = () => {
         setFilteredDetails(mapped);
       }
     } catch (err) {
-      console.error('Fetch data error', err);
+      
     }
   };
   const [formData, setFormData] = useState({
@@ -397,7 +397,6 @@ const OrderDetailManagement = () => {
                   showToast('Đã hoàn thành đơn hàng và cập nhật khách hàng');
                   await fetchAll();
                 } catch (e) {
-                  console.error('Complete order error', e);
                   showToast('Hoàn thành đơn thất bại', 'error');
                 } finally {
                   setCompleting(false);

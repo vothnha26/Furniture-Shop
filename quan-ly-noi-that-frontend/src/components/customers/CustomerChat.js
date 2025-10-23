@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { IoSend, IoClose, IoChatbubbles, IoCheckmarkDone } from 'react-icons/io5';
 import SockJS from 'sockjs-client';
 import { Client } from '@stomp/stompjs';
-import api from '../../api';
+import api, { BASE_URL } from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 
 const CustomerChat = () => {
@@ -195,8 +195,7 @@ const CustomerChat = () => {
   const connectStomp = (sId, customerId) => {
     if (stompRef.current?.connected) return;
 
-    const base = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081';
-    const sockUrl = base.replace(/\/$/, '') + '/ws-notifications';
+  const sockUrl = `${String(BASE_URL || '').replace(/\/$/, '')}/ws-notifications`;
 
     const client = new Client({
       webSocketFactory: () => new SockJS(sockUrl),
@@ -207,8 +206,6 @@ const CustomerChat = () => {
     });
 
     client.onConnect = () => {
-      console.log('[CustomerChat] STOMP connected');
-
       // Subscribe to session messages
       client.subscribe(`/topic/chat/session-${sId}`, (msg) => {
         try {
@@ -272,10 +269,6 @@ const CustomerChat = () => {
 
     client.onStompError = (frame) => {
       console.error('[CustomerChat] STOMP error:', frame);
-    };
-
-    client.onDisconnect = () => {
-      console.log('[CustomerChat] STOMP disconnected');
     };
 
     stompRef.current = client;

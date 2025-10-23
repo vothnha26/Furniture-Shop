@@ -121,10 +121,9 @@ const CustomerProfile = () => {
               });
             }
           } catch (err) {
-            console.error('Failed to fetch orders:', err);
+
           }
         } catch (err) {
-          console.error('Failed to load user data:', err);
           setError('Không thể tải thông tin người dùng');
         } finally {
           setLoading(false);
@@ -209,7 +208,6 @@ const CustomerProfile = () => {
         setError(result.error || 'Cập nhật thất bại');
       }
     } catch (err) {
-      console.error('Update error:', err);
       setError('Có lỗi xảy ra khi cập nhật thông tin');
     } finally {
       setSaving(false);

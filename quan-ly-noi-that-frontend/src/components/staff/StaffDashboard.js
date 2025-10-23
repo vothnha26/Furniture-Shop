@@ -111,9 +111,7 @@ const StaffDashboard = () => {
       const path = url.startsWith('/') ? url : `/${url}`;
       navigate(path);
     } catch (e) {
-      // swallow navigation errors silently
-      // eslint-disable-next-line no-console
-      console.error('Navigation error', e);
+      
     }
   };
 
@@ -189,7 +187,7 @@ const StaffDashboard = () => {
             <div className="bg-white rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Đơn hàng gần đây</h3>
-                <button 
+                <button
                   onClick={() => navigate('/staff/orders')}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
                 >
@@ -275,7 +273,7 @@ const StaffDashboard = () => {
             <div className="bg-white rounded-lg shadow-sm p-8">
               <h3 className="text-xl font-bold text-gray-900 mb-6">Thao tác nhanh</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                <button 
+                <button
                   onClick={() => navigate('/staff/customers')}
                   className="flex flex-col items-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:from-purple-100 hover:to-purple-200 transition-all duration-300 shadow-sm hover:shadow-md group"
                 >
@@ -285,7 +283,7 @@ const StaffDashboard = () => {
                   <span className="text-sm font-semibold text-gray-900 text-center">Quản lý khách hàng</span>
                 </button>
 
-                <button 
+                <button
                   onClick={() => navigate('/staff/orders')}
                   className="flex flex-col items-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:from-blue-100 hover:to-blue-200 transition-all duration-300 shadow-sm hover:shadow-md group"
                 >
@@ -295,7 +293,7 @@ const StaffDashboard = () => {
                   <span className="text-sm font-semibold text-gray-900 text-center">Xử lý đơn hàng</span>
                 </button>
 
-                <button 
+                <button
                   onClick={() => navigate('/staff/chat')}
                   className="flex flex-col items-center p-6 bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl hover:from-pink-100 hover:to-pink-200 transition-all duration-300 shadow-sm hover:shadow-md group"
                 >
@@ -305,7 +303,7 @@ const StaffDashboard = () => {
                   <span className="text-sm font-semibold text-gray-900 text-center">Hỗ trợ khách hàng</span>
                 </button>
 
-                <button 
+                <button
                   onClick={() => navigate('/staff/products')}
                   className="flex flex-col items-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl hover:from-orange-100 hover:to-orange-200 transition-all duration-300 shadow-sm hover:shadow-md group"
                 >
@@ -315,7 +313,7 @@ const StaffDashboard = () => {
                   <span className="text-sm font-semibold text-gray-900 text-center">Quản lý sản phẩm</span>
                 </button>
 
-                <button 
+                <button
                   onClick={openInventoryWithImport}
                   className="flex flex-col items-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl hover:from-green-100 hover:to-green-200 transition-all duration-300 shadow-sm hover:shadow-md group"
                   title="Mở giao diện nhập hàng"

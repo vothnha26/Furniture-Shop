@@ -35,14 +35,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
   // Prefer AuthContext.user, fallback to localStorage and/or server-by-phone
   const auth = useAuth();
 
-  // Debug: log auth context on mount (avoid trusting raw localStorage user)
-  useEffect(() => {
-    console.log('=== � DIAGNOSTIC CHECK ===');
-    console.log('� auth.token exists:', !!(auth && (auth.token || auth.authToken)));
-    console.log('👤 auth.user:', auth && auth.user ? auth.user : 'NULL');
-    console.log('=========================');
-  }, [auth]);
-
   useEffect(() => {
     const loadCustomerInfo = async () => {
       try {
@@ -55,7 +47,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
             phone: u?.soDienThoai || u?.phone || '',
             email: u?.email || ''
           };
-          console.log('✅ [CustomerCheckout] Using auth.user:', customerData);
           setCustomerInfo(customerData);
           // Persist ma_khach_hang back into localStorage.user if missing
           try {
@@ -80,7 +71,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
               phone: user.soDienThoai || user.phone || '',
               email: user.email || ''
             };
-            console.log('✅ [CustomerCheckout] Using localStorage.user:', customerData);
             setCustomerInfo(customerData);
             return;
           } catch (e) {
@@ -99,7 +89,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
               phone: prof.soDienThoai || prof.phone || '',
               email: prof.email || ''
             };
-            console.log('✅ [CustomerCheckout] Using /api/v1/auth/me:', customerData);
             setCustomerInfo(customerData);
             try {
               localStorage.setItem('user', JSON.stringify(prof));
@@ -110,9 +99,8 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
           // ignore - we may be unauthenticated
         }
 
-        console.log('⚠️ [CustomerCheckout] No user profile available yet');
       } catch (err) {
-        console.error('❌ [CustomerCheckout] Failed to load customer info:', err);
+
       }
     };
     loadCustomerInfo();
@@ -122,7 +110,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
   useEffect(() => {
     const fetchCartDetails = async () => {
       if (cartItems.length === 0) {
-        console.log('🛒 [Cart Details] Cart is empty, skipping fetch');
         setCartDetails([]);
         return;
       }
@@ -135,19 +122,12 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
           }))
         };
 
-        console.log('🔄 [Cart Details] Fetching with payload:', payload);
-        console.log('🌐 [Cart Details] API URL: POST /api/thanhtoan/cart-details');
-
         const data = await api.post('/api/thanhtoan/cart-details', payload);
-        console.log('✅ [Cart Details] Response:', data);
 
         if (Array.isArray(data)) {
           setCartDetails(data);
-          console.log('📦 [Cart Details] Set cart details:', data.length, 'items');
         }
       } catch (err) {
-        console.error('❌ [Cart Details] Failed to fetch:', err);
-        console.error('Error details:', err.response?.data || err.message);
         setCartDetails([]);
       }
     };
@@ -160,15 +140,12 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
     const fetchAvailableVouchers = async () => {
       try {
         let ma_khach_hang = customerInfo.maKhachHang || customerInfo.ma_khach_hang;
-        console.log('🎟️ [Vouchers] Customer ID (before fetch):', ma_khach_hang);
 
         // If we don't have a ma_khach_hang persisted yet, try to fetch profile from server
         if (!ma_khach_hang) {
           try {
-            console.log('🔎 [Vouchers] No ma_khach_hang in localStorage.user — calling /api/v1/khach-hang/me');
             const profileResp = await api.get('/api/v1/khach-hang/me');
             const prof = profileResp?.data ?? profileResp;
-            console.log('🔎 [Vouchers] Profile from /api/v1/khach-hang/me:', prof);
             if (prof) {
               // Backend returns camelCase (maKhachHang), normalize to snake_case for internal use
               ma_khach_hang = prof.maKhachHang ?? prof.ma_khach_hang ?? prof.id ?? null;
@@ -192,10 +169,8 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
               try { const u = JSON.parse(localStorage.getItem('user') || '{}'); return u?.soDienThoai || u?.phone || null; } catch (er) { return null; }
             })();
             if (possiblePhone) {
-              console.log('🔎 [Vouchers] Trying /api/v1/khach-hang/by-phone with phone=', possiblePhone);
               const byPhone = await api.get(`/api/v1/khach-hang/by-phone/${encodeURIComponent(possiblePhone)}`);
               const byPhoneData = byPhone?.data ?? byPhone;
-              console.log('🔎 [Vouchers] Response from by-phone:', byPhoneData);
               if (byPhoneData) {
                 // Backend returns camelCase (maKhachHang), normalize to snake_case
                 ma_khach_hang = byPhoneData.maKhachHang ?? byPhoneData.ma_khach_hang ?? byPhoneData.id ?? null;
@@ -211,7 +186,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
 
         // Only fetch vouchers when we have a ma_khach_hang and at least one cart item
         if (!ma_khach_hang || cartItems.length === 0) {
-          console.log('⚠️ [Vouchers] Skipping - ma_khach_hang:', ma_khach_hang, 'cartItems:', cartItems.length);
           return;
         }
 
@@ -222,11 +196,8 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
 
         // Backend uses camelCase: maKhachHang (not ma_khach_hang)
         const url = `/api/thanhtoan/applicable-vouchers?maKhachHang=${ma_khach_hang}&tongTienDonHang=${subtotal}`;
-        console.log('🔄 [Vouchers] Fetching from:', url);
-        console.log('🔄 [Vouchers] Params:', { maKhachHang: ma_khach_hang, tongTienDonHang: subtotal });
 
         const data = await api.get(url);
-        console.log('✅ [Vouchers] Raw response:', data);
 
         // Normalize different response shapes: direct array OR { data: [...] } OR { success:true, data: [...] }
         let vouchers = [];
@@ -237,10 +208,8 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         else if (data.success && Array.isArray(data.data)) vouchers = data.data;
 
         setAvailableVouchers(vouchers);
-        console.log('📦 [Vouchers] Set vouchers:', vouchers.length, 'items');
       } catch (err) {
-        console.error('❌ [Vouchers] Failed to fetch:', err);
-        console.error('Error details:', err.response?.data || err.message);
+
       }
     };
 
@@ -302,10 +271,9 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
           setShippingOptions(data);
           // default to first option's id
           setShippingMethod(String(data[0].maDichVu));
-          console.log('📦 [Shipping] Loaded shipping options:', data);
         }
       } catch (err) {
-        console.error('❌ [Shipping] Failed to load shipping methods:', err);
+
       }
     };
 
@@ -444,7 +412,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
     const fetchPreview = async () => {
       // allow preview even when customer is not logged in; preview only requires cart items
       if (cartItems.length === 0) {
-        console.log('📊 [Checkout Summary] Cart is empty, skipping');
         setServerPreview(null);
         return;
       }
@@ -456,13 +423,9 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         maVoucherCode: selectedVoucher?.code || null
       };
 
-      console.log('🔄 [Checkout Summary] Fetching with payload:', payload);
-      console.log('🌐 [Checkout Summary] API URL: POST /api/thanhtoan/checkout-summary');
-
       try {
         // Call server checkout-summary to get authoritative preview
         const data = await api.post('/api/thanhtoan/checkout-summary', payload);
-        console.log('✅ [Checkout Summary] Response:', data);
 
         if (!cancelled && data) {
           // Map backend response to local state
@@ -486,12 +449,9 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
             ,rewardMoneyPerPoint: data.rewardMoneyPerPoint ?? data.reward_money_per_point ?? null,
             rewardPointPerMoney: data.rewardPointPerMoney ?? data.reward_point_per_money ?? null,
           };
-          console.log('📦 [Checkout Summary] Set preview:', preview);
           setServerPreview(preview);
         }
       } catch (err) {
-        console.error('❌ [Checkout Summary] Failed:', err);
-        console.error('Error details:', err.response?.data || err.message);
         if (!cancelled) setServerPreview(null);
       }
     };
@@ -627,17 +587,13 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         diemThuongSuDung: appliedLoyaltyPoints || 0
       };
 
-      console.log('🔔 [PlaceOrder] Sending payload to /api/thanhtoan/tao-don-hang', { body: payload });
-
       // Try both variants (without and with trailing slash) to avoid server redirect issues
       let resp = null;
       const endpointsToTry = ['/api/thanhtoan/tao-don-hang', '/api/thanhtoan/tao-don-hang'];
       let lastErr = null;
       for (const ep of endpointsToTry) {
         try {
-          console.log(`🔁 [PlaceOrder] Trying POST ${ep}`);
           resp = await api.post(ep, payload);
-          console.log(`✅ [PlaceOrder] Success from ${ep}`);
           lastErr = null;
           break;
         } catch (e) {
@@ -646,7 +602,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
         }
       }
       if (!resp && lastErr) throw lastErr;
-      console.log('✅ [PlaceOrder] Response:', resp);
       // save server response and current preview so success screen can show authoritative values
       setLastOrderResponse(resp || null);
       setLastOrderPreview(serverPreview || null);
@@ -671,9 +626,6 @@ const CustomerCheckout = ({ onBack, onOrderComplete }) => {
       try { clearCart(); } catch (e) { /* ignore */ }
 
     } catch (err) {
-      // Log more details from the API helper so we can see HTTP status and body
-      console.error('❌ [PlaceOrder] Error creating order:', err, 'status=', err?.status, 'data=', err?.data);
-
       // Try to extract a friendly server message. Backend often returns { success:false, message: '...' }
       let serverMsg = null;
       if (err) {

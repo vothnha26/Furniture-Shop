@@ -120,7 +120,6 @@ const MembershipTierManagement = () => {
       Toast.show('Thêm hạng thành viên thành công', 'success');
       return created;
     } catch (err) {
-      console.error('Create tier error', err);
       Toast.show(err.data?.message || 'Không thể thêm hạng', 'error');
       throw err;
     }
@@ -135,7 +134,6 @@ const MembershipTierManagement = () => {
       Toast.show('Cập nhật hạng thành viên thành công', 'success');
       return updated;
     } catch (err) {
-      console.error('Update tier error', err);
       Toast.show(err.data?.message || 'Không thể cập nhật hạng', 'error');
       throw err;
     }
@@ -148,7 +146,6 @@ const MembershipTierManagement = () => {
       setMembershipTiers(prev => prev.filter(t => t.maHang !== id && t.maHang !== String(id)));
       Toast.show('Xóa hạng thành viên thành công', 'success');
     } catch (err) {
-      console.error('Delete tier error', err);
       Toast.show(err.data?.message || 'Không thể xóa hạng', 'error');
       throw err;
     }
@@ -171,7 +168,6 @@ const MembershipTierManagement = () => {
       })));
       setShowCustomersModal(true);
     } catch (err) {
-      console.error('Fetch tier customers error', err);
       Toast.show('Không thể tải danh sách khách hàng', 'error');
     } finally {
       setLoadingCustomers(false);
@@ -188,7 +184,6 @@ const MembershipTierManagement = () => {
           setMembershipTiers(data.map(mapMembershipTierFromApi));
         }
       } catch (err) {
-        console.error('Fetch membership tiers error', err);
         setError(err);
         Toast.show('Không thể tải danh sách hạng thành viên', 'error');
       } finally {
@@ -984,7 +979,6 @@ const MembershipTierManagement = () => {
                   setBenefitsEditingTier(null);
                   Toast.show('Lưu ưu đãi thành công', 'success');
                 } catch (err) {
-                  console.error('Lưu ưu đãi lỗi', err);
                   Toast.show(err.data?.message || 'Không thể lưu ưu đãi', 'error');
                 } finally {
                   setIsLoading(false);

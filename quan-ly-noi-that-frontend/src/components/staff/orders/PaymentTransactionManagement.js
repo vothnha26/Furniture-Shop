@@ -49,7 +49,6 @@ const PaymentTransactionManagement = () => {
       setTransactions(response.data.map(mapTransactionFromApi));
     } catch (error) {
       setError('Không thể tải danh sách giao dịch');
-      console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
     }

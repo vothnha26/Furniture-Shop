@@ -195,15 +195,9 @@ const VoucherManagement = () => {
           return;
         }
       } catch (fallbackErr) {
-        console.warn('Fallback /api/v1/voucher failed', fallbackErr);
-      }
 
-      console.warn('Unexpected /api/v1/voucher/details response shape', response);
+      }
     } catch (err) {
-      // Log helpful debugging info for the developer
-      console.error('Fetch vouchers error', err);
-      if (err && err.status) console.error('Fetch vouchers HTTP status:', err.status);
-      if (err && err.data) console.error('Fetch vouchers error body:', err.data);
       setError('Không thể tải danh sách voucher (xem console để biết chi tiết)');
     }
   };
@@ -223,7 +217,6 @@ const VoucherManagement = () => {
         : [];
       return { ...base, applicableTo, selectedTiers };
     } catch (err) {
-      console.error('Fetch voucher detail error', err);
       throw err;
     }
   };
@@ -243,8 +236,6 @@ const VoucherManagement = () => {
       setVouchers(prev => [...prev, newVoucher]);
       return newVoucher;
     } catch (err) {
-      console.error('Create voucher error', err);
-      console.error('Error details:', err.response || err.data || err.message);
       throw new Error(err.response?.message || err.message || 'Không thể tạo voucher');
     }
   };
@@ -258,9 +249,6 @@ const VoucherManagement = () => {
       ));
       return updatedVoucher;
     } catch (err) {
-      console.error('Update voucher error', err);
-      // If the API wrapper attached a parsed response body, log it for easier debugging
-      if (err && err.data) console.error('Update voucher error body:', err.data);
       throw new Error('Không thể cập nhật voucher');
     }
   };
@@ -270,7 +258,6 @@ const VoucherManagement = () => {
     try {
       await updateVoucher(voucher.id, { trangThai: newStatus });
     } catch (err) {
-      console.error('Toggle voucher status error', err);
       throw new Error('Không thể cập nhật trạng thái voucher');
     }
   };
@@ -291,11 +278,8 @@ const VoucherManagement = () => {
         setMembershipTiers(mapTiers(tResp.data));
       } else if (tResp && Array.isArray(tResp.content)) {
         setMembershipTiers(mapTiers(tResp.content));
-      } else {
-        console.warn('Unexpected /api/hang-thanh-vien/all response shape', tResp);
       }
     } catch (err) {
-      console.error('Fetch membership tiers error', err);
       setError('Không thể tải danh sách hạng thành viên');
     }
   };
@@ -312,7 +296,6 @@ const VoucherManagement = () => {
         if (Array.isArray(hResp)) setUsageHistory(hResp);
         await fetchMembershipTiers();
       } catch (err) {
-        console.error('Fetch data error', err);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -336,7 +319,6 @@ const VoucherManagement = () => {
         setSelectedVoucher(detailed);
         setShowVoucherModal(true);
       } catch (err) {
-        console.error('Fetch voucher detail (view) error', err);
         setError('Không tải được chi tiết voucher');
       }
     })();
@@ -734,7 +716,6 @@ const VoucherManagement = () => {
                                   setAssigningVoucher(assignData);
                                   setShowAssignModal(true);
                                 } catch (err) {
-                                  console.error('Fetch voucher detail for assign error', err);
                                   setError('Không tải được chi tiết voucher để gán hạng');
                                 }
                               })();
@@ -1232,7 +1213,6 @@ const VoucherManagement = () => {
                       setError(null);
                       showToast('success', 'Đã gán hạng cho voucher');
                     } catch (err) {
-                      console.error('Assign tiers error', err);
                       setError('Gán hạng thất bại');
                       showToast('error', 'Gán hạng thất bại');
                     }
@@ -1419,7 +1399,6 @@ const VoucherManagement = () => {
                             setShowAssignModal(true);
                             // Keep edit modal open underneath; admin can close when done
                           } catch (err) {
-                            console.error('Fetch voucher detail for assign error', err);
                             setError('Không tải được chi tiết voucher để gán hạng');
                           }
                         }} className="px-3 py-1 bg-indigo-600 text-white rounded">Gán hạng</button>

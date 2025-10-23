@@ -189,7 +189,6 @@ const ProductManagement = () => {
       }
     } catch (err) {
       setError(err);
-      console.error('Fetch products error', err);
     } finally {
       setIsLoading(false);
     }
@@ -206,7 +205,6 @@ const ProductManagement = () => {
           const resp = await api.get(`/api/bien-the-san-pham/san-pham/${p.id}`);
           counts[p.id] = Array.isArray(resp) ? resp.length : Number(p.soLuongBienThe || 0);
         } catch (e) {
-          console.warn(`Failed to load variants for product ${p.id}`, e?.message || e);
           counts[p.id] = Number(p.soLuongBienThe || 0);
         }
       }));
@@ -226,7 +224,7 @@ const ProductManagement = () => {
       const data = await api.get('/api/categories');
       setCategories(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Fetch categories error', err);
+
     }
   };
 
@@ -235,7 +233,7 @@ const ProductManagement = () => {
       const data = await api.get('/api/suppliers');
       setSuppliers(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Fetch suppliers error', err);
+      
     }
   };
 
@@ -244,7 +242,7 @@ const ProductManagement = () => {
       const data = await api.get('/api/collections');
       setCollections(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Fetch collections error', err);
+      
     }
   };
 
@@ -256,7 +254,6 @@ const ProductManagement = () => {
         setVariantCountsMap(prev => ({ ...prev, [maSanPham]: data.length }));
       }
     } catch (err) {
-      console.error('Fetch variants error', err);
       setProductVariants([]);
     }
   };
@@ -283,7 +280,6 @@ const ProductManagement = () => {
         setAttributes(grouped);
       }
     } catch (e) {
-      console.warn('fetchAttributesSilent failed', e?.message || e);
     } finally {
       setAttrLoading(false);
     }
@@ -341,7 +337,6 @@ const ProductManagement = () => {
             if (refreshed) created = refreshed;
           }
         } catch (refetchErr) {
-          console.warn('Failed to refetch product after create', refetchErr);
         }
       }
 
@@ -350,7 +345,6 @@ const ProductManagement = () => {
       setShowAddModal(false);
       resetForm();
     } catch (err) {
-      console.error('Add product error', err);
       setError(err);
     }
   };
@@ -363,7 +357,7 @@ const ProductManagement = () => {
       try {
         updatedProduct = await api.put(`/api/products/${selectedProduct.id}`, { body: payload });
       } catch (jsonErr) {
-        console.warn('PUT /api/products failed, will still try image upload if present', jsonErr?.message || jsonErr);
+        
       }
 
       const hasFileObjects = Array.isArray(productImages) && productImages.some(f => f && ((typeof File !== 'undefined' && f instanceof File) || (f.name && typeof f.size === 'number')));
@@ -390,7 +384,7 @@ const ProductManagement = () => {
           const imgResp = await api.post(`/api/products/${selectedProduct.id}/images/upload`, { body: formData });
           if (imgResp) updatedProduct = imgResp;
         } catch (imgErr1) {
-          console.error('Image upload failed for product', selectedProduct?.id, imgErr1);
+          
         }
       }
 
@@ -400,7 +394,7 @@ const ProductManagement = () => {
             const refreshed = await api.get(`/api/products/${selectedProduct.id}`);
             if (refreshed) updatedProduct = refreshed;
           } catch (refetchErr) {
-            console.warn('Failed to refetch product after upload', refetchErr);
+            
           }
         }
         const mapped = mapProductFromApi(updatedProduct);
@@ -413,7 +407,6 @@ const ProductManagement = () => {
       setSelectedProduct(null);
       resetForm();
     } catch (err) {
-      console.error('Edit product error', err);
       setError(err);
     }
   };
@@ -427,7 +420,6 @@ const ProductManagement = () => {
       product = products.find(p => p.id === maybeIdOrObj || p.maSanPham === maybeIdOrObj);
     }
     if (!product) {
-      console.warn('Could not find product to deactivate for', maybeIdOrObj);
       return;
     }
     setProductToDelete(product);
@@ -455,7 +447,6 @@ const ProductManagement = () => {
       setShowDeleteConfirm(false);
       setProductToDelete(null);
     } catch (err) {
-      console.error('Deactivate product error', err);
       setError(err);
     }
   };
@@ -469,7 +460,6 @@ const ProductManagement = () => {
       product = products.find(p => p.id === maybeIdOrObj || p.maSanPham === maybeIdOrObj);
     }
     if (!product) {
-      console.warn('Could not find product to reactivate for', maybeIdOrObj);
       return;
     }
 
@@ -488,7 +478,6 @@ const ProductManagement = () => {
           : p
       ));
     } catch (err) {
-      console.error('Reactivate product error', err);
       setError(err);
     }
   };
@@ -597,7 +586,6 @@ const ProductManagement = () => {
 
   const handleAddVariant = () => {
     if (!selectedProduct) {
-      console.error('Cannot add variant: no product selected');
       return;
     }
     resetVariantForm();
@@ -621,7 +609,7 @@ const ProductManagement = () => {
           const resp = await api.get(`/api/bien-the-san-pham/san-pham/${selectedProduct.id}`);
           variantsValues = Array.isArray(resp) ? resp : [];
         } catch (e) {
-          console.warn('Failed to load variant-values from /api/bien-the-san-pham/san-pham/{id}', e?.message || e);
+          
         }
       }
 
@@ -737,7 +725,6 @@ const ProductManagement = () => {
         setVariantSelections(pre);
       }
     } catch (err) {
-      console.error('Load attributes error', err);
       setAttributes([]);
       setAttrError(err?.message || 'Lỗi tải thuộc tính');
     } finally {
@@ -855,12 +842,7 @@ const ProductManagement = () => {
       setProducts(prev => prev.map(p => p.id === selectedProduct.id ? { ...p, soLuongBienThe: (p.soLuongBienThe || 0) + 1 } : p));
       setVariantCountsMap(prev => ({ ...prev, [selectedProduct.id]: (Number(prev[selectedProduct.id] || selectedProduct.soLuongBienThe || 0) + 1) }));
 
-    } catch (err) {
-        console.error('❌ Create single variant error', err);
-        console.error('❌ Error status:', err.status);
-        console.error('❌ Error data:', err.data);
-        console.error('❌ Error message:', err.message);
-      
+    } catch (err) {      
         // Display detailed error message
         let errorMessage = 'Không thể tạo biến thể: ';
         if (err.data) {
@@ -900,7 +882,6 @@ const ProductManagement = () => {
         setVariantSelections({});
         fetchAttributes(false, variantData);
       } catch (err) {
-        console.warn('Failed to fetch full variant for edit, falling back to provided object', err?.message || err);
         setSelectedVariant(variant);
         setVariantForm({
           sku: variant.sku || '',
@@ -917,7 +898,6 @@ const ProductManagement = () => {
 
   const handleUpdateVariant = async () => {
     if (!selectedVariant) {
-      console.error('No selected variant for update');
       return;
     }
 
@@ -949,7 +929,6 @@ const ProductManagement = () => {
 
       const variantId = selectedVariant?.id ?? selectedVariant?.maBienThe ?? selectedVariant?.ma ?? selectedVariant?.maBienTheId ?? null;
       if (!variantId) {
-        console.error('Cannot determine variant id for update', selectedVariant);
         setError(new Error('Không xác định được ID biến thể'));
         return;
       }
@@ -962,7 +941,6 @@ const ProductManagement = () => {
       setSelectedVariant(null);
       resetVariantForm();
     } catch (err) {
-      console.error('Update variant error', err);
       setError(err);
     }
   };
@@ -978,7 +956,6 @@ const ProductManagement = () => {
     try {
       const variantId = variantToDelete?.id ?? variantToDelete?.maBienThe ?? variantToDelete?.ma ?? variantToDelete?.maBienTheId ?? null;
       if (!variantId) {
-        console.error('Cannot determine variant id for deactivate', variantToDelete);
         setError(new Error('Không xác định được ID biến thể'));
         return;
       }
@@ -1000,7 +977,6 @@ const ProductManagement = () => {
       setShowDeleteVariantConfirm(false);
       setVariantToDelete(null);
     } catch (err) {
-      console.error('Deactivate variant error', err);
       setError(err);
     }
   };
@@ -1009,7 +985,6 @@ const ProductManagement = () => {
     try {
       const variantId = variant?.id ?? variant?.maBienThe ?? variant?.ma ?? variant?.maBienTheId ?? null;
       if (!variantId) {
-        console.error('Cannot determine variant id for reactivate', variant);
         setError(new Error('Không xác định được ID biến thể'));
         return;
       }
@@ -1028,7 +1003,6 @@ const ProductManagement = () => {
           : v
       ));
     } catch (err) {
-      console.error('Reactivate variant error', err);
       setError(err);
     }
   };
@@ -1199,7 +1173,7 @@ const ProductManagement = () => {
                       <div className="aspect-square bg-gray-100 relative">
                         {product.hinhAnhs && product.hinhAnhs.length > 0 ? (
                           <img
-                            src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}${product.hinhAnhs[0].duongDanHinhAnh}`}
+                            src={api.buildUrl(product.hinhAnhs[0].duongDanHinhAnh)}
                             alt={product.tenSanPham}
                             className="w-full h-full object-cover"
                           />
@@ -1633,7 +1607,7 @@ const ProductManagement = () => {
                     {selectedProduct.hinhAnhs.map((image, index) => (
                       <div key={image.maHinhAnh || index} className="relative aspect-square">
                         <img
-                          src={`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:8081'}${image.duongDanHinhAnh}`}
+                          src={api.buildUrl(image.duongDanHinhAnh)}
                           alt={image.moTa || `Ảnh ${index + 1}`}
                           className="w-full h-full object-cover rounded-lg"
                         />
@@ -1900,7 +1874,6 @@ const ProductManagement = () => {
                         // resp may be an array of created image DTOs
                         uploadedResponses = Array.isArray(resp) ? resp : [];
                       } catch (uploadErr) {
-                        console.error('Image upload failed:', uploadErr);
                         setError('Không thể upload ảnh: ' + (uploadErr?.data || uploadErr.message || uploadErr));
                         return;
                       }
@@ -1969,7 +1942,6 @@ const ProductManagement = () => {
                     setShowDetailModal(true);
 
                   } catch (err) {
-                    console.error('Error saving images:', err);
                     setError('Không thể lưu hình ảnh: ' + (err.response?.data?.message || err.message));
                   }
                 }

@@ -53,7 +53,7 @@ const CustomerProductDetail = () => {
                         const relatedList = Array.isArray(relatedData) ? relatedData : (relatedData.items ?? relatedData.content ?? []);
                         setRelatedProducts(relatedList.filter(p => p.maSanPham !== data.maSanPham).slice(0, 6));
                     } catch (err) {
-                        console.error('Failed to fetch related products:', err);
+
                     }
                 }
 
@@ -63,10 +63,10 @@ const CustomerProductDetail = () => {
                     const reviewData = reviewRes.data ?? reviewRes;
                     setReviews(Array.isArray(reviewData) ? reviewData : (reviewData.items ?? reviewData.content ?? []));
                 } catch (err) {
-                    console.error('Failed to fetch reviews:', err);
+                    
                 }
             } catch (err) {
-                console.error('Failed to fetch product detail:', err);
+                
             } finally {
                 setIsLoading(false);
             }
@@ -143,8 +143,6 @@ const CustomerProductDetail = () => {
             giaBan: selectedVariant.giaBan,
             image: product.hinhAnh?.[0] ? resolveImageUrl(product.hinhAnh[0]) : null
         };
-
-        console.log('Adding to cart:', { product: productData, variant: variantData, quantity }); // Debug log
         
         // Call addToCart with 3 parameters as expected by CartContext
         addToCart(productData, variantData, quantity);
@@ -175,7 +173,6 @@ const CustomerProductDetail = () => {
             setNewReview({ rating: 5, title: '', content: '' });
             alert('Đánh giá của bạn đã được gửi!');
         } catch (err) {
-            console.error('Failed to submit review:', err);
             alert('Không thể gửi đánh giá. Vui lòng thử lại!');
         }
     };

@@ -52,7 +52,7 @@ const EmailNotifications = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -75,7 +75,6 @@ const EmailNotifications = () => {
       setEmails(response.data.map(mapEmailFromApi));
     } catch (error) {
       setError('Không thể tải danh sách email');
-      console.error('Error fetching emails:', error);
     } finally {
       setLoading(false);
     }
@@ -86,7 +85,7 @@ const EmailNotifications = () => {
       const response = await api.get('/api/v1/email/mau-email');
       setTemplates(response.data.map(mapTemplateFromApi));
     } catch (error) {
-      console.error('Error fetching templates:', error);
+
     }
   };
 
@@ -283,7 +282,6 @@ const EmailNotifications = () => {
   };
 
   const handleSaveTemplate = () => {
-    console.log('Creating new email template:', newTemplate);
     setShowCreateTemplateModal(false);
     setNewTemplate({
       name: '',
@@ -365,7 +363,7 @@ const EmailNotifications = () => {
         <div className="bg-white rounded-lg shadow-sm mb-8">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Mẫu email</h3>
-            <button 
+            <button
               onClick={handleCreateTemplate}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
             >
@@ -390,7 +388,7 @@ const EmailNotifications = () => {
                         >
                           <IoEye className="w-4 h-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleEditTemplate(template)}
                           className="text-gray-400 hover:text-gray-600"
                         >
@@ -459,7 +457,7 @@ const EmailNotifications = () => {
                 {emailHistory.map((email) => {
                   const statusInfo = getStatusInfo(email.status);
                   const StatusIcon = statusInfo.icon;
-                  
+
                   return (
                     <tr key={email.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -486,7 +484,7 @@ const EmailNotifications = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
-                          <button 
+                          <button
                             onClick={() => handleViewEmailDetail(email)}
                             className="text-blue-600 hover:text-blue-800"
                           >
@@ -550,7 +548,7 @@ const EmailNotifications = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Nội dung
                     </label>
-                    <div 
+                    <div
                       className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50"
                       dangerouslySetInnerHTML={{ __html: selectedTemplate.content }}
                     />
@@ -586,7 +584,7 @@ const EmailNotifications = () => {
                         <input
                           type="text"
                           value={newTemplate.name}
-                          onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                          onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập tên mẫu email"
                           required
@@ -596,7 +594,7 @@ const EmailNotifications = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Loại mẫu</label>
                         <select
                           value={newTemplate.type}
-                          onChange={(e) => setNewTemplate({...newTemplate, type: e.target.value})}
+                          onChange={(e) => setNewTemplate({ ...newTemplate, type: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           required
                         >
@@ -615,7 +613,7 @@ const EmailNotifications = () => {
                       <input
                         type="text"
                         value={newTemplate.subject}
-                        onChange={(e) => setNewTemplate({...newTemplate, subject: e.target.value})}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, subject: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Nhập tiêu đề email"
                         required
@@ -626,7 +624,7 @@ const EmailNotifications = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Nội dung email</label>
                       <textarea
                         value={newTemplate.content}
-                        onChange={(e) => setNewTemplate({...newTemplate, content: e.target.value})}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, content: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         rows="12"
                         placeholder="Nhập nội dung email (HTML được hỗ trợ)..."
@@ -642,7 +640,7 @@ const EmailNotifications = () => {
                       <input
                         type="text"
                         value={newTemplate.variables.join(', ')}
-                        onChange={(e) => setNewTemplate({...newTemplate, variables: e.target.value.split(',').map(variable => variable.trim()).filter(variable => variable)})}
+                        onChange={(e) => setNewTemplate({ ...newTemplate, variables: e.target.value.split(',').map(variable => variable.trim()).filter(variable => variable) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Nhập các biến cách nhau bởi dấu phẩy"
                       />
@@ -749,10 +747,10 @@ const EmailNotifications = () => {
                           <div className="text-sm">
                             <strong>Nội dung mẫu:</strong>
                             <div className="mt-2 text-gray-700">
-                              Xin chào khách hàng,<br/>
-                              Cảm ơn bạn đã mua hàng tại FurniShop...<br/>
-                              <br/>
-                              Trân trọng,<br/>
+                              Xin chào khách hàng,<br />
+                              Cảm ơn bạn đã mua hàng tại FurniShop...<br />
+                              <br />
+                              Trân trọng,<br />
                               Đội ngũ FurniShop
                             </div>
                           </div>

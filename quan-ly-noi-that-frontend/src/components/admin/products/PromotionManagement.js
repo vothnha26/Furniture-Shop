@@ -44,7 +44,6 @@ const PromotionManagement = () => {
           setPromotions(data.map(mapPromotionFromApi));
         }
       } catch (err) {
-        console.error('Fetch promotions error', err);
         setError(err);
       } finally {
         setIsLoading(false);
@@ -206,7 +205,7 @@ const PromotionManagement = () => {
           setShowEditModal(true);
         }
       } catch (err) {
-        console.error('Failed to fetch promotion by id', routeId, err);
+        
       }
     };
 

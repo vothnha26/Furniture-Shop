@@ -128,7 +128,6 @@ const ReportsAnalytics = () => {
         setCustomerStats(normalizedCustomers);
         setInventoryAlerts(normalizedInventory);
       } catch (err) {
-        console.error('Error fetching reports data:', err);
         setError('Không thể tải dữ liệu báo cáo');
       } finally {
         setLoading(false);
@@ -150,7 +149,6 @@ const ReportsAnalytics = () => {
       link.click();
       link.remove();
     } catch (error) {
-      console.error('Error exporting report:', error);
       alert('Không thể xuất báo cáo');
     }
   };

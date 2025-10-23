@@ -61,7 +61,6 @@ const AttributeManagement = () => {
                 giaTriThuocTinhs: Array.isArray(values) ? values.map(mapValueFromApi) : []
               };
             } catch (err) {
-              console.error(`Error fetching values for attribute ${attr.maThuocTinh || attr.id}:`, err);
               return mapAttributeFromApi(attr);
             }
           })
@@ -72,7 +71,6 @@ const AttributeManagement = () => {
       }
     } catch (err) {
       setError(err);
-      console.error('Fetch attributes error', err);
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +92,6 @@ const AttributeManagement = () => {
       setShowAddAttributeModal(false);
       resetAttributeForm();
     } catch (err) {
-      console.error('Add attribute error', err);
       setError(err);
     }
   };
@@ -111,7 +108,6 @@ const AttributeManagement = () => {
       setSelectedAttribute(null);
       resetAttributeForm();
     } catch (err) {
-      console.error('Edit attribute error', err);
       setError(err);
     }
   };
@@ -132,7 +128,6 @@ const AttributeManagement = () => {
       setShowAddValueModal(false);
       resetValueForm();
     } catch (err) {
-      console.error('Add value error', err);
       setError(err);
     }
   };
@@ -158,7 +153,6 @@ const AttributeManagement = () => {
       setSelectedValue(null);
       resetValueForm();
     } catch (err) {
-      console.error('Edit value error', err);
       setError(err);
     }
   };
@@ -186,7 +180,6 @@ const AttributeManagement = () => {
       setShowDeleteConfirm(false);
       setItemToDelete(null);
     } catch (err) {
-      console.error('Delete error', err);
       setError(err);
     }
   };

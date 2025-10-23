@@ -48,7 +48,6 @@ const SupplierManagement = () => {
           setSuppliers(data.map(mapSupplierFromApi));
         }
       } catch (err) {
-        console.error('Fetch suppliers error', err);
         setError(err);
       } finally {
         setIsLoading(false);
@@ -164,7 +163,6 @@ const SupplierManagement = () => {
   };
 
   const handleSaveSupplier = () => {
-    console.log('Creating new supplier:', newSupplier);
     setShowAddModal(false);
     setNewSupplier({
       name: '',
@@ -185,7 +183,7 @@ const SupplierManagement = () => {
 
   const handleDeleteSupplier = (supplier) => {
     if (window.confirm(`Bạn có chắc muốn xóa nhà cung cấp ${supplier.name}?`)) {
-      console.log('Deleting supplier:', supplier.id);
+
     }
   };
 
@@ -266,7 +264,7 @@ const SupplierManagement = () => {
                 <IoRefresh className="w-4 h-4" />
                 Làm mới
               </button>
-              <button 
+              <button
                 onClick={handleAddSupplier}
                 className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
               >
@@ -302,7 +300,7 @@ const SupplierManagement = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {suppliers.map((supplier) => {
                   const statusInfo = getStatusInfo(supplier.status);
-                  
+
                   return (
                     <tr key={supplier.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -336,13 +334,13 @@ const SupplierManagement = () => {
                           >
                             <IoEye className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleEditSupplier(supplier)}
                             className="text-green-600 hover:text-green-800"
                           >
                             <IoCreate className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDeleteSupplier(supplier)}
                             className="text-red-600 hover:text-red-800"
                           >
@@ -529,7 +527,7 @@ const SupplierManagement = () => {
                         <input
                           type="text"
                           value={newSupplier.name}
-                          onChange={(e) => setNewSupplier({...newSupplier, name: e.target.value})}
+                          onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập tên nhà cung cấp"
                           required
@@ -540,7 +538,7 @@ const SupplierManagement = () => {
                         <input
                           type="text"
                           value={newSupplier.contactPerson}
-                          onChange={(e) => setNewSupplier({...newSupplier, contactPerson: e.target.value})}
+                          onChange={(e) => setNewSupplier({ ...newSupplier, contactPerson: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập tên người liên hệ"
                           required
@@ -554,7 +552,7 @@ const SupplierManagement = () => {
                         <input
                           type="tel"
                           value={newSupplier.phone}
-                          onChange={(e) => setNewSupplier({...newSupplier, phone: e.target.value})}
+                          onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập số điện thoại"
                           required
@@ -565,7 +563,7 @@ const SupplierManagement = () => {
                         <input
                           type="email"
                           value={newSupplier.email}
-                          onChange={(e) => setNewSupplier({...newSupplier, email: e.target.value})}
+                          onChange={(e) => setNewSupplier({ ...newSupplier, email: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="Nhập email"
                           required
@@ -577,7 +575,7 @@ const SupplierManagement = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
                       <textarea
                         value={newSupplier.address}
-                        onChange={(e) => setNewSupplier({...newSupplier, address: e.target.value})}
+                        onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         rows="3"
                         placeholder="Nhập địa chỉ đầy đủ"
@@ -590,7 +588,7 @@ const SupplierManagement = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Danh mục</label>
                         <select
                           value={newSupplier.category}
-                          onChange={(e) => setNewSupplier({...newSupplier, category: e.target.value})}
+                          onChange={(e) => setNewSupplier({ ...newSupplier, category: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           required
                         >
@@ -606,7 +604,7 @@ const SupplierManagement = () => {
                         <input
                           type="number"
                           value={newSupplier.rating}
-                          onChange={(e) => setNewSupplier({...newSupplier, rating: parseInt(e.target.value)})}
+                          onChange={(e) => setNewSupplier({ ...newSupplier, rating: parseInt(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           min="1"
                           max="5"
@@ -619,7 +617,7 @@ const SupplierManagement = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
                       <textarea
                         value={newSupplier.notes}
-                        onChange={(e) => setNewSupplier({...newSupplier, notes: e.target.value})}
+                        onChange={(e) => setNewSupplier({ ...newSupplier, notes: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         rows="3"
                         placeholder="Nhập ghi chú bổ sung..."

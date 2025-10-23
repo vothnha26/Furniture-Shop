@@ -29,7 +29,6 @@ const NewItemsSlider = () => {
         const mapped = arr.map(p => productHelpers.mapProductFromApi(p));
         if (mounted) setItems(mapped);
       } catch (e) {
-        console.error('NewItemsSlider fetch error', e);
         if (mounted) setError(e);
       } finally {
         if (mounted) setIsLoading(false);

@@ -11,9 +11,7 @@ import {
 } from 'react-icons/io5';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import api from '../../api';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8081';
+import api, { BASE_URL } from '../../api';
 
 const StaffNotificationPopup = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -39,73 +37,52 @@ const StaffNotificationPopup = ({ user }) => {
   };
 
   // Fetch notifications from API
-  useEffect(() => {
-    console.log('[StaffNotificationPopup] Initializing for user:', user);
-    
+  useEffect(() => {    
     // Initial fetch
     const fetchNotifications = async () => {
       try {
-        console.log('[StaffNotificationPopup] Fetching staff notifications...');
         const response = await api.get('/api/v1/thong-bao/staff/me');
         const data = response?.data ?? response;
-        console.log('[StaffNotificationPopup] Received notifications:', data);
         setNotifications(normalizeNotifications(data));
       } catch (error) {
-        console.error('[StaffNotificationPopup] Error fetching notifications:', error);
+        
       }
     };
     
     fetchNotifications();
 
     // WebSocket connection for real-time updates
-    console.log('[StaffNotificationPopup] Setting up WebSocket connection');
-    const socket = new SockJS(`${API_BASE_URL}/ws-notifications`);
+  const wsUrl = `${String(BASE_URL || '').replace(/\/$/, '')}/ws-notifications`;
+  const socket = new SockJS(wsUrl);
     const stompClient = new Client({
-      webSocketFactory: () => socket,
-      debug: (str) => console.log('[StaffNotificationPopup STOMP]', str),
-      reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
+      webSocketFactory: () => socket
     });
 
     stompClient.onConnect = () => {
-      console.log('[StaffNotificationPopup] WebSocket connected!');
       
       // Subscribe to ALL notifications (for all staff)
-      const allSub = stompClient.subscribe('/topic/thong-bao/all', (message) => {
-        console.log('[StaffNotificationPopup] Received ALL notification:', message.body);
+  stompClient.subscribe('/topic/thong-bao/all', (message) => {
         try {
           const notification = JSON.parse(message.body);
           const normalized = normalizeNotifications([notification])[0];
           setNotifications(prev => [normalized, ...prev]);
         } catch (e) {
-          console.error('[StaffNotificationPopup] Error parsing notification:', e);
+          
         }
       });
-      console.log('[StaffNotificationPopup] Subscribed to: /topic/thong-bao/all');
 
       // Subscribe to STAFF notifications (if user has staff ID)
       if (user?.maNhanVien) {
-        const staffSub = stompClient.subscribe(`/topic/thong-bao/staff/${user.maNhanVien}`, (message) => {
-          console.log('[StaffNotificationPopup] Received STAFF notification:', message.body);
+  stompClient.subscribe(`/topic/thong-bao/staff/${user.maNhanVien}`, (message) => {
           try {
             const notification = JSON.parse(message.body);
             const normalized = normalizeNotifications([notification])[0];
             setNotifications(prev => [normalized, ...prev]);
           } catch (e) {
-            console.error('[StaffNotificationPopup] Error parsing STAFF notification:', e);
+            
           }
         });
-        console.log('[StaffNotificationPopup] Subscribed to: /topic/thong-bao/staff/' + user.maNhanVien);
       }
-    };
-
-    stompClient.onStompError = (frame) => {
-      console.error('[StaffNotificationPopup] STOMP error:', frame);
-    };
-
-    stompClient.onWebSocketError = (error) => {
-      console.error('[StaffNotificationPopup] WebSocket error:', error);
     };
 
     stompClient.activate();
@@ -114,7 +91,6 @@ const StaffNotificationPopup = ({ user }) => {
     // Fallback polling every 30s
     const startPolling = () => {
       if (pollerRef.current) return;
-      console.log('[StaffNotificationPopup] Starting fallback polling');
       pollerRef.current = setInterval(() => {
         api.get('/api/v1/thong-bao/staff/me').then(res => {
           const data = res?.data ?? res;
@@ -125,7 +101,6 @@ const StaffNotificationPopup = ({ user }) => {
     startPolling();
 
     return () => {
-      console.log('[StaffNotificationPopup] Cleaning up WebSocket and polling');
       if (stompRef.current) {
         stompRef.current.deactivate();
         stompRef.current = null;
@@ -184,34 +159,30 @@ const StaffNotificationPopup = ({ user }) => {
   };
 
   const markAsRead = (id) => {
-    console.log('[StaffNotificationPopup] Marking notification as read:', id);
     api.put(`/api/v1/thong-bao/${id}/danh-dau-da-doc`).then(() => {
       setNotifications(notifications.map(notif =>
         notif.id === id ? { ...notif, read: true } : notif
       ));
     }).catch(err => {
-      console.error('[StaffNotificationPopup] Error marking as read:', err);
+      
     });
   };
 
   const markAllAsRead = () => {
-    console.log('[StaffNotificationPopup] Đánh dấu tất cả thông báo staff là đã đọc');
     api.put('/api/v1/thong-bao/staff/danh-dau-tat-ca-da-doc').then(() => {
-      console.log('[StaffNotificationPopup] Thành công! Cập nhật UI');
       setNotifications(notifications.map(notif => ({ ...notif, read: true })));
       setIsOpen(false);
     }).catch(err => {
-      console.error('[StaffNotificationPopup] Lỗi khi đánh dấu tất cả:', err);
+
     });
   };
 
   const deleteNotification = (id, e) => {
     e.stopPropagation();
-    console.log('[StaffNotificationPopup] Deleting notification:', id);
     api.delete(`/api/v1/thong-bao/${id}`).then(() => {
       setNotifications(notifications.filter(notif => notif.id !== id));
     }).catch(err => {
-      console.error('[StaffNotificationPopup] Error deleting:', err);
+
     });
   };
 

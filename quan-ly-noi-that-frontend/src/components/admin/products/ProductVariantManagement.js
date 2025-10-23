@@ -104,12 +104,11 @@ const ProductVariantManagement = () => {
             const mapped = await fetchVariantsByProduct(p.maSanPham);
             allVariants.push(...mapped);
           } catch (e) {
-            console.warn('Failed to load variants for product', p.maSanPham, e);
+
           }
         }
         if (!cancelled) setVariants(allVariants);
       } catch (err) {
-        console.error('Fetch products/variants error', err);
         if (!cancelled) setError(err);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -253,7 +252,6 @@ const ProductVariantManagement = () => {
       }
       closeModal();
     } catch (err) {
-      console.error('Submit variant failed', err);
       const msg = err?.data?.error || err?.message || 'Có lỗi xảy ra';
       showToast(msg, 'error');
     }
@@ -305,7 +303,6 @@ const ProductVariantManagement = () => {
         setAttributes(loaded);
       }
     } catch (err) {
-      console.warn('fetchAttributes failed', err?.message || err);
       setAttributes([]);
       setAttrError(err?.message || 'Lỗi tải thuộc tính');
     } finally {
@@ -342,7 +339,6 @@ const ProductVariantManagement = () => {
       setDeleteId(null);
       showToast('Biến thể đã được tạm dừng hoạt động', 'success');
     } catch (error) {
-      console.error('Error deactivating variant:', error);
       showToast('Có lỗi xảy ra khi tạm dừng biến thể', 'error');
       setShowConfirmDialog(false);
       setDeleteId(null);
@@ -362,7 +358,6 @@ const ProductVariantManagement = () => {
       setVariants(prev => prev.map(x => x.maBienThe === id ? { ...x, trangThai: true } : x));
       showToast('Đã kích hoạt lại biến thể', 'success');
     } catch (error) {
-      console.error('Error activating variant:', error);
       showToast('Có lỗi xảy ra khi kích hoạt biến thể', 'error');
     }
   };

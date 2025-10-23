@@ -38,7 +38,6 @@ const CollectionManagement = () => {
         setCollections(data.content.map(mapCollectionFromApi));
       }
     } catch (err) {
-      console.error('Fetch collections error', err);
       setError(err);
     } finally {
       setIsLoading(false);
@@ -128,7 +127,6 @@ const CollectionManagement = () => {
         await fetchCollections();
         closeModal();
       } catch (err) {
-        console.error('Save collection error', err);
         showToast('Lưu bộ sưu tập thất bại', 'error');
       } finally {
         setIsLoading(false);
@@ -166,7 +164,6 @@ const CollectionManagement = () => {
         showToast('Xóa bộ sưu tập thành công');
         await fetchCollections();
       } catch (err) {
-        console.error('Delete collection error', err);
         // Hiển thị thông báo lỗi chi tiết
         const errorMessage = err.data?.message || err.message || 'Xóa bộ sưu tập thất bại';
         showToast(errorMessage, 'error');
@@ -201,7 +198,6 @@ const CollectionManagement = () => {
       const available = allList.filter(p => !inIds.has(p.maSanPham ?? p.id)).map(p => ({ maSanPham: p.maSanPham || p.id, tenSanPham: p.tenSanPham || p.name }));
       setAvailableProducts(available);
     } catch (err) {
-      console.error('Load products for collection error', err);
       showToast('Không thể tải danh sách sản phẩm', 'error');
       setManagingProducts([]);
       setAvailableProducts([]);
@@ -219,7 +215,6 @@ const CollectionManagement = () => {
       await loadProductsForCollection(collectionId);
       await fetchCollections();
     } catch (err) {
-      console.error('Add product to collection error', err);
       showToast('Thêm sản phẩm thất bại', 'error');
     } finally {
       setProductsLoading(false);
@@ -234,7 +229,6 @@ const CollectionManagement = () => {
       await loadProductsForCollection(collectionId);
       await fetchCollections();
     } catch (err) {
-      console.error('Remove product from collection error', err);
       showToast('Xóa sản phẩm thất bại', 'error');
     } finally {
       setProductsLoading(false);

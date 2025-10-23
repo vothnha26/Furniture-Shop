@@ -106,8 +106,6 @@ const OrderManagement = () => {
     useEffect(() => {
         const fetchOrders = async () => {
             setIsLoading(true);
-            // clear previous errors by logging (UI shows loading state)
-            console.debug('Fetching orders...');
             try {
                 // Giả định api.get('/api/banhang/donhang') trả về một object có property 'data' hoặc trực tiếp là mảng
                 const response = await api.get('/api/banhang/donhang');
@@ -120,7 +118,6 @@ const OrderManagement = () => {
                     setOrders([]);
                 }
             } catch (err) {
-                console.error('Fetch orders error', err);
                 alert('Không thể tải danh sách đơn hàng. Kiểm tra console để biết chi tiết.');
             } finally {
                 setIsLoading(false);
@@ -140,7 +137,6 @@ const OrderManagement = () => {
                 if (Array.isArray(data)) setVariants(data);
                 else setVariants([]);
             } catch (err) {
-                console.error('Fetch variants error', err);
                 setVariants([]);
             }
         };
@@ -182,7 +178,6 @@ const OrderManagement = () => {
             setSelectedQuantity(1);
             setShowAddModal(false);
         } catch (err) {
-            console.error('Create order error', err);
             alert('Lỗi khi tạo đơn hàng. Kiểm tra console để biết chi tiết.');
         } finally {
             setIsLoading(false);
@@ -197,7 +192,6 @@ const OrderManagement = () => {
                 // Optimistic UI update
                 setOrders(orders.filter(order => order.id !== id));
             } catch (err) {
-                console.error('Delete order error', err);
                 alert('Lỗi khi xóa đơn hàng. Kiểm tra console để biết chi tiết.');
             }
         }
@@ -220,7 +214,6 @@ const OrderManagement = () => {
             setNewStatus('');
             setSelectedOrder(null);
         } catch (err) {
-            console.error('Update order status error', err);
             alert('Lỗi khi cập nhật trạng thái đơn hàng. Kiểm tra console để biết chi tiết.');
         }
     };

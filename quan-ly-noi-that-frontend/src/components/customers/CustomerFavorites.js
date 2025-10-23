@@ -9,10 +9,10 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
   const { id, name, image, collection, rating, reviewCount, price, originalPrice } = product;
 
   const formatPrice = (p) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
-  
+
   // Tính discount percent từ originalPrice và price
-  const discountPercent = originalPrice > 0 && price > 0 && originalPrice > price 
-    ? Math.round(((originalPrice - price) / originalPrice) * 100) 
+  const discountPercent = originalPrice > 0 && price > 0 && originalPrice > price
+    ? Math.round(((originalPrice - price) / originalPrice) * 100)
     : 0;
 
   return (
@@ -20,11 +20,11 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
       <div className="relative overflow-hidden">
         <Link to={`/shop/products/${id}`} className="block">
           {image && image !== 'https://via.placeholder.com/300' ? (
-            <img 
-              loading="lazy" 
-              src={image} 
-              alt={name} 
-              className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500 bg-gray-100" 
+            <img
+              loading="lazy"
+              src={image}
+              alt={name}
+              className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500 bg-gray-100"
             />
           ) : (
             <div className="w-full h-64 bg-gradient-to-br from-gray-200 to-gray-100 flex flex-col items-center justify-center">
@@ -44,8 +44,8 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
         )}
 
         {/* Favorite Button */}
-        <button 
-          onClick={onToggleFavorite} 
+        <button
+          onClick={onToggleFavorite}
           className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 group/btn"
         >
           <IoHeart className="text-xl text-red-500 group-hover/btn:scale-125 transition-transform" />
@@ -62,8 +62,8 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
 
         {/* Product Name */}
         <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 min-h-[3rem]">
-          <Link 
-            to={`/shop/products/${id}`} 
+          <Link
+            to={`/shop/products/${id}`}
             className="hover:text-orange-600 transition-colors"
           >
             {name}
@@ -75,9 +75,9 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center">
               {[...Array(5)].map((_, i) => (
-                <IoStar 
-                  key={i} 
-                  className={`text-sm ${i < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`} 
+                <IoStar
+                  key={i}
+                  className={`text-sm ${i < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`}
                 />
               ))}
             </div>
@@ -114,7 +114,7 @@ const ProductCard = ({ product, onAddToCart, onToggleFavorite }) => {
 
         {/* Action Buttons */}
         <div className="flex justify-center">
-          <button 
+          <button
             onClick={onToggleFavorite}
             className="w-full py-3 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white rounded-lg transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg"
             title="Xóa khỏi yêu thích"
@@ -137,20 +137,20 @@ const CustomerFavorites = () => {
 
   useEffect(() => {
     const loadFavorites = async () => {
-      
+
       try {
         const res = await api.get('/api/v1/yeu-thich');
-        
+
         const data = res?.data || res || [];
-        
+
         // Lấy tất cả sản phẩm từ shop API để có giá đầy đủ
         const shopResponse = await api.get('/api/products/shop');
         const shopData = shopResponse.data ?? shopResponse;
         const shopProducts = Array.isArray(shopData) ? shopData : (shopData.items ?? shopData.content ?? []);
-        
+
         // Map product IDs từ favorites
         const favoriteIds = new Set((Array.isArray(data) ? data : []).map(p => p.maSanPham ?? p.id));
-        
+
         // Filter shop products để chỉ lấy những sản phẩm yêu thích
         const mapped = shopProducts
           .filter(p => favoriteIds.has(p.maSanPham ?? p.id))
@@ -195,7 +195,7 @@ const CustomerFavorites = () => {
           });
 
         setFavorites(mapped);
-        try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mapped.length } })); } catch (e) {}
+        try { window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: mapped.length } })); } catch (e) { }
       } catch (e) {
         setFavorites([]);
       }
@@ -209,15 +209,15 @@ const CustomerFavorites = () => {
         // Gọi API xóa khỏi database
         await api.del(`/api/v1/yeu-thich/${id}`);
       }
-      
+
       // Cập nhật state
       setFavorites(prev => {
         const next = prev.filter(item => String(item.id) !== String(id));
-        
-        try { 
-          window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: next.length } })); 
-        } catch (e) {}
-        
+
+        try {
+          window.dispatchEvent(new CustomEvent('favorites:changed', { detail: { count: next.length } }));
+        } catch (e) { }
+
         return next;
       });
     } catch (e) {
@@ -234,9 +234,11 @@ const CustomerFavorites = () => {
     if (!auth?.isAuthenticated) { window.location.href = '/login'; return false; }
     try {
       const ok = ctxAddToCart(product, null, 1);
-      if (ok !== false) { try { window.alert(`Đã thêm "${product.name || 'sản phẩm'}" vào giỏ hàng`); } catch (e) {} }
+      if (ok !== false) { try { window.alert(`Đã thêm "${product.name || 'sản phẩm'}" vào giỏ hàng`); } catch (e) { } }
       return ok;
-    } catch (e) { console.error(e); return false; }
+    } catch (e) {
+      return false;
+    }
   };
 
   const filteredFavorites = favorites.filter(item => String(item?.name || '').toLowerCase().includes(String(searchTerm || '').toLowerCase()));
@@ -254,13 +256,13 @@ const CustomerFavorites = () => {
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">Sản phẩm yêu thích</h1>
                 <p className="text-white/90 text-sm">
-                  {favorites.length > 0 
-                    ? `Bạn có ${favorites.length} sản phẩm trong danh sách yêu thích` 
+                  {favorites.length > 0
+                    ? `Bạn có ${favorites.length} sản phẩm trong danh sách yêu thích`
                     : 'Chưa có sản phẩm nào trong danh sách'}
                 </p>
               </div>
             </div>
-            
+
             {favorites.length > 0 && (
               <div className="text-right">
                 <div className="text-white/90 text-sm mb-1">Tổng giá trị ước tính</div>
@@ -304,23 +306,23 @@ const CustomerFavorites = () => {
         {filteredFavorites.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredFavorites.map(item => (
-              <ProductCard 
-                key={item.id} 
-                product={{ 
-                  id: item.id, 
-                  name: item.name, 
-                  image: item.image, 
-                  collection: item.category, 
-                  rating: item.rating, 
-                  reviewCount: item.reviews, 
-                  price: item.price || 0, 
-                  originalPrice: item.originalPrice || 0, 
-                  discount: (item.originalPrice && item.price) ? (item.originalPrice - item.price) : 0, 
-                  isFavorite: true, 
-                  inStock: item.inStock !== false 
-                }} 
-                onAddToCart={() => addToCart(item)} 
-                onToggleFavorite={() => removeFromFavorites(item.id)} 
+              <ProductCard
+                key={item.id}
+                product={{
+                  id: item.id,
+                  name: item.name,
+                  image: item.image,
+                  collection: item.category,
+                  rating: item.rating,
+                  reviewCount: item.reviews,
+                  price: item.price || 0,
+                  originalPrice: item.originalPrice || 0,
+                  discount: (item.originalPrice && item.price) ? (item.originalPrice - item.price) : 0,
+                  isFavorite: true,
+                  inStock: item.inStock !== false
+                }}
+                onAddToCart={() => addToCart(item)}
+                onToggleFavorite={() => removeFromFavorites(item.id)}
               />
             ))}
           </div>
@@ -345,8 +347,8 @@ const CustomerFavorites = () => {
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
               Hãy khám phá và thêm những sản phẩm bạn yêu thích vào danh sách để dễ dàng theo dõi và mua sắm sau này
             </p>
-            <Link 
-              to="/shop" 
+            <Link
+              to="/shop"
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105"
             >
               <IoStorefront className="w-5 h-5" />

@@ -83,7 +83,6 @@ const InvoiceManagement = () => {
       if (Array.isArray(data)) setInvoices(data.map(mapInvoiceFromApi));
       else setInvoices([]);
     } catch (err) {
-      console.error('Error fetching invoices:', err);
       alert('Không thể tải danh sách hóa đơn. Kiểm tra console để biết chi tiết.');
       setInvoices([]);
     }
@@ -110,7 +109,6 @@ const InvoiceManagement = () => {
           const sData = staffRes.value.data || staffRes.value;
           setStaff(Array.isArray(sData) ? sData : []);
         } else {
-          console.debug('No staff endpoint or error', staffRes.reason);
           setStaff([]);
         }
 
@@ -118,11 +116,9 @@ const InvoiceManagement = () => {
           const oData = ordersRes.value.data || ordersRes.value;
           setOrders(Array.isArray(oData) ? oData : []);
         } else {
-          console.debug('No orders endpoint or error', ordersRes.reason);
           setOrders([]);
         }
       } catch (err) {
-        console.error('Error fetching supporting invoice data', err);
         setStaff([]);
         setOrders([]);
       }

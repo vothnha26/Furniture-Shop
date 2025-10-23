@@ -79,11 +79,8 @@ const CustomerBenefits = () => {
     setLoading(true);
     try {
       // Load membership tiers from API first
-      console.log('[CustomerBenefits] Loading membership tiers...');
       const tiersResponse = await api.get('/api/hang-thanh-vien/all');
       const tiersData = tiersResponse?.data || tiersResponse || [];
-      
-      console.log('[CustomerBenefits] Membership tiers from API:', tiersData);
       
       // Map backend data to frontend format
       const mappedTiers = tiersData
@@ -118,13 +115,10 @@ const CustomerBenefits = () => {
         });
       
       setMembershipTiers(mappedTiers);
-      console.log('[CustomerBenefits] Mapped membership tiers:', mappedTiers);
 
       // Load customer data including membership info
       const customerData = await api.get('/api/v1/khach-hang/me');
       const customer = customerData?.data || customerData;
-      
-      console.log('[CustomerBenefits] Customer data:', customer);
 
       // Get points from backend (diemThuong)
       const points = customer.diemThuong || 0;
@@ -154,16 +148,13 @@ const CustomerBenefits = () => {
       await loadVouchers();
 
     } catch (error) {
-      console.error('[CustomerBenefits] Error loading data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const loadVouchers = async () => {
-    try {
-      console.log('[CustomerBenefits] Fetching vouchers from API...');
-      
+    try {      
       // Option 1: Try to get eligible vouchers for current customer if we have customer ID
       let response;
       try {
@@ -172,33 +163,19 @@ const CustomerBenefits = () => {
         const maKhachHang = customer?.maKhachHang;
         
         if (maKhachHang) {
-          console.log('[CustomerBenefits] Fetching eligible vouchers for customer:', maKhachHang);
           response = await api.get(`/api/v1/voucher/eligible/${maKhachHang}/details`);
         } else {
-          console.log('[CustomerBenefits] No customer ID, fetching all vouchers');
           response = await api.get('/api/v1/voucher/all');
         }
       } catch (err) {
-        console.log('[CustomerBenefits] Error getting customer-specific vouchers, falling back to all:', err.message);
         // Fallback to getting all vouchers
         response = await api.get('/api/v1/voucher/all');
       }
       
-      console.log('[CustomerBenefits] Raw API response:', response);
-      console.log('[CustomerBenefits] Response type:', typeof response);
-      console.log('[CustomerBenefits] Response keys:', Object.keys(response || {}));
-      
       const voucherList = response?.data || response || [];
-      console.log('[CustomerBenefits] Parsed voucher list:', voucherList);
-      console.log('[CustomerBenefits] Total vouchers from API:', voucherList.length);
-      
-      if (voucherList.length > 0) {
-        console.log('[CustomerBenefits] Sample voucher structure:', voucherList[0]);
-      }
       
       // Filter active vouchers (not expired and available)
       const now = new Date();
-      console.log('[CustomerBenefits] Current date for filtering:', now);
       
       const activeVouchers = voucherList.filter((v, index) => {
         const endDate = new Date(v.ngayKetThuc);
@@ -214,38 +191,13 @@ const CustomerBenefits = () => {
         
         const isActive = notExpired && available && statusOk;
         
-        if (index < 5) { // Log first 5 vouchers for debugging
-          console.log(`[CustomerBenefits] Voucher ${index + 1}:`, {
-            tenVoucher: v.tenVoucher,
-            maCode: v.maCode,
-            ngayKetThuc: v.ngayKetThuc,
-            endDate: endDate,
-            notExpired: notExpired,
-            soLuongToiDa: soLuongToiDa,
-            soLuongDaSuDung: soLuongDaSuDung,
-            available: available,
-            trangThai: v.trangThai,
-            statusOk: statusOk,
-            isActive: isActive
-          });
-        }
-        
         return isActive;
       });
-
-      console.log('[CustomerBenefits] Active vouchers after filtering:', activeVouchers.length);
-      console.log('[CustomerBenefits] Active vouchers:', activeVouchers);
       
       // Store all active vouchers
       setAllVouchers(activeVouchers);
       setVouchers(activeVouchers);
     } catch (error) {
-      console.error('[CustomerBenefits] Error loading vouchers:', error);
-      console.error('[CustomerBenefits] Error details:', {
-        message: error.message,
-        response: error.response,
-        stack: error.stack
-      });
       setAllVouchers([]);
       setVouchers([]);
     }

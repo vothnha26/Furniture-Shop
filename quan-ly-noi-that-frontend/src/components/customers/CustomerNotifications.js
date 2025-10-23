@@ -32,7 +32,6 @@ const CustomerNotifications = () => {
       const list = Array.isArray(data) ? data : (data?.data || []);
       setNotifications(list.map(normalize));
     } catch (e) {
-      console.error('[CustomerNotifications] Fetch error', e);
       setError('Không thể tải thông báo');
     } finally {
       setLoading(false);
@@ -91,7 +90,6 @@ const CustomerNotifications = () => {
       await api.put(`/api/v1/thong-bao/${id}/danh-dau-da-doc`, {});
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (e) {
-      console.error('[CustomerNotifications] markAsRead error', e);
       alert('Không thể đánh dấu đã đọc');
     }
   };
@@ -101,7 +99,6 @@ const CustomerNotifications = () => {
       await api.put('/api/v1/thong-bao/danh-dau-tat-ca-da-doc', {});
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (e) {
-      console.error('[CustomerNotifications] markAllAsRead error', e);
       alert('Không thể đánh dấu tất cả đã đọc');
     }
   };
@@ -111,7 +108,6 @@ const CustomerNotifications = () => {
       await api.delete(`/api/v1/thong-bao/${id}`);
       setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (e) {
-      console.error('[CustomerNotifications] delete error', e);
       alert('Không thể xóa thông báo');
     }
   };

@@ -67,7 +67,6 @@ const InventoryManagement = () => {
       setVariants(list);
       setError(null);
     } catch (err) {
-      console.error('Lỗi tải danh sách biến thể:', err);
       setError('Không thể tải danh sách biến thể');
     } finally {
       setIsLoading(false);
@@ -117,7 +116,7 @@ const InventoryManagement = () => {
           const prodList = Array.isArray(prodResp) ? prodResp : (prodResp?.data || prodResp?.content || []);
           setProducts(prodList.map(p => ({ maSanPham: p.maSanPham ?? p.id, tenSanPham: p.tenSanPham ?? p.name })));
         } catch (e) {
-          console.warn('Không lấy được danh sách sản phẩm', e);
+          
         }
         // load recent transactions (from stock history table) - fetch last 20 entries
         try {
@@ -141,7 +140,7 @@ const InventoryManagement = () => {
           const supResp = await api.get('/api/suppliers');
           setSuppliers(Array.isArray(supResp) ? supResp : (supResp?.data || []));
         } catch (err) {
-          console.warn('Không lấy được danh sách nhà cung cấp', err);
+          
         }
         // Auto-open import modal if quick-launch flag is set
         try {
@@ -155,7 +154,6 @@ const InventoryManagement = () => {
         }
         setError(null);
       } catch (err) {
-        console.error('Fetch inventory error', err);
         setError('Không thể tải dữ liệu tồn kho');
       } finally {
         setIsLoading(false);
@@ -177,7 +175,7 @@ const InventoryManagement = () => {
       });
       setInventory(mapped);
     } catch (err) {
-      console.error('Refresh inventory error', err);
+      
     }
   };
 
@@ -257,7 +255,6 @@ const InventoryManagement = () => {
           alert(resp?.message || 'Nhập kho thất bại');
         }
       } catch (err) {
-        console.error('Import API error', err);
         alert('Lỗi khi gọi API nhập kho');
       } finally {
         setIsLoading(false);
@@ -289,7 +286,6 @@ const InventoryManagement = () => {
         alert('Không thể tạo nhà cung cấp');
       }
     } catch (err) {
-      console.error('Create supplier error', err);
       alert('Lỗi khi tạo nhà cung cấp');
     }
   };
@@ -330,7 +326,6 @@ const InventoryManagement = () => {
           alert(resp?.message || 'Xuất kho thất bại');
         }
       } catch (err) {
-        console.error('Export API error', err);
         alert('Lỗi khi gọi API xuất kho');
       } finally {
         setIsLoading(false);
@@ -364,7 +359,6 @@ const InventoryManagement = () => {
           alert(resp?.message || 'Điều chỉnh thất bại');
         }
       } catch (err) {
-        console.error('Adjust API error', err);
         alert('Lỗi khi gọi API điều chỉnh');
       } finally {
         setIsLoading(false);

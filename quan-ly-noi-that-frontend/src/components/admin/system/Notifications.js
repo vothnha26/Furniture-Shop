@@ -60,7 +60,7 @@ const Notifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [quickCreate, setQuickCreate] = useState({ loai: 'info', tieuDe: '', noiDung: '', loaiNguoiNhan: 'ALL' });
-  
+
   const [selectedFilter, setSelectedFilter] = useState('all');
 
   // API Functions
@@ -108,7 +108,6 @@ const Notifications = () => {
       const status = error && error.status ? error.status : 'network-error';
       const body = error && error.data ? JSON.stringify(error.data) : String(error);
       setError(`Error fetching notifications (status: ${status}) — ${body}`);
-      console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -120,17 +119,17 @@ const Notifications = () => {
       const data = res && res.data ? res.data : res;
       const count = data && (data.unread ?? data.count ?? 0);
       setUnreadCount(Number(count || 0));
-    } catch (e) { console.debug('Failed to fetch unread count', e); }
+    } catch (e) { }
   };
 
   const markAsRead = async (notificationId) => {
     try {
       await api.put(`/api/v1/thong-bao/${notificationId}/danh-dau-da-doc`);
-      setNotifications(prev => prev.map(notif => 
+      setNotifications(prev => prev.map(notif =>
         notif.id === notificationId ? { ...notif, read: true } : notif
       ));
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+
     }
   };
 
@@ -140,7 +139,7 @@ const Notifications = () => {
       setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
       setUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+
     }
   };
 
@@ -149,14 +148,14 @@ const Notifications = () => {
       await api.delete(`/api/v1/thong-bao/${notificationId}`);
       setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
     } catch (error) {
-      console.error('Error deleting notification:', error);
+
     }
   };
 
   useEffect(() => {
     fetchNotifications();
     fetchUnreadCount();
-    
+
     // Set up polling for new notifications
     const interval = setInterval(fetchNotifications, 30000); // Check every 30 seconds
     return () => clearInterval(interval);
@@ -192,18 +191,17 @@ const Notifications = () => {
           <p className="text-gray-600">Quản lý và theo dõi các thông báo hệ thống</p>
         </div>
 
-  {/* Filter Tabs */}
+        {/* Filter Tabs */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex flex-wrap gap-2">
             {filters.map((filter) => (
               <button
                 key={filter.id}
                 onClick={() => setSelectedFilter(filter.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedFilter === filter.id
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedFilter === filter.id
                     ? 'bg-primary text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {filter.name} ({filter.count})
               </button>
@@ -269,7 +267,7 @@ const Notifications = () => {
                     await fetchNotifications();
                     await fetchUnreadCount();
                     setShowQuickCreate(false);
-                  } catch (e) { console.error('Quick create failed', e); }
+                  } catch (e) { }
                 }}>Gửi</button>
                 <button className="px-4 py-2 border rounded" onClick={() => setShowQuickCreate(false)}>Hủy</button>
               </div>
@@ -291,9 +289,8 @@ const Notifications = () => {
               return (
                 <div
                   key={notification.id}
-                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
-                    notification.read ? 'border-gray-200' : 'border-primary'
-                  }`}
+                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${notification.read ? 'border-gray-200' : 'border-primary'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-4">
@@ -315,15 +312,14 @@ const Notifications = () => {
                             <IoTime className="w-4 h-4" />
                             {notification.time}
                           </span>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            notification.type === 'success' ? 'bg-green-100 text-green-800' :
-                            notification.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
-                            notification.type === 'info' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${notification.type === 'success' ? 'bg-green-100 text-green-800' :
+                              notification.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                                notification.type === 'info' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                            }`}>
                             {notification.type === 'success' ? 'Thành công' :
-                             notification.type === 'warning' ? 'Cảnh báo' :
-                             notification.type === 'info' ? 'Thông tin' : 'Khác'}
+                              notification.type === 'warning' ? 'Cảnh báo' :
+                                notification.type === 'info' ? 'Thông tin' : 'Khác'}
                           </span>
                         </div>
                       </div>

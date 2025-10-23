@@ -118,7 +118,6 @@ const SalesManagement = () => {
 
         // productsData not used in admin flow; skip
       } catch (err) {
-        console.error('Fetch data error', err);
         setError(err);
       } finally {
         setIsLoading(false);
@@ -178,7 +177,6 @@ const SalesManagement = () => {
           })));
         }
       } catch (e) {
-        console.warn('Variant search failed', e);
         if (active) setVariants([]);
       }
     };
@@ -336,10 +334,10 @@ const SalesManagement = () => {
           };
           await api.post('/api/v1/thong-bao', payload);
         } else {
-          console.info('Create order response did not include maDonHang, skipping notification.');
+
         }
       } catch (notifyErr) {
-        console.warn('Failed to send admin notification for created order', notifyErr);
+
       }
 
       // Refresh data
@@ -359,7 +357,6 @@ const SalesManagement = () => {
       });
       setShowCreateOrderModal(false);
     } catch (error) {
-      console.error('Error creating order:', error);
       alert('Có lỗi xảy ra khi tạo đơn hàng!');
     }
   };
@@ -412,7 +409,6 @@ const SalesManagement = () => {
       distributeVoucherDiscount(Number(res.giamGiaVoucher || 0));
       showToast('Áp dụng voucher thành công');
     } catch (err) {
-      console.error('Apply voucher error', err);
       alert('Lỗi khi áp dụng voucher');
     }
   };
@@ -441,7 +437,6 @@ const SalesManagement = () => {
       setNewOrder(prev => ({ ...prev, customerName: mapped.tenKhachHang || prev.customerName, customerPhone: mapped.soDienThoai || prev.customerPhone, maKhachHang: mapped.maKhachHang }));
       return mapped;
     } catch (err) {
-      console.warn('Customer lookup failed', err);
       return null;
     }
   };
@@ -506,7 +501,6 @@ const SalesManagement = () => {
       setShowPaymentModal(false);
       showToast('Đã đánh dấu đơn hàng là đã thanh toán.');
     } catch (err) {
-      console.error('Complete payment error', err);
       setError(err);
       alert(`Không thể cập nhật thanh toán: ${err?.data?.message || err.message || 'Lỗi không xác định'}`);
     }
@@ -522,7 +516,6 @@ const SalesManagement = () => {
           setOrders(ordersData.map(mapSalesFromApi));
         }
       } catch (err) {
-        console.error('Delete order error', err);
         setError(err);
       }
     }
@@ -543,7 +536,6 @@ const SalesManagement = () => {
 
   const handleChangeStatus = async (orderId, newStatus) => {
     if (!orderId || !newStatus) {
-      console.warn('handleChangeStatus called with invalid args', { orderId, newStatus });
       return;
     }
 
@@ -572,14 +564,12 @@ const SalesManagement = () => {
     setOrders(updated);
 
     try {
-      console.log('Updating status for order', orderId, '->', newStatus);
       if (newStatus === 'completed') {
         // Use service-backed complete endpoint to ensure all side-effects (PAID, points, stats)
         await api.post(`/api/v1/quan-ly-trang-thai-don-hang/${orderId}/complete`);
       } else {
         // Build payload for unified endpoint for other transitions
         const backendStatus = toBackendStatus(newStatus);
-        console.log('Status change payload:', { trangThai: backendStatus });
         await api.put(`/api/banhang/donhang/${orderId}/trangthai`, { trangThai: backendStatus });
       }
 
@@ -596,8 +586,6 @@ const SalesManagement = () => {
         setOrders(ordersData.map(mapSalesFromApi));
       }
     } catch (err) {
-      // Log richer error details to help compare with Postman
-      console.error('Update status error', err, 'status=', err?.status, 'data=', err?.data);
       setError(err);
       // revert optimistic update
       setOrders(prevOrders);

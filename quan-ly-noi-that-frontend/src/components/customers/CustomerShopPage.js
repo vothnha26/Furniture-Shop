@@ -44,7 +44,7 @@ const mapProductFromApi = (product) => {
     discount: Number(product.giam_gia ?? product.discount) || 0,
     isNew: Boolean(product.san_pham_moi ?? product.isNew),
     isFeatured: Boolean(product.noi_bat ?? product.isFeatured),
-  variants: Number(product.so_luong_bien_the ?? product.soLuongBienThe ?? product.availableVariantCount ?? product.available_variant_count ?? product.so_luong_bien_the ?? product.variants ?? 0) || 0,
+    variants: Number(product.so_luong_bien_the ?? product.soLuongBienThe ?? product.availableVariantCount ?? product.available_variant_count ?? product.so_luong_bien_the ?? product.variants ?? 0) || 0,
     attributes: (product.thuoc_tinh || product.attributes || []).map(attr => ({
       name: attr.ten_thuoc_tinh ?? attr.name,
       value: attr.gia_tri ?? attr.value
@@ -94,22 +94,19 @@ const CustomerShopPage = () => {
       setFavoriteIds(new Set());
       return;
     }
-    
+
     try {
-      console.log('🔄 [Shop] Load danh sách yêu thích từ database...');
       const response = await api.get('/api/v1/yeu-thich');
       const favoriteProducts = response.data || [];
       const ids = new Set(favoriteProducts.map(p => p.maSanPham || p.id));
       setFavoriteIds(ids);
-      console.log('✅ [Shop] Đã load', ids.size, 'sản phẩm yêu thích');
-      
+
       // Update products with favorite status
       setProducts(prev => prev.map(p => ({
         ...p,
         isFavorite: ids.has(p.id)
       })));
     } catch (error) {
-      console.error('❌ [Shop] Lỗi khi load yêu thích:', error);
       setFavoriteIds(new Set());
     }
   }, [auth?.isAuthenticated]);
@@ -124,10 +121,10 @@ const CustomerShopPage = () => {
       if (filters.collectionId) params.append('bo_suu_tap_id', filters.collectionId);
       if (filters.minPrice) params.append('gia_tu', filters.minPrice);
       if (filters.maxPrice) params.append('gia_den', filters.maxPrice);
-  if (filters.sortBy) params.append('sap_xep', filters.sortBy);
-  // Pagination params
-  if (requestedPage !== undefined && requestedPage !== null) params.append('page', String(requestedPage));
-  if (requestedSize !== undefined && requestedSize !== null) params.append('size', String(requestedSize));
+      if (filters.sortBy) params.append('sap_xep', filters.sortBy);
+      // Pagination params
+      if (requestedPage !== undefined && requestedPage !== null) params.append('page', String(requestedPage));
+      if (requestedSize !== undefined && requestedSize !== null) params.append('size', String(requestedSize));
 
       // Prefer a shop-optimized endpoint that returns variant-aware min/max prices and stock
       let response;
@@ -141,18 +138,17 @@ const CustomerShopPage = () => {
 
       // Debug: log the first few items so we can inspect the API shape in the browser console
       try {
-        console.debug('products response sample', Array.isArray(response.data) ? response.data.slice(0, 3) : response.data);
       } catch (e) {
         // ignore
       }
 
       // Map either shop DTOs or legacy product objects into the UI product shape
-  // If backend returned paged response (items + page metadata)
-  const payload = response.data && response.data.items ? response.data : response.data;
+      // If backend returned paged response (items + page metadata)
+      const payload = response.data && response.data.items ? response.data : response.data;
 
-  const sourceArray = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : []);
+      const sourceArray = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : []);
 
-  const mapped = sourceArray.map((p) => {
+      const mapped = sourceArray.map((p) => {
         // If the backend returned the shop DTO fields (minPrice/maxPrice/stockQuantity)
         if (p && (p.minPrice !== undefined || p.min_price !== undefined || p.price !== undefined || p.maSanPham !== undefined)) {
           const min = Number(p.minPrice ?? p.min_price ?? p.price ?? 0) || 0;
@@ -245,7 +241,7 @@ const CustomerShopPage = () => {
       });
 
       // If paged response, update pagination info and either append or replace
-  if (response.data && response.data.items) {
+      if (response.data && response.data.items) {
         const respPage = Number(response.data.page ?? requestedPage) || 0;
         const respSize = Number(response.data.size ?? requestedSize) || requestedSize;
         const respTotalPages = Number(response.data.totalPages ?? Math.ceil((response.data.totalItems || 0) / respSize));
@@ -261,23 +257,22 @@ const CustomerShopPage = () => {
         }));
 
         setProducts(prev => append ? [...prev, ...mappedWithFavorites] : mappedWithFavorites);
-  } else {
+      } else {
         // legacy array response — treat as single full page (replace)
         setPage(0);
         setSize(mapped.length);
         setTotalPages(1);
-        
+
         // Mark products as favorite based on favoriteIds
         const mappedWithFavorites = mapped.map(p => ({
           ...p,
           isFavorite: favoriteIds.has(p.id)
         }));
-        
+
         setProducts(mappedWithFavorites);
       }
     } catch (error) {
       setError('Không thể tải danh sách sản phẩm');
-      console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
     }
@@ -288,7 +283,7 @@ const CustomerShopPage = () => {
       const response = await api.get('/api/categories');
       setCategories(response.data.map(mapCategoryFromApi));
     } catch (error) {
-      console.error('Error fetching categories:', error);
+
     }
   };
 
@@ -302,7 +297,7 @@ const CustomerShopPage = () => {
         productCount: collection.so_san_pham || 0
       })));
     } catch (error) {
-      console.error('Error fetching collections:', error);
+
     }
   };
 
@@ -311,7 +306,7 @@ const CustomerShopPage = () => {
       const isAuthenticated = auth?.isAuthenticated;
       // Accept either product object or id
       const id = typeof productId === 'object' ? (productId.id ?? productId.maSanPham) : productId;
-      
+
       if (!isAuthenticated) {
         // redirect to login
         window.location.href = '/login';
@@ -321,49 +316,44 @@ const CustomerShopPage = () => {
       // Check if product is already in favorites
       const isFavorite = favoriteIds.has(id);
 
-      console.log(`${isFavorite ? '🗑️' : '💝'} [Shop] ${isFavorite ? 'Xóa' : 'Thêm'} yêu thích:`, id);
-
       if (isFavorite) {
         // Remove from favorites
         await api.delete(`/api/v1/yeu-thich/${id}`);
-        console.log('✅ [Shop] Đã xóa khỏi yêu thích:', id);
-        
+
         // Update favoriteIds
         setFavoriteIds(prev => {
           const newSet = new Set(prev);
           newSet.delete(id);
           return newSet;
         });
-        
+
         // Update UI
         setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: false } : p));
-        
+
         // Dispatch event to update favorites count
-        window.dispatchEvent(new CustomEvent('favorites:changed', { 
-          detail: { count: favoriteIds.size - 1 } 
+        window.dispatchEvent(new CustomEvent('favorites:changed', {
+          detail: { count: favoriteIds.size - 1 }
         }));
       } else {
         // Add to favorites
         await api.post('/api/v1/yeu-thich', { productId: id });
-        console.log('✅ [Shop] Đã thêm vào yêu thích:', id);
-        
+
         // Update favoriteIds
         setFavoriteIds(prev => {
           const newSet = new Set(prev);
           newSet.add(id);
           return newSet;
         });
-        
+
         // Update UI
         setProducts(prev => prev.map(p => p.id === id ? { ...p, isFavorite: true } : p));
-        
+
         // Dispatch event to update favorites count
-        window.dispatchEvent(new CustomEvent('favorites:changed', { 
-          detail: { count: favoriteIds.size + 1 } 
+        window.dispatchEvent(new CustomEvent('favorites:changed', {
+          detail: { count: favoriteIds.size + 1 }
         }));
       }
     } catch (error) {
-      console.error('❌ [Shop] Lỗi khi thao tác yêu thích:', error);
       alert('Có lỗi xảy ra. Vui lòng thử lại!');
     }
   };
@@ -385,7 +375,7 @@ const CustomerShopPage = () => {
         setProducts(prev => prev.map(p => p.id === productId ? { ...p, inCart: true } : p));
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
+
     }
   };
 
@@ -473,11 +463,11 @@ const CustomerShopPage = () => {
 
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
-          { (product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
+          {(product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
             <span className="bg-red-500 text-white px-2 py-1 rounded text-xs font-medium">
               -{product.discountPercent != null && product.discountPercent > 0 ? product.discountPercent : Math.round(((product.discount || 0) / (product.originalPrice || 1)) * 100)}%
             </span>
-          ) : null }
+          ) : null}
         </div>
 
         {/* Favorite Button */}
@@ -520,10 +510,10 @@ const CustomerShopPage = () => {
               {product.price > 0 ? formatPrice(product.price) : 'Liên hệ'}
             </span>
             {/* show discount percent badge (prefer explicit discountPercent or computed from discount amount) */}
-            { (product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
+            {(product.discountPercent != null && product.discountPercent > 0) || (product.discount && product.discount > 0) ? (
               <span className="text-sm text-red-600 font-medium">-
                 {product.discountPercent != null && product.discountPercent > 0 ? product.discountPercent : Math.round(((product.discount || 0) / (product.originalPrice || 1)) * 100)}%</span>
-            ) : null }
+            ) : null}
           </div>
           {(product.discount && product.discount > 0) && (
             <div className="text-xs text-gray-500">Tiết kiệm: {formatPrice(product.discount)}</div>
@@ -596,11 +586,11 @@ const CustomerShopPage = () => {
 
             <div className="mb-4">
               <div className="font-bold text-xl text-gray-900">
-                  {product.price > 0 ? formatPrice(product.price) : 'Liên hệ'}
-                </div>
-                {(product.discount && product.discount > 0) && (
-                  <div className="text-sm text-gray-500">Tiết kiệm: {formatPrice(product.discount)}</div>
-                )}
+                {product.price > 0 ? formatPrice(product.price) : 'Liên hệ'}
+              </div>
+              {(product.discount && product.discount > 0) && (
+                <div className="text-sm text-gray-500">Tiết kiệm: {formatPrice(product.discount)}</div>
+              )}
             </div>
 
             <button onClick={() => addToCart(product.id, 1)} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors">

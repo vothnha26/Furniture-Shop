@@ -82,7 +82,6 @@ const CustomerManagement = () => {
         }
       } catch (err) {
         setError(err);
-        console.error('Fetch customers error', err);
       } finally {
         setIsLoading(false);
       }
@@ -100,7 +99,7 @@ const CustomerManagement = () => {
         });
         setTiers(sorted);
       } catch (e) {
-        console.error('Fetch tiers error', e);
+        
       }
     };
     fetchCustomers();
@@ -116,7 +115,6 @@ const CustomerManagement = () => {
         const createdMapped = mapCustomerFromApi(created || {});
         setCustomers(prev => [...prev, createdMapped]);
       } catch (err) {
-        console.error('Add customer error', err);
         setError(err);
       } finally {
         setNewCustomer({ name: '', email: '', phone: '', address: '', vipLevelId: '' });
@@ -132,7 +130,6 @@ const CustomerManagement = () => {
         await api.del(`/api/v1/khach-hang/${id}`);
         setCustomers(prev => prev.filter(customer => customer.id !== id));
       } catch (err) {
-        console.error('Delete customer error', err);
         setError(err);
       }
     };
@@ -156,7 +153,6 @@ const CustomerManagement = () => {
         await api.put(`/api/v1/khach-hang/${selectedCustomer.id}`, { body: payload });
         setCustomers(prev => prev.map(c => c.id === selectedCustomer.id ? { ...c, ...selectedCustomer } : c));
       } catch (err) {
-        console.error('Save edit error', err);
         setError(err);
       } finally {
         setShowEditModal(false);

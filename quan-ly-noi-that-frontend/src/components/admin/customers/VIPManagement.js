@@ -150,7 +150,6 @@ const VIPManagement = () => {
           setVipBenefits(response.map(mapVipLevelFromApi));
         }
       } catch (err) {
-        console.error('Fetch VIP levels error', err);
         setError('Không thể tải danh sách cấp độ VIP');
       }
     };
@@ -162,7 +161,6 @@ const VIPManagement = () => {
           setVipCustomers(response.map(mapVipCustomerFromApi));
         }
       } catch (err) {
-        console.error('Fetch VIP customers error', err);
         setError('Không thể tải danh sách khách hàng VIP');
       }
     };
@@ -192,7 +190,7 @@ const VIPManagement = () => {
       try {
         await Promise.all([fetchVipLevels(), fetchVipCustomers()]);
       } catch (err) {
-        console.error('Fetch VIP data error', err);
+        
       } finally {
         setIsLoading(false);
       }

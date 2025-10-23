@@ -27,8 +27,6 @@ const Login = () => {
     setIsLoading(true);
     setError('');
 
-    console.log('🔐 [Login] Submitting login form...');
-
     try {
       // Use AuthContext.login so provider state updates and ProtectedRoute can pick up the user
       const result = await auth.login({ tenDangNhap: formData.tenDangNhap, password: formData.password });
@@ -42,13 +40,11 @@ const Login = () => {
       const normalizeRole = (r) => (r || '').toString().toUpperCase().replace(/^ROLE_/, '').trim();
       const role = normalizeRole(rawRole);
 
-      console.log('🚀 [Login] Redirecting for role:', role || 'UNKNOWN');
       if (role === 'USER' || !role) navigate('/shop');
       else if (role === 'ADMIN' || role === 'MANAGER') navigate('/admin/dashboard');
       else if (role === 'STAFF' || role === 'EMPLOYEE') navigate('/staff/dashboard');
       else navigate('/shop');
     } catch (err) {
-      console.error('❌ [Login] Authentication failed:', err);
       setError(err.data?.message || err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);

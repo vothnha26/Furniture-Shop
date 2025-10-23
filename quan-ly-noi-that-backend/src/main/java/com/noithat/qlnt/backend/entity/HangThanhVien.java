@@ -24,7 +24,7 @@ public class HangThanhVien {
     @Column(name = "diem_toi_thieu", nullable = false)
     private Integer diemToiThieu = 0;
 
-    @Column(name = "mo_ta", columnDefinition = "TEXT")
+    @Column(name = "mo_ta", columnDefinition = "NVARCHAR(MAX)")
     private String moTa; // Mô tả hạng thành viên
 
     @Column(name = "mau_sac", columnDefinition = "NVARCHAR(20)")

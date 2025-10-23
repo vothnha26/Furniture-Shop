@@ -22,7 +22,7 @@ public class BoSuuTap {
     @Column(name = "TenBoSuuTap", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenBoSuuTap;
 
-    @Column(name = "MoTa", columnDefinition = "TEXT")
+    @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
     // Optional main image path for the collection (relative URL, e.g. /uploads/collections/{id}/file.jpg)

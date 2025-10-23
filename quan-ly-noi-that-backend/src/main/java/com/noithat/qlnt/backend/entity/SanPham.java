@@ -16,7 +16,7 @@ public class SanPham {
     @Column(name = "TenSanPham", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenSanPham;
 
-    @Column(name = "MoTa", columnDefinition = "TEXT")
+    @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
     @ManyToOne(fetch = FetchType.LAZY)

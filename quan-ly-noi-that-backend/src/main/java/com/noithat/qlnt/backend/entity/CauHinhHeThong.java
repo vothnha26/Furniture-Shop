@@ -25,7 +25,7 @@ public class CauHinhHeThong {
     @Column(name = "config_value", columnDefinition = "NVARCHAR(4000)")
     private String configValue;
 
-    @Column(name = "mo_ta", columnDefinition = "TEXT")
+    @Column(name = "mo_ta", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
     @Column(name = "ngay_cap_nhat")

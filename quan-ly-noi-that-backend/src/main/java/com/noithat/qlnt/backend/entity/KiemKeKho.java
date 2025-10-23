@@ -18,7 +18,7 @@ public class KiemKeKho {
     @Column(name = "TenKiemKe", nullable = false, columnDefinition = "NVARCHAR(255)")
     private String tenKiemKe;
     
-    @Column(name = "MoTa", columnDefinition = "TEXT")
+    @Column(name = "MoTa", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
     
     @Column(name = "TrangThai", nullable = false)

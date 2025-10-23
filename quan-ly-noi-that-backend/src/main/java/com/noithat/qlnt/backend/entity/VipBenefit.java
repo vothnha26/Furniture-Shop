@@ -27,10 +27,10 @@ public class VipBenefit {
     private String benefitType;
 
     // Params stored as JSON or plain text (eg: {"minOrder":200000})
-    @Column(name = "Params", columnDefinition = "TEXT")
+    @Column(name = "Params", columnDefinition = "NVARCHAR(MAX)")
     private String params;
 
-    @Column(name = "Description", columnDefinition = "TEXT")
+    @Column(name = "Description", columnDefinition = "NVARCHAR(MAX)")
     private String description;
 
     @Column(name = "Active")

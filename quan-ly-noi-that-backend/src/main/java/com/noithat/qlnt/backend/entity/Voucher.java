@@ -24,7 +24,7 @@ public class Voucher {
     @Column(name = "ten_voucher", columnDefinition = "NVARCHAR(255)")
     private String tenVoucher;
     
-    @Column(name = "mo_ta", columnDefinition = "TEXT")
+    @Column(name = "mo_ta", columnDefinition = "NVARCHAR(MAX)")
     private String moTa;
 
     @Column(name = "loai_giam_gia", columnDefinition = "NVARCHAR(20)")

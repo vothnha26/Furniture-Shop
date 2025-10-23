@@ -3,7 +3,6 @@ package com.noithat.qlnt.backend.controller;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.service.IQuanLyTonKhoService;
 import com.noithat.qlnt.backend.service.IQuanLyTrangThaiDonHangService;
-import com.noithat.qlnt.backend.service.IQuanLyKiemKeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,9 +22,6 @@ public class BaoCaoThongKeController {
 
     @Autowired
     private IQuanLyTrangThaiDonHangService quanLyTrangThaiDonHangService;
-
-    @Autowired
-    private IQuanLyKiemKeService quanLyKiemKeService;
 
     @Autowired
     private com.noithat.qlnt.backend.service.IDonHangService donHangService;
@@ -63,8 +59,6 @@ public class BaoCaoThongKeController {
             var pendingOrders = quanLyTrangThaiDonHangService.getPendingOrders();
             var shippingOrders = quanLyTrangThaiDonHangService.getShippingOrders();
 
-            // Thống kê kiểm kê
-            var activeInventoryChecks = quanLyKiemKeService.getActiveInventoryChecks();
 
             // Tạo dashboard data
             Map<String, Object> dashboard = new HashMap<>();
@@ -73,7 +67,6 @@ public class BaoCaoThongKeController {
             dashboard.put("soLuongSanPhamHetHang", outOfStockProducts.size());
             dashboard.put("soDonHangChoXuLy", pendingOrders.size());
             dashboard.put("soDonHangDangGiao", shippingOrders.size());
-            dashboard.put("soKiemKeDangThucHien", activeInventoryChecks.size());
             dashboard.put("lastUpdated", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
 
             response.put("success", true);
@@ -370,12 +363,10 @@ public class BaoCaoThongKeController {
     public ResponseEntity<Map<String, Object>> getInventoryReportSummary() {
         Map<String, Object> response = new HashMap<>();
         try {
-            var activeChecks = quanLyKiemKeService.getActiveInventoryChecks();
-            var inventoryStats = quanLyKiemKeService.getInventoryCheckStatistics();
             
             Map<String, Object> summary = new HashMap<>();
-            summary.put("soKiemKeDangThucHien", activeChecks.size());
-            summary.put("thongKeChung", inventoryStats);
+            summary.put("soKiemKeDangThucHien", 0);
+            summary.put("thongKeChung", new HashMap<>());
             summary.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             
             response.put("success", true);

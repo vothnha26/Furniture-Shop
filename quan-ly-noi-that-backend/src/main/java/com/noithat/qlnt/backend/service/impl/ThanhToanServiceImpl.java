@@ -7,7 +7,6 @@ import com.noithat.qlnt.backend.dto.response.*;
 import com.noithat.qlnt.backend.entity.*;
 import com.noithat.qlnt.backend.exception.AppException;
 import com.noithat.qlnt.backend.repository.*;
-import com.noithat.qlnt.backend.service.HoaDonService;
 import com.noithat.qlnt.backend.service.ThanhToanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,7 +34,6 @@ public class ThanhToanServiceImpl implements ThanhToanService {
     private final VoucherRepository voucherRepository;
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
     private final com.noithat.qlnt.backend.service.CauHinhService cauHinhService;
-    private final HoaDonService hoaDonService;
     private final com.noithat.qlnt.backend.repository.CauHinhHeThongRepository cauHinhHeThongRepository;
 
     @Override
@@ -365,7 +363,7 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         }
 
         // 6b. Cộng điểm thưởng cho khách hàng từ đơn hàng này (nếu có)
-       BigDecimal total = summary.getTongCong();
+        BigDecimal total = summary.getTongCong();
         int rewardPoints = 0;
         try {
             // Lấy giá trị quy đổi từ bảng cấu hình hệ thống (chuẩn key)
@@ -373,10 +371,13 @@ public class ThanhToanServiceImpl implements ThanhToanService {
             String pointPerMoneyStr = cauHinhHeThongRepository.findConfigValueByKey("reward_point_per_money");
             int moneyPerPoint = 100000;
             int pointPerMoney = 10;
-            if (moneyPerPointStr != null) moneyPerPoint = Integer.parseInt(moneyPerPointStr);
-            if (pointPerMoneyStr != null) pointPerMoney = Integer.parseInt(pointPerMoneyStr);
+            if (moneyPerPointStr != null)
+                moneyPerPoint = Integer.parseInt(moneyPerPointStr);
+            if (pointPerMoneyStr != null)
+                pointPerMoney = Integer.parseInt(pointPerMoneyStr);
             if (total != null && moneyPerPoint > 0 && pointPerMoney > 0) {
-                rewardPoints = (total.divide(new BigDecimal(moneyPerPoint), 0, java.math.RoundingMode.DOWN)).intValue() * pointPerMoney;
+                rewardPoints = (total.divide(new BigDecimal(moneyPerPoint), 0, java.math.RoundingMode.DOWN)).intValue()
+                        * pointPerMoney;
             }
         } catch (Exception e) {
             // fallback mặc định nếu lỗi
@@ -435,7 +436,6 @@ public class ThanhToanServiceImpl implements ThanhToanService {
         // Do not force a default employee; allow null so invoice can be created without
         // a NhanVien
         taoHoaDonRequest.setMaNhanVienXuat(null);
-        hoaDonService.taoHoaDon(taoHoaDonRequest);
 
         // 11. Trả về kết quả
         return new ThanhToanResponse(

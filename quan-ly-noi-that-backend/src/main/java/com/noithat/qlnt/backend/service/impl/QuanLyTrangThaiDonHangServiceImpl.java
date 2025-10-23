@@ -3,14 +3,12 @@ package com.noithat.qlnt.backend.service.impl;
 import com.noithat.qlnt.backend.entity.DonHang;
 import com.noithat.qlnt.backend.entity.LichSuTrangThaiDonHang;
 import com.noithat.qlnt.backend.entity.KhachHang;
-import com.noithat.qlnt.backend.entity.LichSuDiemThuong;
 import com.noithat.qlnt.backend.entity.Voucher;
 import com.noithat.qlnt.backend.entity.ChiTietDonHang;
 import com.noithat.qlnt.backend.entity.BienTheSanPham;
 import com.noithat.qlnt.backend.repository.DonHangRepository;
 import com.noithat.qlnt.backend.repository.LichSuTrangThaiDonHangRepository;
 import com.noithat.qlnt.backend.repository.KhachHangRepository;
-import com.noithat.qlnt.backend.repository.LichSuDiemThuongRepository;
 import com.noithat.qlnt.backend.repository.VoucherRepository;
 import com.noithat.qlnt.backend.repository.BienTheSanPhamRepository;
 import com.noithat.qlnt.backend.service.IQuanLyTrangThaiDonHangService;
@@ -27,7 +25,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
     private final DonHangRepository donHangRepository;
     private final LichSuTrangThaiDonHangRepository lichSuTrangThaiDonHangRepository;
     private final KhachHangRepository khachHangRepository;
-    private final LichSuDiemThuongRepository lichSuDiemThuongRepository;
     private final VoucherRepository voucherRepository;
     private final BienTheSanPhamRepository bienTheSanPhamRepository;
 
@@ -49,10 +46,11 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
     static {
         VALID_TRANSITIONS.put(CHO_XU_LY, Arrays.asList(XAC_NHAN, DANG_CHUAN_BI, DANG_GIAO_HANG, DA_HUY));
         VALID_TRANSITIONS.put(XAC_NHAN, Arrays.asList(DANG_CHUAN_BI, DA_HUY));
-    VALID_TRANSITIONS.put(DANG_CHUAN_BI, Arrays.asList(DANG_GIAO_HANG, DA_HUY));
-    // Cho phép hoàn thành trực tiếp từ trạng thái đang giao hàng (staff hoàn tất tại quầy)
-    VALID_TRANSITIONS.put(DANG_GIAO_HANG, Arrays.asList(DA_GIAO_HANG, HOAN_THANH, DA_HUY));
-    VALID_TRANSITIONS.put(DA_GIAO_HANG, Arrays.asList(HOAN_THANH)); // Customer can confirm delivery
+        VALID_TRANSITIONS.put(DANG_CHUAN_BI, Arrays.asList(DANG_GIAO_HANG, DA_HUY));
+        // Cho phép hoàn thành trực tiếp từ trạng thái đang giao hàng (staff hoàn tất
+        // tại quầy)
+        VALID_TRANSITIONS.put(DANG_GIAO_HANG, Arrays.asList(DA_GIAO_HANG, HOAN_THANH, DA_HUY));
+        VALID_TRANSITIONS.put(DA_GIAO_HANG, Arrays.asList(HOAN_THANH)); // Customer can confirm delivery
         VALID_TRANSITIONS.put(HOAN_THANH, Collections.emptyList());
         VALID_TRANSITIONS.put(DA_HUY, Collections.emptyList());
     }
@@ -99,12 +97,15 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
                 ghiChu);
         lichSuTrangThaiDonHangRepository.save(lichSu);
 
-        // --- Side-effects: award/refund points, rollback voucher usage, restore stock ---
+        // --- Side-effects: award/refund points, rollback voucher usage, restore stock
+        // ---
         try {
-            // Khi trạng thái chuyển sang HOAN_THANH hoặc DA_GIAO_HANG thì cộng thống kê cho khách hàng
+            // Khi trạng thái chuyển sang HOAN_THANH hoặc DA_GIAO_HANG thì cộng thống kê cho
+            // khách hàng
             boolean shouldUpdateStats = false;
-            if ((IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiMoi) && !IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiCu))
-                || (DA_GIAO_HANG.equals(trangThaiMoi) && !DA_GIAO_HANG.equals(trangThaiCu))) {
+            if ((IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiMoi)
+                    && !IQuanLyTrangThaiDonHangService.HOAN_THANH.equals(trangThaiCu))
+                    || (DA_GIAO_HANG.equals(trangThaiMoi) && !DA_GIAO_HANG.equals(trangThaiCu))) {
                 shouldUpdateStats = true;
             }
             if (shouldUpdateStats) {
@@ -116,12 +117,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
                         if (toAward > 0) {
                             int current = kh.getDiemThuong() != null ? kh.getDiemThuong() : 0;
                             kh.setDiemThuong(current + toAward);
-
-                            LichSuDiemThuong ls = new LichSuDiemThuong();
-                            ls.setKhachHang(kh);
-                            ls.setDiemThayDoi(toAward);
-                            ls.setLyDo("Cộng điểm khi hoàn thành đơn " + donHang.getMaDonHang());
-                            lichSuDiemThuongRepository.save(ls);
                         }
                     }
                     // Update total spending and order count (payment is PAID)
@@ -150,12 +145,6 @@ public class QuanLyTrangThaiDonHangServiceImpl implements IQuanLyTrangThaiDonHan
                     int current = kh.getDiemThuong() != null ? kh.getDiemThuong() : 0;
                     kh.setDiemThuong(current + used);
                     khachHangRepository.save(kh);
-
-                    LichSuDiemThuong ls = new LichSuDiemThuong();
-                    ls.setKhachHang(kh);
-                    ls.setDiemThayDoi(used);
-                    ls.setLyDo("Hoàn điểm khi hủy đơn " + donHang.getMaDonHang());
-                    lichSuDiemThuongRepository.save(ls);
                 }
 
                 // Rollback voucher usage count

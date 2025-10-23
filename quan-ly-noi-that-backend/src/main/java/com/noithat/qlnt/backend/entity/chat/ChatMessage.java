@@ -22,7 +22,7 @@ public class ChatMessage {
 
     private Integer senderId;
 
-    @Lob
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
     private LocalDateTime sentAt = LocalDateTime.now();

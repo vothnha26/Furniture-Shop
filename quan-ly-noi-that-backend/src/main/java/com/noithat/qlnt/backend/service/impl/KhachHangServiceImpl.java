@@ -4,11 +4,9 @@ import com.noithat.qlnt.backend.dto.request.KhachHangCreationRequest;
 import com.noithat.qlnt.backend.entity.KhachHang;
 import com.noithat.qlnt.backend.entity.HangThanhVien;
 import com.noithat.qlnt.backend.entity.TaiKhoan;
-import com.noithat.qlnt.backend.entity.LichSuDiemThuong;
 import com.noithat.qlnt.backend.repository.KhachHangRepository;
 import com.noithat.qlnt.backend.repository.HangThanhVienRepository;
 import com.noithat.qlnt.backend.repository.TaiKhoanRepository;
-import com.noithat.qlnt.backend.repository.LichSuDiemThuongRepository;
 import com.noithat.qlnt.backend.repository.DonHangRepository;
 import com.noithat.qlnt.backend.exception.ResourceNotFoundException;
 import com.noithat.qlnt.backend.service.IKhachHangService;
@@ -22,18 +20,15 @@ public class KhachHangServiceImpl implements IKhachHangService {
     private final KhachHangRepository khachHangRepository;
     private final HangThanhVienRepository hangThanhVienRepository;
     private final TaiKhoanRepository taiKhoanRepository;
-    private final LichSuDiemThuongRepository lichSuDiemThuongRepository;
     private final DonHangRepository donHangRepository;
 
     public KhachHangServiceImpl(KhachHangRepository khachHangRepository,
-                               HangThanhVienRepository hangThanhVienRepository,
-                               TaiKhoanRepository taiKhoanRepository,
-                               LichSuDiemThuongRepository lichSuDiemThuongRepository,
-                               DonHangRepository donHangRepository) {
+            HangThanhVienRepository hangThanhVienRepository,
+            TaiKhoanRepository taiKhoanRepository,
+            DonHangRepository donHangRepository) {
         this.khachHangRepository = khachHangRepository;
         this.hangThanhVienRepository = hangThanhVienRepository;
         this.taiKhoanRepository = taiKhoanRepository;
-        this.lichSuDiemThuongRepository = lichSuDiemThuongRepository;
         this.donHangRepository = donHangRepository;
     }
 
@@ -53,12 +48,14 @@ public class KhachHangServiceImpl implements IKhachHangService {
         khachHang.setDiemThuong(0);
 
         HangThanhVien hangThanhVien = hangThanhVienRepository.findById(request.getMaHangThanhVien())
-                .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên không tồn tại: " + request.getMaHangThanhVien()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Hạng thành viên không tồn tại: " + request.getMaHangThanhVien()));
         khachHang.setHangThanhVien(hangThanhVien);
 
         if (request.getMaTaiKhoan() != null) {
             TaiKhoan taiKhoan = taiKhoanRepository.findById(request.getMaTaiKhoan())
-                    .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không tồn tại: " + request.getMaTaiKhoan()));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Tài khoản không tồn tại: " + request.getMaTaiKhoan()));
             khachHang.setTaiKhoan(taiKhoan);
         }
 
@@ -70,22 +67,30 @@ public class KhachHangServiceImpl implements IKhachHangService {
     public KhachHang update(Integer maKhachHang, KhachHang request) {
         KhachHang existing = getKhachHangProfile(maKhachHang);
         // Partial update: only overwrite fields that are provided (non-null)
-        if (request.getHoTen() != null) existing.setHoTen(request.getHoTen());
-        if (request.getEmail() != null) existing.setEmail(request.getEmail());
-        if (request.getSoDienThoai() != null) existing.setSoDienThoai(request.getSoDienThoai());
-        if (request.getDiaChi() != null) existing.setDiaChi(request.getDiaChi());
+        if (request.getHoTen() != null)
+            existing.setHoTen(request.getHoTen());
+        if (request.getEmail() != null)
+            existing.setEmail(request.getEmail());
+        if (request.getSoDienThoai() != null)
+            existing.setSoDienThoai(request.getSoDienThoai());
+        if (request.getDiaChi() != null)
+            existing.setDiaChi(request.getDiaChi());
         // Update ngaySinh and gioiTinh if provided
-        if (request.getNgaySinh() != null) existing.setNgaySinh(request.getNgaySinh());
-        if (request.getGioiTinh() != null) existing.setGioiTinh(request.getGioiTinh());
+        if (request.getNgaySinh() != null)
+            existing.setNgaySinh(request.getNgaySinh());
+        if (request.getGioiTinh() != null)
+            existing.setGioiTinh(request.getGioiTinh());
 
         // Only update diemThuong if explicitly provided (avoid nulling out)
-        if (request.getDiemThuong() != null) existing.setDiemThuong(request.getDiemThuong());
+        if (request.getDiemThuong() != null)
+            existing.setDiemThuong(request.getDiemThuong());
 
         // Update hang thanh vien only when provided and valid
         if (request.getHangThanhVien() != null && request.getHangThanhVien().getMaHangThanhVien() != null) {
             Integer hangId = request.getHangThanhVien().getMaHangThanhVien();
             var hang = hangThanhVienRepository.findById(hangId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
+                    .orElseThrow(
+                            () -> new ResourceNotFoundException("Hạng thành viên ID: " + hangId + " không tồn tại."));
             existing.setHangThanhVien(hang);
         }
 
@@ -96,14 +101,14 @@ public class KhachHangServiceImpl implements IKhachHangService {
     @Transactional
     public void delete(Integer maKhachHang) {
         KhachHang existing = getKhachHangProfile(maKhachHang);
-        
+
         // Kiểm tra xem khách hàng có đơn hàng nào không
         long orderCount = donHangRepository.countByKhachHang_MaKhachHang(maKhachHang);
         if (orderCount > 0) {
             throw new IllegalStateException(
-                "Không thể xóa khách hàng này vì đã có " + orderCount + " đơn hàng");
+                    "Không thể xóa khách hàng này vì đã có " + orderCount + " đơn hàng");
         }
-        
+
         khachHangRepository.delete(existing);
     }
 
@@ -115,7 +120,8 @@ public class KhachHangServiceImpl implements IKhachHangService {
 
     @Override
     public KhachHang findBySoDienThoai(String soDienThoai) {
-        if (soDienThoai == null || soDienThoai.trim().isEmpty()) return null;
+        if (soDienThoai == null || soDienThoai.trim().isEmpty())
+            return null;
         return khachHangRepository.findBySoDienThoai(soDienThoai.trim()).orElse(null);
     }
 
@@ -141,23 +147,8 @@ public class KhachHangServiceImpl implements IKhachHangService {
             }
         }
 
-        LichSuDiemThuong lsTichDiem = new LichSuDiemThuong();
-        lsTichDiem.setKhachHang(khachHang);
-        lsTichDiem.setDiemThayDoi(diemThayDoi);
-        lsTichDiem.setLyDo("Tích điểm thưởng: +" + diemThayDoi + " điểm");
-        lichSuDiemThuongRepository.save(lsTichDiem);
-
         if (!hangMoi.equals(hangCu)) {
             khachHang.setHangThanhVien(hangMoi);
-
-            LichSuDiemThuong lsNangHang = new LichSuDiemThuong();
-            lsNangHang.setKhachHang(khachHang);
-            lsNangHang.setDiemThayDoi(0);
-            lsNangHang.setLyDo(String.format("Nâng hạng từ %s lên %s (đạt %d điểm)",
-                    hangCu.getTenHang(),
-                    hangMoi.getTenHang(),
-                    khachHang.getDiemThuong()));
-            lichSuDiemThuongRepository.save(lsNangHang);
         }
 
         return khachHangRepository.save(khachHang);

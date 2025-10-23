@@ -27,14 +27,12 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\EmailController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\HangThanhVienController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\HinhAnhSanPhamController.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\HoaDonController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\KhachHangController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\LiveChatApiController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\NhaCungCapController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\OrderTrackingController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\PaymentController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\ProductController.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\QuanLyKiemKeController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\QuanLyTonKhoController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\QuanLyTrangThaiDonHangController.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\controller\ReportsController.java
@@ -139,7 +137,6 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\BienTheSanPham.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\BienTheThuocTinh.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\BoSuuTap.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\CanhBaoTonKho.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\CauHinhHeThong.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\chat\ChatMessage.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\chat\ChatSession.java
@@ -152,11 +149,7 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\GiaoDichThanhToan.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\HangThanhVien.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\HinhAnhSanPham.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\HoaDon.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\KhachHang.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\KiemKeChiTiet.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\KiemKeKho.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\LichSuDiemThuong.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\LichSuTonKho.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\LichSuTrangThaiDonHang.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\NhaCungCap.java
@@ -164,7 +157,6 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\SanPham.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\TaiKhoan.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\ThongBao.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\ThongTinGiaoHang.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\ThuocTinh.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\VaiTro.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\entity\VipBenefit.java
@@ -186,7 +178,6 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\BienTheSanPhamRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\BienTheThuocTinhRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\BoSuuTapRepository.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\CanhBaoTonKhoRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\CauHinhHeThongRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\CauHinhRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\chat\ChatMessageRepository.java
@@ -200,11 +191,7 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\GiaoDichThanhToanRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\HangThanhVienRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\HinhAnhSanPhamRepository.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\HoaDonRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\KhachHangRepository.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\KiemKeChiTietRepository.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\KiemKeKhoRepository.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\LichSuDiemThuongRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\LichSuTonKhoRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\LichSuTrangThaiDonHangRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\NhaCungCapRepository.java
@@ -212,7 +199,6 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\SanPhamRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\TaiKhoanRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\ThongBaoRepository.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\ThongTinGiaoHangRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\ThuocTinhRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\VaiTroRepository.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\repository\VipBenefitRepository.java
@@ -225,7 +211,6 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\chat\GuestChatRateLimiter.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\chat\impl\ChatServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\EmailService.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\HoaDonService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IAttributeService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IBienTheSanPhamService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IBoSuuTapService.java
@@ -250,11 +235,9 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\GiaoDichThanhToanServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\HangThanhVienServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\HinhAnhSanPhamServiceImpl.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\HoaDonServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\KhachHangServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\NhaCungCapServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\ProductServiceImpl.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\QuanLyKiemKeServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\QuanLyTonKhoServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\QuanLyTrangThaiDonHangServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\ThanhToanServiceImpl.java
@@ -264,7 +247,6 @@ D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\ja
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\impl\YeuThichServiceImpl.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\INhaCungCapService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IProductService.java
-D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IQuanLyKiemKeService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IQuanLyTonKhoService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IQuanLyTrangThaiDonHangService.java
 D:\Fullit\projects\CNPM\Java\Furniture-Shop\quan-ly-noi-that-backend\src\main\java\com\noithat\qlnt\backend\service\IThongBaoService.java

@@ -2,8 +2,6 @@ package com.noithat.qlnt.backend.controller;
 
 import com.noithat.qlnt.backend.dto.response.DonHangResponse;
 import com.noithat.qlnt.backend.entity.LichSuTrangThaiDonHang;
-import com.noithat.qlnt.backend.entity.ThongTinGiaoHang;
-import com.noithat.qlnt.backend.repository.ThongTinGiaoHangRepository;
 import com.noithat.qlnt.backend.service.IDonHangService;
 import com.noithat.qlnt.backend.service.IQuanLyTrangThaiDonHangService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +24,6 @@ import java.util.Map;
 public class OrderTrackingController {
 
     private final IDonHangService donHangService;
-    private final ThongTinGiaoHangRepository thongTinGiaoHangRepository;
     private final IQuanLyTrangThaiDonHangService orderStatusService;
 
     @GetMapping("/{maDonHang}")
@@ -40,38 +37,6 @@ public class OrderTrackingController {
             Map<String, Object> payload = buildTrackingPayloadFromResponse(resp);
             List<LichSuTrangThaiDonHang> history = orderStatusService.getOrderStatusHistory(maDonHang);
             payload.put("lich_su_van_chuyen", history);
-
-            // Add shipping details if present
-            ThongTinGiaoHang ttgh = thongTinGiaoHangRepository.findById(maDonHang).orElse(null);
-            if (ttgh != null) {
-                payload.put("ma_van_don", ttgh.getMaVanDon());
-                payload.put("don_vi_van_chuyen", ttgh.getDonViVanChuyen());
-                payload.put("trang_thai_giao_hang", ttgh.getTrangThaiGiaoHang());
-            }
-
-            return ResponseEntity.ok(payload);
-        } catch (Exception e) {
-            Map<String, Object> err = new HashMap<>();
-            err.put("success", false);
-            err.put("message", e.getMessage());
-            return ResponseEntity.internalServerError().body(err);
-        }
-    }
-
-    @GetMapping("/ma-van-don/{maVanDon}")
-    public ResponseEntity<?> getTrackingByTrackingNumber(@PathVariable String maVanDon) {
-        try {
-
-        ThongTinGiaoHang found = thongTinGiaoHangRepository.findByMaVanDon(maVanDon).orElse(null);
-        if (found == null) return ResponseEntity.notFound().build();
-
-            Integer maDonHang = found.getDonHang().getMaDonHang();
-            DonHangResponse resp = donHangService.getDonHangById(maDonHang);
-            Map<String, Object> payload = buildTrackingPayloadFromResponse(resp);
-            List<LichSuTrangThaiDonHang> history = orderStatusService.getOrderStatusHistory(maDonHang);
-            payload.put("lich_su_van_chuyen", history);
-            payload.put("ma_van_don", found.getMaVanDon());
-            payload.put("don_vi_van_chuyen", found.getDonViVanChuyen());
 
             return ResponseEntity.ok(payload);
         } catch (Exception e) {

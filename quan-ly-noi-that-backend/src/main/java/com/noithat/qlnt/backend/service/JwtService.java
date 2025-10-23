@@ -66,7 +66,6 @@ public class JwtService {
         try {
             return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
         } catch (Exception ex) {
-            System.err.println("[JwtService] Error during token validation: " + ex.getMessage());
             return false;
         }
     }
@@ -90,7 +89,6 @@ public class JwtService {
                     .parseClaimsJws(token)
                     .getBody();
         } catch (JwtException ex) {
-            System.err.println("[JwtService] Failed to parse JWT: " + ex.getMessage());
             return null;
         }
     }

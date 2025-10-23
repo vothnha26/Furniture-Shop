@@ -7,12 +7,10 @@ import {
   IoStar, 
   IoGift, 
   IoCart,
-  IoClose,
-  IoCheckmarkDone,
-  IoEllipsisVertical
+  IoClose
 } from 'react-icons/io5';
 import { useAuth } from '../../contexts/AuthContext';
-import api from '../../api';
+import api, { BASE_URL } from '../../api';
 import SockJS from 'sockjs-client';
 import { Client as StompClient } from '@stomp/stompjs';
 
@@ -63,10 +61,8 @@ const NotificationPopup = () => {
       return;
     }
 
-    // Lấy baseURL từ api client nếu có, fallback sang current origin
-    const baseURL = api?.defaults?.baseURL || `${window.location.protocol}//${window.location.hostname}:8081`;
-    // Backend SockJS endpoint is registered at /ws-notifications
-    const wsUrl = `${baseURL.replace(/\/$/, '')}/ws-notifications`;
+  // Lấy baseURL chuẩn từ api.js (ưu tiên biến môi trường), tránh hardcode port
+  const wsUrl = `${String(BASE_URL || '').replace(/\/$/, '')}/ws-notifications`;
 
     const client = new StompClient({
       webSocketFactory: () => new SockJS(wsUrl),
